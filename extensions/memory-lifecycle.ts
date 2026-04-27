@@ -256,7 +256,8 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       if (!runtime) return;
       try {
         await flushRetainQueue(resolveQueuePath(runtime.cwd, config.retain.queuePath), client, {
-          maxJobs: 1,
+          maxJobs: config.retain.shutdownFlushMaxJobs,
+          maxElapsedMs: config.retain.shutdownFlushTimeoutMs,
           stopOnFirstFailure: true,
         });
       } catch {

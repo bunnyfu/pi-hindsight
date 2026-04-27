@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import {
   enqueueRetainJob,
   flushRetainQueue,
+  isQueueLockOwnerStale,
   readDeadLetterQueue,
   readRetainQueue,
   RETAIN_QUEUE_LOCK,
@@ -43,6 +44,18 @@ function runWorker(mode: string, path: string, id: string): Promise<void> {
 }
 
 describe("retain queue", () => {
+  it("checks stale locks from owner acquiredAt instead of waiter age", () => {
+    const now = Date.parse("2026-04-27T12:00:00.000Z");
+    expect(
+      isQueueLockOwnerStale({ pid: 123, acquiredAt: "2026-04-27T11:59:59.000Z" }, now, 2_000),
+    ).toBe(false);
+    expect(
+      isQueueLockOwnerStale({ pid: 123, acquiredAt: "2026-04-27T11:59:57.000Z" }, now, 2_000),
+    ).toBe(true);
+    expect(isQueueLockOwnerStale(undefined, now, 2_000)).toBe(true);
+    expect(isQueueLockOwnerStale({ pid: 123, acquiredAt: "not-a-date" }, now, 2_000)).toBe(true);
+  });
+
   it("persists and flushes jobs", async () => {
     const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
     await enqueueRetainJob(path, job);
@@ -106,6 +119,27 @@ describe("retain queue", () => {
     expect((await readRetainQueue(path)).map((item) => item.id)).toEqual(["2", "3"]);
   });
 
+  it("stops bounded flushing between jobs instead of leaving background work", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
+    await enqueueRetainJob(path, { ...job, id: "1" });
+    await enqueueRetainJob(path, { ...job, id: "2" });
+    const calls: unknown[] = [];
+    const result = await flushRetainQueue(
+      path,
+      {
+        retain: async (...args: unknown[]) => {
+          calls.push(args);
+        },
+        recall: async () => [],
+        reflect: async () => ({}),
+      },
+      { maxElapsedMs: 0 },
+    );
+    expect(result.sent).toBe(0);
+    expect(calls).toHaveLength(0);
+    expect((await readRetainQueue(path)).map((item) => item.id)).toEqual(["1", "2"]);
+  });
+
   it("stops shutdown flushing after first failure", async () => {
     const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
     await enqueueRetainJob(path, { ...job, id: "1" });
@@ -162,6 +196,31 @@ describe("retain queue", () => {
     );
     expect(resolveQueuePath("/repo", "/tmp/q.jsonl")).toBe("/tmp/q.jsonl");
     expect(resolveDeadLetterQueuePath("/tmp/q.jsonl")).toBe("/tmp/q.jsonl.dead.jsonl");
+  });
+
+  it("does not remove fresh owner locks while waiting", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
+    const lockPath = `${path}.lock`;
+    mkdirSync(lockPath, { recursive: true });
+    writeFileSync(
+      join(lockPath, "owner"),
+      JSON.stringify({ pid: 123, acquiredAt: new Date().toISOString() }),
+    );
+    const originalStaleMs = RETAIN_QUEUE_LOCK.staleMs;
+    const originalTimeoutMs = RETAIN_QUEUE_LOCK.timeoutMs;
+    const originalRetryMs = RETAIN_QUEUE_LOCK.retryMs;
+    RETAIN_QUEUE_LOCK.staleMs = 30_000;
+    RETAIN_QUEUE_LOCK.timeoutMs = 50;
+    RETAIN_QUEUE_LOCK.retryMs = 1;
+    try {
+      await expect(enqueueRetainJob(path, job)).rejects.toThrow(/Timed out waiting/);
+      expect(existsSync(lockPath)).toBe(true);
+      expect(await readRetainQueue(path)).toHaveLength(0);
+    } finally {
+      RETAIN_QUEUE_LOCK.staleMs = originalStaleMs;
+      RETAIN_QUEUE_LOCK.timeoutMs = originalTimeoutMs;
+      RETAIN_QUEUE_LOCK.retryMs = originalRetryMs;
+    }
   });
 
   it("cleans stale lock directories instead of waiting forever", async () => {

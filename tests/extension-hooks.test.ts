@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { enqueueRetainJob, readRetainQueue, resolveQueuePath } from "../extensions/queue.js";
+import type { RetainJob } from "../extensions/types.js";
 
 const mocked = vi.hoisted(() => ({
   client: {
@@ -291,6 +293,47 @@ describe("extension hooks", () => {
     expect(secondContent).toContain("a2");
     expect(secondContent).not.toContain("u1");
     expect(secondContent).not.toContain("a1");
+  });
+
+  it("uses configured shutdown flush bounds", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({
+        retain: { shutdownFlushMaxJobs: 2, shutdownFlushTimeoutMs: 1_000 },
+        notifications: { startup: false },
+      }),
+    );
+    const queuePath = resolveQueuePath(cwd, ".pi/hindsight/retain-queue.jsonl");
+    const baseJob: RetainJob = {
+      id: "1",
+      bankId: "project-bank",
+      createdAt: "now",
+      documentId: "doc",
+      updateMode: "append",
+      item: { content: "raw", context: "ctx", async: true, tags: ["source:pi"] },
+      retries: 0,
+    };
+    await enqueueRetainJob(queuePath, { ...baseJob, id: "1" });
+    await enqueueRetainJob(queuePath, { ...baseJob, id: "2" });
+    await enqueueRetainJob(queuePath, { ...baseJob, id: "3" });
+
+    const { createMemoryLifecycle } = await import("../extensions/memory-lifecycle.js");
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const lifecycle = createMemoryLifecycle(cwd);
+    await lifecycle.initialize(ctx);
+    mocked.client.retain.mockClear();
+    await lifecycle.shutdown(ctx);
+
+    expect(mocked.client.retain).toHaveBeenCalledTimes(2);
+    expect((await readRetainQueue(queuePath)).map((job) => job.id)).toEqual(["3"]);
   });
 
   it("emits optional recall and retain notifications", async () => {

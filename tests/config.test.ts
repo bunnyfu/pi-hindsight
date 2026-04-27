@@ -39,7 +39,12 @@ describe("resolveConfig", () => {
       join(cwd, ".pi", "hindsight.json"),
       JSON.stringify({
         recall: { budget: "huge", maxTokens: -1, types: ["world", 42] },
-        retain: { includeToolResults: "sometimes", queuePath: "" },
+        retain: {
+          includeToolResults: "sometimes",
+          queuePath: "",
+          shutdownFlushMaxJobs: -1,
+          shutdownFlushTimeoutMs: 0,
+        },
         import: {
           includeBranches: "all-the-branches",
           includeCompactionSummaries: false,
@@ -56,6 +61,8 @@ describe("resolveConfig", () => {
     expect(config.recall.types).toEqual(["world", "experience", "observation"]);
     expect(config.retain.includeToolResults).toBe("meaningful-only");
     expect(config.retain.queuePath).toBe(".pi/hindsight/retain-queue.jsonl");
+    expect(config.retain.shutdownFlushMaxJobs).toBe(10);
+    expect(config.retain.shutdownFlushTimeoutMs).toBe(2_000);
     expect(config.import.includeBranches).toBe("current-only");
     expect(config).not.toHaveProperty("import.includeCompactionSummaries");
     expect(config).not.toHaveProperty("import.includeBranchSummaries");

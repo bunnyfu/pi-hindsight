@@ -25,6 +25,8 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     includeToolResults: "meaningful-only",
     redactSecrets: true,
     queuePath: ".pi/hindsight/retain-queue.jsonl",
+    shutdownFlushMaxJobs: 10,
+    shutdownFlushTimeoutMs: 2_000,
   },
   import: {
     includeBranches: "current-only",
@@ -160,6 +162,14 @@ export function normalizeConfig(config: ResolvedConfig): ResolvedConfig {
       ),
       redactSecrets: bool(config.retain?.redactSecrets, DEFAULT_CONFIG.retain.redactSecrets),
       queuePath: stringValue(config.retain?.queuePath, DEFAULT_CONFIG.retain.queuePath),
+      shutdownFlushMaxJobs: positiveInt(
+        config.retain?.shutdownFlushMaxJobs,
+        DEFAULT_CONFIG.retain.shutdownFlushMaxJobs,
+      ),
+      shutdownFlushTimeoutMs: positiveInt(
+        config.retain?.shutdownFlushTimeoutMs,
+        DEFAULT_CONFIG.retain.shutdownFlushTimeoutMs,
+      ),
     },
     import: {
       includeBranches: enumValue(
