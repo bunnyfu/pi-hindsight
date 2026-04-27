@@ -152,7 +152,7 @@ describe("extension hooks", () => {
     expect(mocked.ensureGlobalBank).toHaveBeenCalledWith(
       mocked.client,
       "global-bank",
-      expect.objectContaining({ enabled: true, bankId: "global-bank", enableObservations: false }),
+      expect.objectContaining({ enabled: true, bankId: "global-bank", enableObservations: true }),
     );
   });
 

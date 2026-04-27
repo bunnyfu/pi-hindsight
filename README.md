@@ -119,7 +119,7 @@ Example project config:
     "injectionPosition": "prepend"
   },
   "observations": {
-    "enabled": false,
+    "enabled": true,
     "scopes": [["harness:pi"], ["repo:{repoKey}"]]
   },
   "retain": {

@@ -25,7 +25,7 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     includeFactsInDebug: false,
   },
   observations: {
-    enabled: false,
+    enabled: true,
     scopes: [["harness:pi"], ["repo:{repoKey}"]],
   },
   retain: {
