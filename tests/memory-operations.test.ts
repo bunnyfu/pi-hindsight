@@ -33,6 +33,17 @@ describe("memory operations", () => {
       global: { enabled: true, bankId: "shared" },
     });
 
+    await operations.configure(cwd, { timeoutMs: 1234 });
+    written = JSON.parse(readFileSync(join(cwd, ".pi", "hindsight.json"), "utf8")) as Record<
+      string,
+      any
+    >;
+    expect(written.banks).toMatchObject({
+      project: { enabled: false },
+      global: { enabled: true, bankId: "shared" },
+    });
+    expect(written.hindsight).toMatchObject({ timeoutMs: 1234 });
+
     await operations.configure(cwd, { memoryProfile: "project-only", globalBankId: "shared" });
     written = JSON.parse(readFileSync(join(cwd, ".pi", "hindsight.json"), "utf8")) as Record<
       string,

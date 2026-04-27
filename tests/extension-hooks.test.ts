@@ -565,7 +565,12 @@ describe("extension hooks", () => {
     const { default: hindsightExtension } = await import("../extensions/index.js");
     hindsightExtension(pi as any);
     await handlers.session_start?.[0]?.({}, ctx);
-    expect(mocked.client.retain).not.toHaveBeenCalled();
+    expect(mocked.client.retain).toHaveBeenCalledWith(
+      "global-bank",
+      "Pi Hindsight append capability probe. Safe to ignore.",
+      expect.objectContaining({ updateMode: "append" }),
+    );
+    mocked.client.retain.mockClear();
     await handlers.agent_end?.[0]?.(
       { messages: [{ role: "user", content: "remember", timestamp: 1 }] },
       ctx,

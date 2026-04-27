@@ -187,9 +187,14 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
           );
         }
       }
-      if (config.retain.enabled && config.banks.project.enabled) {
+      const capabilityProbeBankId = config.banks.project.enabled
+        ? projectBankId
+        : config.banks.global.enabled
+          ? config.banks.global.bankId
+          : undefined;
+      if (config.retain.enabled && capabilityProbeBankId) {
         try {
-          capabilities = await detectAppendCapability(client, projectBankId);
+          capabilities = await detectAppendCapability(client, capabilityProbeBankId);
         } catch (error) {
           setMemoryStatus(runtime, "recall-failed");
           notify(
