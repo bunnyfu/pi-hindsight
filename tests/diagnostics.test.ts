@@ -24,9 +24,10 @@ describe("diagnostics", () => {
   it("redacts api key in debug config", () => {
     const config = {
       ...DEFAULT_CONFIG,
-      hindsight: { ...DEFAULT_CONFIG.hindsight, apiKey: "secret" },
+      hindsight: { ...DEFAULT_CONFIG.hindsight, apiKey: "secret", apiKeyRef: "env:KEY" },
     };
     expect(safeConfig(config).hindsight.apiKey).toBe("[set]");
+    expect(safeConfig(config).hindsight.apiKeyRef).toBe("env:KEY");
   });
 
   it("formats stable debug report", () => {

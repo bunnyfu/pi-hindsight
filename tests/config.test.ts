@@ -30,6 +30,71 @@ describe("resolveConfig", () => {
     expect(config.banks.project.mission).toBe("Project mission");
   });
 
+  it("resolves env SecretRef API keys and lets direct env override win", () => {
+    const cwd = tmp();
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ hindsight: { apiKey: { source: "env", name: "PROJECT_KEY" } } }),
+    );
+
+    const fromRef = resolveConfig(cwd, { PROJECT_KEY: "project-secret" });
+    expect(fromRef.hindsight.apiKey).toBe("project-secret");
+    expect(fromRef.hindsight.apiKeyRef).toBe("env:PROJECT_KEY");
+
+    const override = resolveConfig(cwd, {
+      PROJECT_KEY: "project-secret",
+      HINDSIGHT_API_KEY: "override-secret",
+    });
+    expect(override.hindsight.apiKey).toBe("override-secret");
+
+    const refFromEnv = resolveConfig(cwd, {
+      HINDSIGHT_API_KEY_REF: "OTHER_KEY",
+      OTHER_KEY: "other-secret",
+    });
+    expect(refFromEnv.hindsight.apiKey).toBe("other-secret");
+    expect(refFromEnv.hindsight.apiKeyRef).toBe("env:OTHER_KEY");
+  });
+
+  it("ignores invalid project SecretRef env var names", () => {
+    const cwd = tmp();
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ hindsight: { apiKey: { source: "env", name: "sk-secret" } } }),
+    );
+    const config = resolveConfig(cwd, { "sk-secret": "secret" });
+    expect(config.hindsight.apiKey).toBeUndefined();
+    expect(config.hindsight.apiKeyRef).toBeUndefined();
+  });
+
+  it("ignores invalid apiKeyRef strings and prefers valid SecretRef objects", () => {
+    const cwd = tmp();
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({
+        hindsight: {
+          apiKeyRef: "env:sk-secret",
+          apiKey: { source: "env", name: "PROJECT_KEY" },
+        },
+      }),
+    );
+    const config = resolveConfig(cwd, { PROJECT_KEY: "project-secret" });
+    expect(config.hindsight.apiKey).toBe("project-secret");
+    expect(config.hindsight.apiKeyRef).toBe("env:PROJECT_KEY");
+  });
+
+  it("keeps direct apiKey strings even if they start with env prefix", () => {
+    const cwd = tmp();
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ hindsight: { apiKey: "env:literal-secret" } }),
+    );
+    expect(resolveConfig(cwd).hindsight.apiKey).toBe("env:literal-secret");
+  });
+
   it("reads boolean overrides from injected env", () => {
     const cwd = tmp();
     expect(resolveConfig(cwd, { PI_HINDSIGHT_ENABLED: "false" }).enabled).toBe(false);

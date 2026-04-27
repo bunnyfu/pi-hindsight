@@ -50,6 +50,7 @@ export function safeConfig(config: ResolvedConfig): ResolvedConfig {
     hindsight: {
       ...config.hindsight,
       ...(config.hindsight.apiKey ? { apiKey: "[set]" } : {}),
+      ...(config.hindsight.apiKeyRef ? { apiKeyRef: config.hindsight.apiKeyRef } : {}),
     },
   };
 }

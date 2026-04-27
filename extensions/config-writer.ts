@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import { validEnvVarName } from "./config.js";
+
 export type MemoryProfile = "project-only" | "project+global" | "global-only";
 
 export const DEFAULT_GLOBAL_BANK_ID = "pi-global";
@@ -37,6 +39,7 @@ export interface ProjectConfigPatchInput {
   enabled?: boolean;
   baseUrl?: string;
   timeoutMs?: number;
+  apiKeyEnvVar?: string;
   projectBankId?: string;
   globalBankId?: string;
   enableGlobalBank?: boolean;
@@ -62,10 +65,14 @@ export interface ProjectConfigPatchInput {
 export function buildProjectConfigPatch(input: ProjectConfigPatchInput): Record<string, unknown> {
   const patch: Record<string, unknown> = {};
   if (input.enabled !== undefined) patch.enabled = input.enabled;
-  if (input.baseUrl || input.timeoutMs !== undefined) {
+  if (input.apiKeyEnvVar && !validEnvVarName(input.apiKeyEnvVar)) {
+    throw new Error("apiKeyEnvVar must be an environment variable name");
+  }
+  if (input.baseUrl || input.timeoutMs !== undefined || input.apiKeyEnvVar) {
     patch.hindsight = {
       ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
+      ...(input.apiKeyEnvVar ? { apiKey: { source: "env", name: input.apiKeyEnvVar } } : {}),
     };
   }
   if (input.memoryProfile) {

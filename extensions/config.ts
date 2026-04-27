@@ -127,6 +127,34 @@ function optionalString(value: unknown, fallback?: string): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : fallback;
 }
 
+export function validEnvVarName(value: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(value);
+}
+
+function normalizeApiKeyRefString(value: unknown): string | undefined {
+  if (typeof value !== "string" || !value.startsWith("env:")) return undefined;
+  const name = value.slice("env:".length);
+  return validEnvVarName(name) ? value : undefined;
+}
+
+function normalizeApiKeyRef(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  if (value.source !== "env" || typeof value.name !== "string" || !validEnvVarName(value.name))
+    return undefined;
+  return `env:${value.name}`;
+}
+
+function resolveApiKeyRef(ref: string | undefined, env: NodeJS.ProcessEnv): string | undefined {
+  if (!ref) return undefined;
+  if (!ref.startsWith("env:")) return undefined;
+  const name = ref.slice("env:".length);
+  return name ? optionalString(env[name]) : undefined;
+}
+
+function directApiKey(value: unknown, fallback?: string): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+
 function enumValue<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
   return typeof value === "string" && (allowed as readonly string[]).includes(value)
     ? (value as T)
@@ -181,8 +209,18 @@ function hasConfiguredRecallField(rawConfig: unknown, field: string): boolean {
   return isRecord(rawConfig) && isRecord(rawConfig.recall) && field in rawConfig.recall;
 }
 
-export function normalizeConfig(config: ResolvedConfig, rawConfig?: unknown): ResolvedConfig {
-  const apiKey = optionalString(config.hindsight?.apiKey, DEFAULT_CONFIG.hindsight.apiKey);
+export function normalizeConfig(
+  config: ResolvedConfig,
+  rawConfig?: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+): ResolvedConfig {
+  const apiKeyRef =
+    normalizeApiKeyRef(config.hindsight?.apiKey) ??
+    normalizeApiKeyRefString(config.hindsight?.apiKeyRef) ??
+    normalizeApiKeyRefString(DEFAULT_CONFIG.hindsight.apiKeyRef);
+  const apiKey =
+    directApiKey(config.hindsight?.apiKey, DEFAULT_CONFIG.hindsight.apiKey) ??
+    resolveApiKeyRef(apiKeyRef, env);
   const projectBankId = optionalString(
     config.banks?.project?.bankId,
     DEFAULT_CONFIG.banks.project.bankId,
@@ -196,6 +234,7 @@ export function normalizeConfig(config: ResolvedConfig, rawConfig?: unknown): Re
     hindsight: {
       baseUrl: stringValue(config.hindsight?.baseUrl, DEFAULT_CONFIG.hindsight.baseUrl),
       ...(apiKey ? { apiKey } : {}),
+      ...(apiKeyRef ? { apiKeyRef } : {}),
       timeoutMs: positiveInt(config.hindsight?.timeoutMs, DEFAULT_CONFIG.hindsight.timeoutMs),
     },
     banks: {
@@ -395,6 +434,11 @@ export function resolveConfig(cwd: string, env: NodeJS.ProcessEnv = process.env)
     rawConfig = merge(rawConfig, { hindsight: { baseUrl: env.HINDSIGHT_BASE_URL } });
     config = merge(config, { hindsight: { baseUrl: env.HINDSIGHT_BASE_URL } });
   }
+  if (env.HINDSIGHT_API_KEY_REF && validEnvVarName(env.HINDSIGHT_API_KEY_REF)) {
+    const ref = { source: "env", name: env.HINDSIGHT_API_KEY_REF };
+    rawConfig = merge(rawConfig, { hindsight: { apiKey: ref } });
+    config = merge(config, { hindsight: { apiKey: ref } });
+  }
   if (env.HINDSIGHT_API_KEY) {
     rawConfig = merge(rawConfig, { hindsight: { apiKey: env.HINDSIGHT_API_KEY } });
     config = merge(config, { hindsight: { apiKey: env.HINDSIGHT_API_KEY } });
@@ -413,7 +457,7 @@ export function resolveConfig(cwd: string, env: NodeJS.ProcessEnv = process.env)
     rawConfig = merge(rawConfig, patch);
     config = merge(config, patch);
   }
-  return normalizeConfig(config, rawConfig);
+  return normalizeConfig(config, rawConfig, env);
 }
 
 export { DEFAULT_CONFIG };
