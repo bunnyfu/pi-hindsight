@@ -36,7 +36,45 @@ describe("formatHindsightStatus", () => {
     };
     expect(
       formatHindsightStatus(config, { cwd: "/repo", projectBankId: "bank", activity: "retaining" }),
-    ).toBe("🧠💾 retaining");
+    ).toBe("🧠");
+  });
+
+  it("shows bank and activity after emoji when detail allows text", () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      status: {
+        style: "emoji" as const,
+        detail: "activity" as const,
+        maxLength: 40,
+        showActivity: true,
+      },
+    };
+    expect(
+      formatHindsightStatus(config, {
+        cwd: "/repo",
+        projectBankId: "pi-project-bank-123",
+        activity: "recalling",
+      }),
+    ).toBe("🧠 bank-123:recalling");
+  });
+
+  it("uses brain explosion for failed emoji status", () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      status: {
+        style: "emoji" as const,
+        detail: "activity" as const,
+        maxLength: 40,
+        showActivity: true,
+      },
+    };
+    expect(
+      formatHindsightStatus(config, {
+        cwd: "/repo",
+        projectBankId: "bank",
+        activity: "recall-failed",
+      }),
+    ).toBe("🤯 bank:recall-failed");
   });
 
   it("can hide status", () => {

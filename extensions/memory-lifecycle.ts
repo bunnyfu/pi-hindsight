@@ -133,8 +133,8 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
     await addRetainFingerprints(runtime.cwd, sessionId, fingerprints);
   };
 
-  const hasRetainableMessages = (messages: AgentEndEvent["messages"]): boolean =>
-    projectMessages(messages as AgentMessage[], config.retain.includeToolResults).length > 0;
+  const retainableMessageCount = (messages: AgentEndEvent["messages"]): number =>
+    projectMessages(messages as AgentMessage[], config.retain.includeToolResults).length;
 
   const deps: MemoryLifecycleDeps = {
     getClient: () => client,
@@ -153,6 +153,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       if (!config.enabled) return;
       if (config.banks.project.enabled)
         void ensureProjectBank(client, projectBankId).catch((error) => {
+          setMemoryStatus(runtime, "recall-failed");
           notify(
             runtime,
             `Hindsight bank ensure failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -160,7 +161,8 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
           );
         });
       setMemoryStatus(runtime, "idle");
-      notify(runtime, bankSelectionMessage(projectBankId, config), "info");
+      if (config.notifications.startup)
+        notify(runtime, bankSelectionMessage(projectBankId, config), "info");
     },
 
     async recall(event: ContextEvent, ctx: RuntimeCtx): Promise<ContextPatch | undefined> {
@@ -179,6 +181,15 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
         });
         const memoryCount = blocks.reduce((count, block) => count + block.memoryCount, 0);
         setMemoryStatus(runtime, memoryCount > 0 ? "recalled" : "recall-empty", memoryCount);
+        if (config.notifications.recall) {
+          notify(
+            runtime,
+            memoryCount > 0
+              ? `Hindsight recalled ${memoryCount} memory item${memoryCount === 1 ? "" : "s"} from ${blocks.map((block) => block.bankId).join(", ")}`
+              : "Hindsight recalled no matching memory",
+            "info",
+          );
+        }
         if (!rendered) return undefined;
         return {
           messages: [
@@ -201,7 +212,8 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       const runtime = snapshotRuntime(ctx);
       if (!runtime) return { queued: false, sent: 0, remaining: 0 };
       const messages = await newRetainMessages(runtime, event.messages);
-      if (!hasRetainableMessages(messages)) return { queued: false, sent: 0, remaining: 0 };
+      const messageCount = retainableMessageCount(messages);
+      if (!messageCount) return { queued: false, sent: 0, remaining: 0 };
       try {
         setMemoryStatus(runtime, "retaining");
         const result = await enqueueRetainFromAgentEnd({
@@ -219,6 +231,13 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
           undefined,
           result.remaining,
         );
+        if (config.notifications.retain) {
+          notify(
+            runtime,
+            `Hindsight retained ${messageCount} new message${messageCount === 1 ? "" : "s"} to ${projectBankId}${result.remaining > 0 ? `; ${result.remaining} queued` : ""}`,
+            "info",
+          );
+        }
         return result;
       } catch (error) {
         setMemoryStatus(runtime, "retain-failed");

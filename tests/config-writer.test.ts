@@ -29,6 +29,8 @@ describe("config writer", () => {
         statusDetail: "activity",
         statusMaxLength: 30,
         statusShowActivity: false,
+        notifyRecall: true,
+        notifyRetain: true,
       }),
     ).toEqual({
       hindsight: { timeoutMs: 1234 },
@@ -36,6 +38,7 @@ describe("config writer", () => {
       retain: { async: false },
       import: { includeBranches: "all-leaves" },
       status: { style: "emoji", detail: "activity", maxLength: 30, showActivity: false },
+      notifications: { recall: true, retain: true },
     });
   });
 

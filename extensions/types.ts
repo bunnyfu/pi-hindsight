@@ -39,6 +39,11 @@ export interface ResolvedConfig {
     maxLength: number;
     showActivity: boolean;
   };
+  notifications: {
+    startup: boolean;
+    recall: boolean;
+    retain: boolean;
+  };
 }
 
 export interface BankSelection {

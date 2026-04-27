@@ -49,6 +49,9 @@ export interface ProjectConfigPatchInput {
   statusDetail?: "minimal" | "project" | "activity" | "verbose";
   statusMaxLength?: number;
   statusShowActivity?: boolean;
+  notifyStartup?: boolean;
+  notifyRecall?: boolean;
+  notifyRetain?: boolean;
 }
 
 export function buildProjectConfigPatch(input: ProjectConfigPatchInput): Record<string, unknown> {
@@ -116,6 +119,17 @@ export function buildProjectConfigPatch(input: ProjectConfigPatchInput): Record<
       ...(input.statusDetail ? { detail: input.statusDetail } : {}),
       ...(input.statusMaxLength !== undefined ? { maxLength: input.statusMaxLength } : {}),
       ...(input.statusShowActivity !== undefined ? { showActivity: input.statusShowActivity } : {}),
+    };
+  }
+  if (
+    input.notifyStartup !== undefined ||
+    input.notifyRecall !== undefined ||
+    input.notifyRetain !== undefined
+  ) {
+    patch.notifications = {
+      ...(input.notifyStartup !== undefined ? { startup: input.notifyStartup } : {}),
+      ...(input.notifyRecall !== undefined ? { recall: input.notifyRecall } : {}),
+      ...(input.notifyRetain !== undefined ? { retain: input.notifyRetain } : {}),
     };
   }
   return patch;

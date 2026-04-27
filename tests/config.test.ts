@@ -46,6 +46,7 @@ describe("resolveConfig", () => {
           includeBranchSummaries: false,
         },
         status: { style: "sparkles", maxLength: 0 },
+        notifications: { startup: "yes", recall: true, retain: true },
       }),
     );
 
@@ -60,5 +61,8 @@ describe("resolveConfig", () => {
     expect(config).not.toHaveProperty("import.includeBranchSummaries");
     expect(config.status.style).toBe("text");
     expect(config.status.maxLength).toBe(24);
+    expect(config.notifications.startup).toBe(true);
+    expect(config.notifications.recall).toBe(true);
+    expect(config.notifications.retain).toBe(true);
   });
 });

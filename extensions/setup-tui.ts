@@ -38,6 +38,7 @@ function statusLines(config: ResolvedConfig, projectBankId: string): string[] {
     `import branches: ${config.import.includeBranches}`,
     `import manifest: ${config.import.manifestPath}`,
     `status: ${config.status.style}, ${config.status.detail}, max=${config.status.maxLength}, activity=${config.status.showActivity}`,
+    `notifications: startup=${config.notifications.startup}, recall=${config.notifications.recall}, retain=${config.notifications.retain}`,
   ];
 }
 
@@ -68,6 +69,9 @@ export async function runHindsightSetupTui(
       "Set status detail",
       "Set status max length",
       config.status.showActivity ? "Hide status activity" : "Show status activity",
+      config.notifications.startup ? "Hide startup notification" : "Show startup notification",
+      config.notifications.recall ? "Hide recall notifications" : "Show recall notifications",
+      config.notifications.retain ? "Hide retain notifications" : "Show retain notifications",
       DONE,
       CANCEL,
     ]);
@@ -156,6 +160,12 @@ export async function runHindsightSetupTui(
         if (statusMaxLength !== undefined) await writeAndReload(ctx, deps, { statusMaxLength });
       } else if (choice === "Hide status activity" || choice === "Show status activity") {
         await writeAndReload(ctx, deps, { statusShowActivity: choice === "Show status activity" });
+      } else if (choice === "Hide startup notification" || choice === "Show startup notification") {
+        await writeAndReload(ctx, deps, { notifyStartup: choice === "Show startup notification" });
+      } else if (choice === "Hide recall notifications" || choice === "Show recall notifications") {
+        await writeAndReload(ctx, deps, { notifyRecall: choice === "Show recall notifications" });
+      } else if (choice === "Hide retain notifications" || choice === "Show retain notifications") {
+        await writeAndReload(ctx, deps, { notifyRetain: choice === "Show retain notifications" });
       }
     } catch (error) {
       ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");

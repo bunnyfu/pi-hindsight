@@ -73,7 +73,7 @@ Inside Pi, open the interactive configuration TUI:
 /hindsight:setup
 ```
 
-The setup TUI lets you edit the project bank ID, Hindsight base URL, timeout, global bank, recall budget, token budget, retain settings, queue path, import branch mode, and statusline display. It writes `.pi/hindsight.json` and reloads the extension config after each change. Active MVP import config is limited to branch mode, replace-vs-append behavior, and manifest path.
+The setup TUI lets you edit the project bank ID, Hindsight base URL, timeout, global bank, recall budget, token budget, retain settings, queue path, import branch mode, statusline display, and Pi window notifications. It writes `.pi/hindsight.json` and reloads the extension config after each change. Active MVP import config is limited to branch mode, replace-vs-append behavior, and manifest path.
 
 For a quick default config, run:
 
@@ -114,9 +114,14 @@ Example project config:
   },
   "status": {
     "style": "text",
-    "detail": "project",
+    "detail": "activity",
     "maxLength": 24,
     "showActivity": true
+  },
+  "notifications": {
+    "startup": true,
+    "recall": false,
+    "retain": false
   }
 }
 ```
@@ -136,7 +141,9 @@ The footer status is configurable with two independent knobs:
 - `status.style`: `off`, `text`, `emoji`, or `nerdfont`
 - `status.detail`: `minimal`, `project`, `activity`, or `verbose`
 
-`status.maxLength` caps displayed text, and `status.showActivity` controls whether recall/retain activity replaces the idle text.
+Emoji mode uses `🧠` when Hindsight is connected and `🤯` after failed recall/retain/bank access. `status.detail: "minimal"` hides all text after the icon. `status.detail: "project"` shows the bank ID, `"activity"` shows bank ID plus recall/retain activity, and `"verbose"` shows project, bank ID, and activity. `status.maxLength` caps displayed text, and `status.showActivity` controls whether recall/retain activity replaces the idle text.
+
+Pi window notifications are configurable under `notifications`. Startup bank selection messages are on by default. Recall and retain activity notifications are off by default and can be enabled with `notifications.recall` and `notifications.retain`. Activity notifications report counts and target banks, not raw recalled memory or retained content.
 
 ## Debug and smoke tests
 

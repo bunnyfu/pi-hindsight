@@ -292,4 +292,50 @@ describe("extension hooks", () => {
     expect(secondContent).not.toContain("u1");
     expect(secondContent).not.toContain("a1");
   });
+
+  it("emits optional recall and retain notifications", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({
+        notifications: { startup: false, recall: true, retain: true },
+      }),
+    );
+    const handlers: Record<string, Array<(event: any, ctx: any) => Promise<any>>> = {};
+    const pi = {
+      on: vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+        handlers[name] = [...(handlers[name] ?? []), handler];
+      }),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    await handlers.session_start?.[0]?.({}, ctx);
+    await handlers.context?.[0]?.(
+      { messages: [{ role: "user", content: "remember?", timestamp: 1 }] },
+      ctx,
+    );
+    await handlers.agent_end?.[0]?.(
+      { messages: [{ role: "assistant", content: "new decision", timestamp: 2 }] },
+      ctx,
+    );
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringMatching(/^Hindsight recalled 1 memory item from pi-project-/),
+      "info",
+    );
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringMatching(/^Hindsight retained 1 new message to pi-project-/),
+      "info",
+    );
+  });
 });

@@ -63,9 +63,7 @@ export function formatHindsightActivity(
 
 function prefix(style: StatusStyle, activity: HindsightActivity): string {
   if (style === "emoji") {
-    if (activity.includes("failed")) return "🧠⚠️";
-    if (activity === "recalling" || activity === "recalled") return "🧠↩️";
-    if (activity === "retaining" || activity === "retained") return "🧠💾";
+    if (activity.includes("failed")) return "🤯";
     return "🧠";
   }
   if (style === "nerdfont") {
@@ -85,15 +83,16 @@ export function formatHindsightStatus(
   if (style === "off") return undefined;
   const p = prefix(style, state.activity);
   const project = shortProject(state.cwd, Math.max(4, maxLength));
+  const bank = shortBank(state.projectBankId, Math.max(8, maxLength));
   const activity = showActivity
     ? formatHindsightActivity(state.activity, state.memoryCount, state.queueRemaining)
     : "ready";
 
   let body: string;
-  if (detail === "minimal") body = activity === "ready" ? "" : activity;
-  else if (detail === "project") body = project;
-  else if (detail === "activity") body = `${project}:${activity}`;
-  else body = `${project}:${shortBank(state.projectBankId, Math.max(8, maxLength))}:${activity}`;
+  if (detail === "minimal") body = "";
+  else if (detail === "project") body = bank;
+  else if (detail === "activity") body = activity === "ready" ? bank : `${bank}:${activity}`;
+  else body = `${project}:${bank}:${activity}`;
 
   const separator = style === "text" ? ":" : " ";
   return truncate(body ? `${p}${separator}${body}` : p, maxLength);

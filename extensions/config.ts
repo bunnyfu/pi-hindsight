@@ -33,9 +33,14 @@ const DEFAULT_CONFIG: ResolvedConfig = {
   },
   status: {
     style: "text",
-    detail: "project",
+    detail: "activity",
     maxLength: 24,
     showActivity: true,
+  },
+  notifications: {
+    startup: true,
+    recall: false,
+    retain: false,
   },
 };
 
@@ -181,6 +186,11 @@ export function normalizeConfig(config: ResolvedConfig): ResolvedConfig {
       ),
       maxLength: positiveInt(config.status?.maxLength, DEFAULT_CONFIG.status.maxLength),
       showActivity: bool(config.status?.showActivity, DEFAULT_CONFIG.status.showActivity),
+    },
+    notifications: {
+      startup: bool(config.notifications?.startup, DEFAULT_CONFIG.notifications.startup),
+      recall: bool(config.notifications?.recall, DEFAULT_CONFIG.notifications.recall),
+      retain: bool(config.notifications?.retain, DEFAULT_CONFIG.notifications.retain),
     },
   };
 }
