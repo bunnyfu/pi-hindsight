@@ -10,6 +10,10 @@ function firstArg(args: unknown): string | undefined {
   return undefined;
 }
 
+function firstNonFlagArg(args: unknown): string | undefined {
+  return argList(args).find((arg) => !arg.startsWith("--"));
+}
+
 function secondArg(args: unknown): string | undefined {
   if (Array.isArray(args)) return typeof args[1] === "string" ? args[1] : undefined;
   if (typeof args === "string") return args.split(/\s+/).filter(Boolean)[1];
@@ -30,6 +34,17 @@ function sessionFile(ctx: {
 
 function isSessionMode(value: string | undefined): value is SessionMemoryMode {
   return value === "normal" || value === "read-only" || value === "ignored";
+}
+
+function importOptions(args: unknown): {
+  dryRun: boolean;
+  includeBranches?: "all-leaves";
+} {
+  const flags = new Set(argList(args));
+  return {
+    dryRun: flags.has("--dry-run") || flags.has("--preview"),
+    ...(flags.has("--all-leaves") ? { includeBranches: "all-leaves" as const } : {}),
+  };
 }
 
 export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
@@ -114,16 +129,71 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
         );
         return;
       }
-      const flags = new Set(argList(args));
       const result = await operations.importSession({
         sessionFile,
-        dryRun: flags.has("--dry-run") || flags.has("--preview"),
-        ...(flags.has("--all-leaves") ? { includeBranches: "all-leaves" } : {}),
+        ...importOptions(args),
       });
       ctx.ui.notify(
         result.dryRun
           ? `Import preview: ${result.messageCount} messages across ${result.documents.length} document${result.documents.length === 1 ? "" : "s"}; first ${result.documentId}; manifest unchanged ${result.manifestPath}`
           : `Imported ${result.messageCount} messages as ${result.documentId}; manifest ${result.manifestPath}`,
+        "info",
+      );
+    },
+  });
+
+  pi.registerCommand("hindsight:import-current", {
+    description: "Import the current Pi session JSONL into Hindsight.",
+    handler: async (args, ctx) => {
+      const current = sessionFile(ctx);
+      if (!current) {
+        ctx.ui.notify("No current session file available.", "warning");
+        return;
+      }
+      const result = await operations.importSession({
+        sessionFile: current,
+        ...importOptions(args),
+      });
+      ctx.ui.notify(
+        result.dryRun
+          ? `Import preview: current session ${result.messageCount} messages across ${result.documents.length} document${result.documents.length === 1 ? "" : "s"}`
+          : `Imported current session ${result.messageCount} messages as ${result.documentId}`,
+        "info",
+      );
+    },
+  });
+
+  pi.registerCommand("hindsight:import-file", {
+    description: "Import an explicit Pi session JSONL file into Hindsight.",
+    handler: async (args, ctx) => {
+      const file = firstNonFlagArg(args);
+      if (!file) {
+        ctx.ui.notify("Usage: /hindsight:import-file <path> [--dry-run] [--all-leaves]", "warning");
+        return;
+      }
+      const result = await operations.importSession({ sessionFile: file, ...importOptions(args) });
+      ctx.ui.notify(
+        result.dryRun
+          ? `Import preview: ${result.messageCount} messages from ${file} across ${result.documents.length} document${result.documents.length === 1 ? "" : "s"}`
+          : `Imported ${result.messageCount} messages from ${file} as ${result.documentId}`,
+        "info",
+      );
+    },
+  });
+
+  pi.registerCommand("hindsight:import-project-sessions", {
+    description: "Import Pi session JSONL files scoped to the current repo/cwd.",
+    handler: async (args, ctx) => {
+      const current = sessionFile(ctx);
+      const result = await operations.importProjectSessions({
+        cwd: ctx.cwd,
+        ...(current ? { currentSessionFile: current } : {}),
+        ...importOptions(args),
+      });
+      ctx.ui.notify(
+        result.dryRun
+          ? `Project import preview: ${result.documentCount} documents from ${result.sessionFiles.length}/${result.scanned} scoped sessions; ${result.messageCount} messages`
+          : `Imported ${result.documentCount} documents from ${result.sessionFiles.length}/${result.scanned} scoped sessions; ${result.messageCount} messages`,
         "info",
       );
     },
