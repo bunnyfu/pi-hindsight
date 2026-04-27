@@ -117,6 +117,54 @@ describe("durable explicit retain", () => {
     ]);
   });
 
+  it("refuses explicit append retain when known unsupported and fallback is error", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
+    const config = testConfig();
+    const operations = createMemoryOperations({
+      getClient: () => client(async () => undefined),
+      getConfig: () => config,
+      getProjectBankId: () => "project-bank",
+      getCapabilities: () => ({ appendUpdateMode: false, checkedAt: "now" }),
+    });
+
+    await expect(
+      operations.retainExplicit({
+        cwd,
+        content: "Decision: no overwrite.",
+        context: "unit test explicit retain",
+      }),
+    ).rejects.toThrow(/append update mode is unsupported/);
+    expect(await readRetainQueue(resolveQueuePath(cwd, config.retain.queuePath))).toHaveLength(0);
+  });
+
+  it("uses per-delta explicit documents when append is unsupported and fallback is configured", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
+    const config: ResolvedConfig = {
+      ...testConfig(),
+      retain: { ...testConfig().retain, appendFallback: "per-turn-documents" },
+    };
+    const operations = createMemoryOperations({
+      getClient: () =>
+        client(async () => {
+          throw new Error("down");
+        }),
+      getConfig: () => config,
+      getProjectBankId: () => "project-bank",
+      getCapabilities: () => ({ appendUpdateMode: false, checkedAt: "now" }),
+    });
+
+    await operations.retainExplicit({
+      cwd,
+      content: "Decision: use per-delta docs.",
+      context: "unit test explicit retain",
+    });
+
+    const queued = await readRetainQueue(resolveQueuePath(cwd, config.retain.queuePath));
+    expect(queued).toHaveLength(1);
+    expect(queued[0]?.documentId).toMatch(/^pi-explicit:.*:delta:/);
+    expect(queued[0]?.updateMode).toBe("replace");
+  });
+
   it("sends explicit retain immediately after enqueue when Hindsight is up", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
     const config = testConfig();

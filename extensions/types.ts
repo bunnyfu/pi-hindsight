@@ -1,5 +1,6 @@
 export type Budget = "low" | "mid" | "high";
 export type UpdateMode = "append" | "replace";
+export type AppendFallback = "error" | "per-turn-documents";
 export type TagsMatch = "any" | "all" | "any_strict" | "all_strict";
 export type StatusStyle = "off" | "text" | "emoji" | "nerdfont";
 export type StatusDetail = "minimal" | "project" | "activity" | "verbose";
@@ -24,6 +25,7 @@ export interface ResolvedConfig {
     enabled: boolean;
     async: boolean;
     updateMode: UpdateMode;
+    appendFallback: AppendFallback;
     includeToolResults: "meaningful-only" | "all" | "none";
     redactSecrets: boolean;
     queuePath: string;
@@ -88,6 +90,14 @@ export interface RetainJob {
   retries: number;
   lastError?: string;
   deadLetteredAt?: string;
+}
+
+export interface HindsightCapabilities {
+  version?: string;
+  appendUpdateMode: boolean;
+  checkedAt: string;
+  error?: string;
+  probeDocumentId?: string;
 }
 
 export interface HindsightLikeClient {

@@ -42,6 +42,7 @@ describe("resolveConfig", () => {
         retain: {
           includeToolResults: "sometimes",
           queuePath: "",
+          appendFallback: "overwrite",
           shutdownFlushMaxJobs: -1,
           shutdownFlushTimeoutMs: 0,
         },
@@ -59,6 +60,7 @@ describe("resolveConfig", () => {
     expect(config.recall.budget).toBe("low");
     expect(config.recall.maxTokens).toBe(800);
     expect(config.recall.types).toEqual(["world", "experience", "observation"]);
+    expect(config.retain.appendFallback).toBe("error");
     expect(config.retain.includeToolResults).toBe("meaningful-only");
     expect(config.retain.queuePath).toBe(".pi/hindsight/retain-queue.jsonl");
     expect(config.retain.shutdownFlushMaxJobs).toBe(10);

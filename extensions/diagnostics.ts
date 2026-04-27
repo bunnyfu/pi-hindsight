@@ -1,4 +1,4 @@
-import type { ResolvedConfig } from "./types.js";
+import type { HindsightCapabilities, ResolvedConfig } from "./types.js";
 import { baseTags, findRepoRoot } from "./banking.js";
 import { stableSessionId } from "./session.js";
 import type { ImportManifestEntry } from "./import-manifest.js";
@@ -18,6 +18,7 @@ export interface DebugReportArgs {
   importCount?: number;
   latestImport?: ImportManifestEntry;
   health?: { ok: boolean; error?: string };
+  capabilities?: HindsightCapabilities;
   activity?: HindsightActivity;
   memoryCount?: number;
   queueRemaining?: number;
@@ -69,6 +70,18 @@ export function formatDebugReport(args: DebugReportArgs): string {
       tags,
       queuePath: args.config.retain.queuePath,
       queueLength: args.queueLength,
+      capabilities: args.capabilities
+        ? {
+            appendUpdateMode: args.capabilities.appendUpdateMode ? "supported" : "unsupported",
+            checkedAt: args.capabilities.checkedAt,
+            error: args.capabilities.error ?? null,
+            probeDocumentId: args.capabilities.probeDocumentId ?? null,
+            appendFallback: args.config.retain.appendFallback,
+            action: args.capabilities.appendUpdateMode
+              ? null
+              : "Upgrade Hindsight or set retain.appendFallback to per-turn-documents.",
+          }
+        : { appendUpdateMode: "not checked", appendFallback: args.config.retain.appendFallback },
       imports: {
         manifestPath: args.importManifestPath ?? args.config.import.manifestPath,
         count: args.importCount ?? 0,
@@ -105,6 +118,7 @@ export function formatDebugReport(args: DebugReportArgs): string {
         enabled: args.config.retain.enabled,
         async: args.config.retain.async,
         updateMode: args.config.retain.updateMode,
+        appendFallback: args.config.retain.appendFallback,
         redactSecrets: args.config.retain.redactSecrets,
         includeToolResults: args.config.retain.includeToolResults,
       },

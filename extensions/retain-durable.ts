@@ -1,7 +1,14 @@
 import { randomUUID } from "node:crypto";
-import type { HindsightLikeClient, ResolvedConfig, RetainJob, UpdateMode } from "./types.js";
+import type {
+  HindsightCapabilities,
+  HindsightLikeClient,
+  ResolvedConfig,
+  RetainJob,
+  UpdateMode,
+} from "./types.js";
 import { enqueueRetainJob, flushRetainQueue, resolveQueuePath } from "./queue.js";
 import { redactSecrets } from "./sanitize.js";
+import { resolveRetainDocumentTarget } from "./capabilities.js";
 
 export type DurableRetainSource = "auto" | "tool" | "command" | "import";
 
@@ -18,6 +25,7 @@ export interface RetainDurablyArgs {
   metadata?: Record<string, string>;
   source: DurableRetainSource;
   timestamp?: string;
+  capabilities?: HindsightCapabilities;
 }
 
 export interface RetainDurablyResult {
@@ -29,12 +37,19 @@ export interface RetainDurablyResult {
 
 export function buildDurableRetainJob(args: Omit<RetainDurablyArgs, "client">): RetainJob {
   const content = args.config.retain.redactSecrets ? redactSecrets(args.content) : args.content;
+  const target = resolveRetainDocumentTarget({
+    config: args.config,
+    ...(args.capabilities ? { capabilities: args.capabilities } : {}),
+    documentId: args.documentId,
+    updateMode: args.updateMode,
+    fallbackParts: [content, args.context, args.tags, args.metadata],
+  });
   return {
     id: randomUUID(),
     bankId: args.bankId,
     createdAt: new Date().toISOString(),
-    documentId: args.documentId,
-    updateMode: args.updateMode,
+    documentId: target.documentId,
+    updateMode: target.updateMode,
     item: {
       content,
       context: args.context,

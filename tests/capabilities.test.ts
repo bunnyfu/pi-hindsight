@@ -1,0 +1,124 @@
+import { describe, expect, it } from "vitest";
+import { DEFAULT_CONFIG } from "../extensions/config.js";
+import {
+  detectAppendCapability,
+  perDeltaDocumentId,
+  resolveRetainDocumentTarget,
+} from "../extensions/capabilities.js";
+import type { HindsightLikeClient, ResolvedConfig } from "../extensions/types.js";
+
+function config(
+  appendFallback: ResolvedConfig["retain"]["appendFallback"] = "error",
+): ResolvedConfig {
+  return {
+    ...DEFAULT_CONFIG,
+    retain: { ...DEFAULT_CONFIG.retain, appendFallback },
+  };
+}
+
+function client(retain: HindsightLikeClient["retain"]): HindsightLikeClient {
+  return {
+    retain,
+    recall: async () => [],
+    reflect: async () => ({}),
+  };
+}
+
+describe("append capabilities", () => {
+  it("detects append support with an isolated probe document", async () => {
+    const calls: unknown[] = [];
+    const capabilities = await detectAppendCapability(
+      client(async (...args: unknown[]) => {
+        calls.push(args);
+      }),
+      "bank",
+    );
+
+    expect(capabilities.appendUpdateMode).toBe(true);
+    expect(capabilities.probeDocumentId).toBe("pi-hindsight-capability:append:bank");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject([
+      "bank",
+      "Pi Hindsight append capability probe. Safe to ignore.",
+      {
+        async: true,
+        documentId: "pi-hindsight-capability:append:bank",
+        updateMode: "append",
+        tags: ["source:pi", "test:capability", "feature:append-probe"],
+      },
+    ]);
+  });
+
+  it("reports unsupported append when the probe fails with an append-specific error", async () => {
+    const capabilities = await detectAppendCapability(
+      client(async () => {
+        throw new Error("update_mode append unsupported");
+      }),
+      "bank",
+    );
+
+    expect(capabilities.appendUpdateMode).toBe(false);
+    expect(capabilities.error).toContain("append unsupported");
+  });
+
+  it("does not mark generic probe failures as unsupported", async () => {
+    const capabilities = await detectAppendCapability(
+      client(async () => {
+        throw new Error("ECONNREFUSED");
+      }),
+      "bank",
+    );
+
+    expect(capabilities.appendUpdateMode).toBe(true);
+    expect(capabilities.error).toContain("Probe inconclusive");
+  });
+
+  it("keeps stable append document IDs when append is supported or unknown", () => {
+    expect(
+      resolveRetainDocumentTarget({
+        config: config(),
+        documentId: "doc",
+        updateMode: "append",
+        fallbackParts: ["content"],
+      }),
+    ).toEqual({ documentId: "doc", updateMode: "append" });
+
+    expect(
+      resolveRetainDocumentTarget({
+        config: config(),
+        capabilities: { appendUpdateMode: true, checkedAt: "now" },
+        documentId: "doc",
+        updateMode: "append",
+        fallbackParts: ["content"],
+      }),
+    ).toEqual({ documentId: "doc", updateMode: "append" });
+  });
+
+  it("refuses append when unsupported and fallback is error", () => {
+    expect(() =>
+      resolveRetainDocumentTarget({
+        config: config("error"),
+        capabilities: { appendUpdateMode: false, checkedAt: "now" },
+        documentId: "doc",
+        updateMode: "append",
+        fallbackParts: ["content"],
+      }),
+    ).toThrow(/append update mode is unsupported/);
+  });
+
+  it("falls back to deterministic per-delta documents when configured", () => {
+    const target = resolveRetainDocumentTarget({
+      config: config("per-turn-documents"),
+      capabilities: { appendUpdateMode: false, checkedAt: "now" },
+      documentId: "doc",
+      updateMode: "append",
+      fallbackParts: ["content"],
+    });
+
+    expect(target).toEqual({
+      documentId: perDeltaDocumentId("doc", ["content"]),
+      updateMode: "replace",
+    });
+    expect(target.documentId).toMatch(/^doc:delta:/);
+  });
+});

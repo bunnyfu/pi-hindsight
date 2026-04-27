@@ -22,6 +22,7 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     enabled: true,
     async: true,
     updateMode: "append",
+    appendFallback: "error",
     includeToolResults: "meaningful-only",
     redactSecrets: true,
     queuePath: ".pi/hindsight/retain-queue.jsonl",
@@ -154,6 +155,11 @@ export function normalizeConfig(config: ResolvedConfig): ResolvedConfig {
         config.retain?.updateMode,
         ["append", "replace"],
         DEFAULT_CONFIG.retain.updateMode,
+      ),
+      appendFallback: enumValue(
+        config.retain?.appendFallback,
+        ["error", "per-turn-documents"],
+        DEFAULT_CONFIG.retain.appendFallback,
       ),
       includeToolResults: enumValue(
         config.retain?.includeToolResults,

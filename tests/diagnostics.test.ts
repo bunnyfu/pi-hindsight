@@ -44,7 +44,36 @@ describe("diagnostics", () => {
     expect(report.projectBankId).toBe("bank");
     expect(report.health).toBe("reachable");
     expect(report.queueLength).toBe(2);
+    expect(report.capabilities).toMatchObject({
+      appendUpdateMode: "not checked",
+      appendFallback: "error",
+    });
     expect(report.overrideProjectBankId).toContain("PI_HINDSIGHT_PROJECT_BANK_ID");
     expect(report.tags).toEqual(expect.arrayContaining(["source:pi"]));
+  });
+
+  it("formats append capability diagnostics", () => {
+    const report = JSON.parse(
+      formatDebugReport({
+        cwd: process.cwd(),
+        projectBankId: "bank",
+        config: DEFAULT_CONFIG,
+        queueLength: 0,
+        capabilities: {
+          appendUpdateMode: false,
+          checkedAt: "2026-04-27T12:00:00.000Z",
+          error: "unsupported",
+          probeDocumentId: "pi-hindsight-capability:append:bank",
+        },
+      }),
+    ) as Record<string, unknown>;
+
+    expect(report.capabilities).toMatchObject({
+      appendUpdateMode: "unsupported",
+      appendFallback: "error",
+      error: "unsupported",
+      probeDocumentId: "pi-hindsight-capability:append:bank",
+      action: "Upgrade Hindsight or set retain.appendFallback to per-turn-documents.",
+    });
   });
 });
