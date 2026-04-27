@@ -150,6 +150,7 @@ Examples:
 - `client.ts` should not parse Pi session JSONL
 - `import-sessions.ts` should not own queue replay logic
 - `renderers.ts` should not contain Hindsight request composition
+- tools and commands should call shared memory operation modules rather than duplicating intent behavior
 
 ### Prefer deterministic functions
 

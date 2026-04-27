@@ -1,22 +1,11 @@
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import type { HindsightLikeClient, ResolvedConfig } from "./types.js";
-import { redactSecrets } from "./sanitize.js";
-import { recallScopeTags } from "./banking.js";
-import { stableSessionId } from "./session.js";
-import { explicitRetainTags } from "./memory-identity.js";
-import { buildProjectConfigPatch, writeProjectConfig } from "./config-writer.js";
-import { importPiSession } from "./import-sessions.js";
+import type { MemoryOperationsDeps } from "./memory-operations.js";
+import { createMemoryOperations } from "./memory-operations.js";
 
-export function registerTools(
-  pi: ExtensionAPI,
-  deps: {
-    getClient(): HindsightLikeClient;
-    getConfig(): ResolvedConfig;
-    getProjectBankId(): string;
-    reloadConfig?(cwd: string): void;
-  },
-) {
+export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
+  const operations = createMemoryOperations(deps);
+
   pi.registerTool({
     name: "hindsight_recall",
     label: "Hindsight Recall",
@@ -28,18 +17,7 @@ export function registerTools(
       ),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
-      const config = deps.getConfig();
-      const bankId = params.bank || deps.getProjectBankId();
-      const tags =
-        config.banks.global.enabled && bankId === config.banks.global.bankId
-          ? ["source:pi"]
-          : recallScopeTags(ctx.cwd);
-      const result = await deps.getClient().recall(bankId, params.query, {
-        budget: config.recall.budget,
-        maxTokens: config.recall.maxTokens,
-        tags,
-        tagsMatch: "any_strict",
-      });
+      const { bankId, result } = await operations.recall(ctx.cwd, params.query, params.bank);
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         details: { bankId },
@@ -62,23 +40,15 @@ export function registerTools(
       tags: Type.Optional(Type.Array(Type.String())),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
-      const config = deps.getConfig();
-      const bankId = params.bank || deps.getProjectBankId();
       const sessionFile = ctx.sessionManager.getSessionFile?.();
-      const tags = explicitRetainTags(ctx.cwd, sessionFile, params.tags);
-      await deps
-        .getClient()
-        .retain(
-          bankId,
-          config.retain.redactSecrets ? redactSecrets(params.content) : params.content,
-          {
-            context: params.context,
-            async: config.retain.async,
-            tags,
-            updateMode: "append",
-            documentId: `pi-explicit:${stableSessionId(ctx.sessionManager.getSessionFile?.(), ctx.cwd)}`,
-          },
-        );
+      const { bankId, tags } = await operations.retainExplicit({
+        cwd: ctx.cwd,
+        content: params.content,
+        context: params.context,
+        ...(sessionFile ? { sessionFile } : {}),
+        ...(params.bank ? { bank: params.bank } : {}),
+        ...(params.tags ? { tags: params.tags } : {}),
+      });
       return {
         content: [{ type: "text", text: `Retained in ${bankId}.` }],
         details: { bankId, tags },
@@ -114,27 +84,15 @@ export function registerTools(
       ),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
-      const projectBankId = params.projectBankId || deps.getProjectBankId();
-      const patch = buildProjectConfigPatch({
-        projectBankId,
-        ...(params.baseUrl ? { baseUrl: params.baseUrl } : {}),
-        ...(params.globalBankId ? { globalBankId: params.globalBankId } : {}),
-        ...(params.enableGlobalBank !== undefined
-          ? { enableGlobalBank: params.enableGlobalBank }
-          : {}),
-        ...(params.enabled !== undefined ? { enabled: params.enabled } : {}),
-        ...(params.queuePath ? { queuePath: params.queuePath } : {}),
-      });
-      const result = await writeProjectConfig(ctx.cwd, patch);
-      deps.reloadConfig?.(ctx.cwd);
+      const result = await operations.configure(ctx.cwd, params);
       return {
         content: [
           {
             type: "text",
-            text: `Wrote ${result.path}\nProject bank: ${projectBankId}\nRun /hindsight:debug to verify.`,
+            text: `Wrote ${result.path}\nProject bank: ${result.projectBankId}\nRun /hindsight:debug to verify.`,
           },
         ],
-        details: { path: result.path, projectBankId, config: result.config },
+        details: { path: result.path, projectBankId: result.projectBankId, config: result.config },
       };
     },
   });
@@ -155,21 +113,18 @@ export function registerTools(
     async execute(_id, params, _signal, _onUpdate, ctx) {
       const sessionFile = params.sessionFile || ctx.sessionManager.getSessionFile?.();
       if (!sessionFile) throw new Error("No session file available. Pass sessionFile explicitly.");
-      const bankId = params.bank || deps.getProjectBankId();
-      const result = await importPiSession({
+      const result = await operations.importSession({
         sessionFile,
-        bankId,
-        client: deps.getClient(),
-        config: deps.getConfig(),
+        ...(params.bank ? { bank: params.bank } : {}),
       });
       return {
         content: [
           {
             type: "text",
-            text: `Imported ${result.messageCount} messages into ${bankId} as ${result.documentId}. Manifest: ${result.manifestPath}.`,
+            text: `Imported ${result.messageCount} messages into ${result.bankId} as ${result.documentId}. Manifest: ${result.manifestPath}.`,
           },
         ],
-        details: { bankId, ...result },
+        details: result,
       };
     },
   });
@@ -185,18 +140,12 @@ export function registerTools(
       bank: Type.Optional(Type.String()),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
-      const config = deps.getConfig();
-      const bankId = params.bank || deps.getProjectBankId();
-      const tags =
-        config.banks.global.enabled && bankId === config.banks.global.bankId
-          ? ["source:pi"]
-          : recallScopeTags(ctx.cwd);
-      const result = await deps.getClient().reflect(bankId, params.query, {
-        ...(params.context ? { context: params.context } : {}),
-        budget: config.recall.budget,
-        tags,
-        tagsMatch: "any_strict",
-      });
+      const { bankId, result } = await operations.reflect(
+        ctx.cwd,
+        params.query,
+        params.context,
+        params.bank,
+      );
       return {
         content: [
           {

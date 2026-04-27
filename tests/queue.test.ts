@@ -5,7 +5,9 @@ import { join } from "node:path";
 import {
   enqueueRetainJob,
   flushRetainQueue,
+  readDeadLetterQueue,
   readRetainQueue,
+  resolveDeadLetterQueuePath,
   resolveQueuePath,
 } from "../extensions/queue.js";
 import type { RetainJob } from "../extensions/types.js";
@@ -39,10 +41,10 @@ describe("retain queue", () => {
     expect(calls[0]).toMatchObject(["b", "raw", { async: true }]);
   });
 
-  it("keeps failed jobs with retry count even after retry limit", async () => {
+  it("moves exhausted failed jobs to the dead-letter queue", async () => {
     const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
     await enqueueRetainJob(path, job);
-    await flushRetainQueue(
+    const result = await flushRetainQueue(
       path,
       {
         retain: async () => {
@@ -53,10 +55,13 @@ describe("retain queue", () => {
       },
       1,
     );
-    const remaining = await readRetainQueue(path);
-    expect(remaining).toHaveLength(1);
-    expect(remaining[0]?.retries).toBe(1);
-    expect(remaining[0]?.lastError).toContain("retry limit reached");
+    expect(result).toMatchObject({ sent: 0, remaining: 0, deadLettered: 1 });
+    expect(await readRetainQueue(path)).toHaveLength(0);
+    const dead = await readDeadLetterQueue(path);
+    expect(dead).toHaveLength(1);
+    expect(dead[0]?.retries).toBe(1);
+    expect(dead[0]?.lastError).toContain("moved to dead-letter queue");
+    expect(dead[0]?.deadLetteredAt).toBeDefined();
   });
 
   it("can bound shutdown flushing to avoid blocking session switches", async () => {
@@ -136,5 +141,6 @@ describe("retain queue", () => {
       join("/repo", ".pi/hindsight/q.jsonl"),
     );
     expect(resolveQueuePath("/repo", "/tmp/q.jsonl")).toBe("/tmp/q.jsonl");
+    expect(resolveDeadLetterQueuePath("/tmp/q.jsonl")).toBe("/tmp/q.jsonl.dead.jsonl");
   });
 });

@@ -30,8 +30,6 @@ export interface ResolvedConfig {
   };
   import: {
     includeBranches: "current-only" | "all-leaves";
-    includeCompactionSummaries: boolean;
-    includeBranchSummaries: boolean;
     replaceExistingImportedDocs: boolean;
     manifestPath: string;
   };
@@ -82,6 +80,7 @@ export interface RetainJob {
   };
   retries: number;
   lastError?: string;
+  deadLetteredAt?: string;
 }
 
 export interface HindsightLikeClient {

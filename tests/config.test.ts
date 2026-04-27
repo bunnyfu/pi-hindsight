@@ -31,4 +31,34 @@ describe("resolveConfig", () => {
     expect(resolveConfig(cwd, { PI_HINDSIGHT_ENABLED: "false" }).enabled).toBe(false);
     expect(resolveConfig(cwd, { PI_HINDSIGHT_ENABLED: "true" }).enabled).toBe(true);
   });
+
+  it("normalizes invalid config values back to defaults", () => {
+    const cwd = tmp();
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({
+        recall: { budget: "huge", maxTokens: -1, types: ["world", 42] },
+        retain: { includeToolResults: "sometimes", queuePath: "" },
+        import: {
+          includeBranches: "all-the-branches",
+          includeCompactionSummaries: false,
+          includeBranchSummaries: false,
+        },
+        status: { style: "sparkles", maxLength: 0 },
+      }),
+    );
+
+    const config = resolveConfig(cwd);
+    expect(config.recall.budget).toBe("low");
+    expect(config.recall.maxTokens).toBe(800);
+    expect(config.recall.types).toEqual(["world", "experience", "observation"]);
+    expect(config.retain.includeToolResults).toBe("meaningful-only");
+    expect(config.retain.queuePath).toBe(".pi/hindsight/retain-queue.jsonl");
+    expect(config.import.includeBranches).toBe("current-only");
+    expect(config).not.toHaveProperty("import.includeCompactionSummaries");
+    expect(config).not.toHaveProperty("import.includeBranchSummaries");
+    expect(config.status.style).toBe("text");
+    expect(config.status.maxLength).toBe(24);
+  });
 });

@@ -28,8 +28,6 @@ const DEFAULT_CONFIG: ResolvedConfig = {
   },
   import: {
     includeBranches: "current-only",
-    includeCompactionSummaries: true,
-    includeBranchSummaries: true,
     replaceExistingImportedDocs: true,
     manifestPath: ".pi/hindsight/import-manifest.json",
   },
@@ -65,6 +63,128 @@ function envBool(env: NodeJS.ProcessEnv, name: string): boolean | undefined {
   return ["1", "true", "yes", "on"].includes(value.toLowerCase());
 }
 
+function bool(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function positiveInt(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+function stringValue(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+
+function optionalString(value: unknown, fallback?: string): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+
+function enumValue<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
+  return typeof value === "string" && (allowed as readonly string[]).includes(value)
+    ? (value as T)
+    : fallback;
+}
+
+function stringArray(value: unknown, fallback: string[]): string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string") ? value : fallback;
+}
+
+export function normalizeConfig(config: ResolvedConfig): ResolvedConfig {
+  const apiKey = optionalString(config.hindsight?.apiKey, DEFAULT_CONFIG.hindsight.apiKey);
+  const projectBankId = optionalString(
+    config.banks?.project?.bankId,
+    DEFAULT_CONFIG.banks.project.bankId,
+  );
+  const globalBankId = optionalString(
+    config.banks?.global?.bankId,
+    DEFAULT_CONFIG.banks.global.bankId,
+  );
+  return {
+    enabled: bool(config.enabled, DEFAULT_CONFIG.enabled),
+    hindsight: {
+      baseUrl: stringValue(config.hindsight?.baseUrl, DEFAULT_CONFIG.hindsight.baseUrl),
+      ...(apiKey ? { apiKey } : {}),
+      timeoutMs: positiveInt(config.hindsight?.timeoutMs, DEFAULT_CONFIG.hindsight.timeoutMs),
+    },
+    banks: {
+      project: {
+        enabled: bool(config.banks?.project?.enabled, DEFAULT_CONFIG.banks.project.enabled),
+        ...(projectBankId ? { bankId: projectBankId } : {}),
+        derive: enumValue(
+          config.banks?.project?.derive,
+          ["repo", "cwd", "manual"],
+          DEFAULT_CONFIG.banks.project.derive,
+        ),
+      },
+      global: {
+        enabled: bool(config.banks?.global?.enabled, DEFAULT_CONFIG.banks.global.enabled),
+        ...(globalBankId ? { bankId: globalBankId } : {}),
+      },
+    },
+    recall: {
+      enabled: bool(config.recall?.enabled, DEFAULT_CONFIG.recall.enabled),
+      budget: enumValue(
+        config.recall?.budget,
+        ["low", "mid", "high"],
+        DEFAULT_CONFIG.recall.budget,
+      ),
+      maxTokens: positiveInt(config.recall?.maxTokens, DEFAULT_CONFIG.recall.maxTokens),
+      types: stringArray(config.recall?.types, DEFAULT_CONFIG.recall.types),
+      recentTurnsForQuery: positiveInt(
+        config.recall?.recentTurnsForQuery,
+        DEFAULT_CONFIG.recall.recentTurnsForQuery,
+      ),
+      injectionMode: "context",
+      includeFactsInDebug: bool(
+        config.recall?.includeFactsInDebug,
+        DEFAULT_CONFIG.recall.includeFactsInDebug,
+      ),
+    },
+    retain: {
+      enabled: bool(config.retain?.enabled, DEFAULT_CONFIG.retain.enabled),
+      async: bool(config.retain?.async, DEFAULT_CONFIG.retain.async),
+      updateMode: enumValue(
+        config.retain?.updateMode,
+        ["append", "replace"],
+        DEFAULT_CONFIG.retain.updateMode,
+      ),
+      includeToolResults: enumValue(
+        config.retain?.includeToolResults,
+        ["meaningful-only", "all", "none"],
+        DEFAULT_CONFIG.retain.includeToolResults,
+      ),
+      redactSecrets: bool(config.retain?.redactSecrets, DEFAULT_CONFIG.retain.redactSecrets),
+      queuePath: stringValue(config.retain?.queuePath, DEFAULT_CONFIG.retain.queuePath),
+    },
+    import: {
+      includeBranches: enumValue(
+        config.import?.includeBranches,
+        ["current-only", "all-leaves"],
+        DEFAULT_CONFIG.import.includeBranches,
+      ),
+      replaceExistingImportedDocs: bool(
+        config.import?.replaceExistingImportedDocs,
+        DEFAULT_CONFIG.import.replaceExistingImportedDocs,
+      ),
+      manifestPath: stringValue(config.import?.manifestPath, DEFAULT_CONFIG.import.manifestPath),
+    },
+    status: {
+      style: enumValue(
+        config.status?.style,
+        ["off", "text", "emoji", "nerdfont"],
+        DEFAULT_CONFIG.status.style,
+      ),
+      detail: enumValue(
+        config.status?.detail,
+        ["minimal", "project", "activity", "verbose"],
+        DEFAULT_CONFIG.status.detail,
+      ),
+      maxLength: positiveInt(config.status?.maxLength, DEFAULT_CONFIG.status.maxLength),
+      showActivity: bool(config.status?.showActivity, DEFAULT_CONFIG.status.showActivity),
+    },
+  };
+}
+
 export function resolveConfig(cwd: string, env: NodeJS.ProcessEnv = process.env): ResolvedConfig {
   let config = DEFAULT_CONFIG;
   const home = env.HOME;
@@ -87,7 +207,7 @@ export function resolveConfig(cwd: string, env: NodeJS.ProcessEnv = process.env)
       banks: { global: { enabled: true, bankId: env.PI_HINDSIGHT_GLOBAL_BANK_ID } },
     });
   }
-  return config;
+  return normalizeConfig(config);
 }
 
 export { DEFAULT_CONFIG };

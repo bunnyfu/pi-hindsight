@@ -25,6 +25,10 @@ export function resolveQueuePath(cwd: string, queuePath: string): string {
   return isAbsolute(queuePath) ? queuePath : join(cwd, queuePath);
 }
 
+export function resolveDeadLetterQueuePath(path: string): string {
+  return `${path}.dead.jsonl`;
+}
+
 export async function enqueueRetainJob(path: string, job: RetainJob): Promise<void> {
   await withQueueLock(path, async () => {
     await mkdir(dirname(path), { recursive: true });
@@ -45,6 +49,10 @@ export async function readRetainQueue(path: string): Promise<RetainJob[]> {
   }
 }
 
+export async function readDeadLetterQueue(path: string): Promise<RetainJob[]> {
+  return readRetainQueue(resolveDeadLetterQueuePath(path));
+}
+
 export async function writeRetainQueue(path: string, jobs: RetainJob[]): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const tmp = `${path}.tmp`;
@@ -62,11 +70,17 @@ export type FlushRetainQueueOptions = {
   stopOnFirstFailure?: boolean;
 };
 
+export interface FlushRetainQueueResult {
+  sent: number;
+  remaining: number;
+  deadLettered: number;
+}
+
 export async function flushRetainQueue(
   path: string,
   client: HindsightLikeClient,
   options: FlushRetainQueueOptions | number = {},
-): Promise<{ sent: number; remaining: number }> {
+): Promise<FlushRetainQueueResult> {
   return withQueueLock(path, async () => {
     const resolvedOptions: FlushRetainQueueOptions =
       typeof options === "number" ? { maxRetries: options } : options;
@@ -74,6 +88,7 @@ export async function flushRetainQueue(
     const maxJobs = resolvedOptions.maxJobs ?? Number.POSITIVE_INFINITY;
     const jobs = await readRetainQueue(path);
     const remaining: RetainJob[] = [];
+    const deadLetteredJobs: RetainJob[] = [];
     let sent = 0;
     for (const [index, job] of jobs.entries()) {
       if (index >= maxJobs) {
@@ -94,16 +109,19 @@ export async function flushRetainQueue(
       } catch (error) {
         const retries = job.retries + 1;
         const deadLetter = retries >= maxRetries;
-        remaining.push({
+        const failedJob = {
           ...job,
           retries,
           lastError: error instanceof Error ? error.message : String(error),
           ...(deadLetter
             ? {
-                lastError: `${error instanceof Error ? error.message : String(error)}; retry limit reached, retained in queue`,
+                deadLetteredAt: new Date().toISOString(),
+                lastError: `${error instanceof Error ? error.message : String(error)}; retry limit reached, moved to dead-letter queue`,
               }
             : {}),
-        });
+        };
+        if (deadLetter) deadLetteredJobs.push(failedJob);
+        else remaining.push(failedJob);
         if (resolvedOptions.stopOnFirstFailure) {
           remaining.push(...jobs.slice(index + 1));
           break;
@@ -111,6 +129,9 @@ export async function flushRetainQueue(
       }
     }
     await writeRetainQueue(path, remaining);
-    return { sent, remaining: remaining.length };
+    for (const deadLetteredJob of deadLetteredJobs) {
+      await enqueueRetainJob(resolveDeadLetterQueuePath(path), deadLetteredJob);
+    }
+    return { sent, remaining: remaining.length, deadLettered: deadLetteredJobs.length };
   });
 }

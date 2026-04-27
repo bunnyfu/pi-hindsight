@@ -65,13 +65,15 @@ Defaults can be overridden by:
 2. `.pi/hindsight.json` in the current repo
 3. environment variables
 
+Config is normalized after merging. Unknown fields are ignored, invalid enum values fall back to defaults, and removed/reserved MVP fields do not affect behavior.
+
 Inside Pi, open the interactive configuration TUI:
 
 ```text
 /hindsight:setup
 ```
 
-The setup TUI lets you edit the project bank ID, Hindsight base URL, timeout, global bank, recall budget, token budget, retain settings, queue path, import branch mode, and statusline display. It writes `.pi/hindsight.json` and reloads the extension config after each change.
+The setup TUI lets you edit the project bank ID, Hindsight base URL, timeout, global bank, recall budget, token budget, retain settings, queue path, import branch mode, and statusline display. It writes `.pi/hindsight.json` and reloads the extension config after each change. Active MVP import config is limited to branch mode, replace-vs-append behavior, and manifest path.
 
 For a quick default config, run:
 
@@ -125,7 +127,7 @@ Automatic recall runs in the `context` hook and injects an ephemeral `<hindsight
 
 Automatic retain runs in the `agent_end` hook. It stores a structured JSON projection of new messages, not a summary. Live sessions use stable `documentId` values and `updateMode: "append"`. Explicit retain tool tags are merged with the base `source:pi`, repo, and session tags so manually retained memories remain visible to default project recall.
 
-Retain jobs are written to a JSONL queue before sending. If Hindsight is down, jobs remain on disk for later flushing.
+Retain jobs are written to a JSONL queue before sending. If Hindsight is down, jobs remain on disk for later flushing. Queue operations are serialized inside the process. Jobs that exceed the retry limit are moved to a sibling dead-letter file (`<queue>.dead.jsonl`) instead of retrying forever.
 
 At session start, the extension shows the selected bank ID. If no bank ID is configured, it reports the automatically derived bank ID and how to override it.
 
