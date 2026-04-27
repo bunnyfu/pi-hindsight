@@ -204,6 +204,34 @@ describe("durable explicit retain", () => {
     expect(await readRetainQueue(resolveQueuePath(cwd, config.retain.queuePath))).toHaveLength(0);
   });
 
+  it("stores fallback targets when append support is unknown and fallback is configured", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
+    const config: ResolvedConfig = {
+      ...testConfig(),
+      retain: { ...testConfig().retain, appendFallback: "per-turn-documents" },
+    };
+    const operations = createMemoryOperations({
+      getClient: () =>
+        client(async () => {
+          throw new Error("down");
+        }),
+      getConfig: () => config,
+      getProjectBankId: () => "project-bank",
+      getCapabilities: () => ({ appendUpdateMode: true, checkedAt: "now", error: "unknown" }),
+    });
+
+    await operations.retainExplicit({
+      cwd,
+      content: "Decision: keep fallback target.",
+      context: "unit test explicit retain",
+    });
+
+    const queued = await readRetainQueue(resolveQueuePath(cwd, config.retain.queuePath));
+    expect(queued[0]?.updateMode).toBe("append");
+    expect(queued[0]?.appendFallback?.documentId).toMatch(/^pi-explicit:.*:delta:/);
+    expect(queued[0]?.appendFallback?.updateMode).toBe("replace");
+  });
+
   it("uses per-delta explicit documents when append is unsupported and fallback is configured", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
     const config: ResolvedConfig = {

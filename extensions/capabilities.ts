@@ -11,6 +11,18 @@ export function perDeltaDocumentId(baseDocumentId: string, parts: unknown[]): st
   return `${baseDocumentId}:delta:${hash}`;
 }
 
+export function appendFallbackTarget(args: {
+  config: ResolvedConfig;
+  documentId: string;
+  fallbackParts: unknown[];
+}): { documentId: string; updateMode: "replace" } | undefined {
+  if (args.config.retain.appendFallback !== "per-turn-documents") return undefined;
+  return {
+    documentId: perDeltaDocumentId(args.documentId, args.fallbackParts),
+    updateMode: "replace",
+  };
+}
+
 export function resolveRetainDocumentTarget(args: {
   config: ResolvedConfig;
   capabilities?: HindsightCapabilities;
@@ -23,15 +35,23 @@ export function resolveRetainDocumentTarget(args: {
   if (!args.capabilities || args.capabilities.appendUpdateMode) {
     return { documentId: args.documentId, updateMode: args.updateMode };
   }
-  if (args.config.retain.appendFallback === "per-turn-documents") {
-    return {
-      documentId: perDeltaDocumentId(args.documentId, args.fallbackParts),
-      updateMode: "replace",
-    };
-  }
+  const fallback = appendFallbackTarget(args);
+  if (fallback) return fallback;
   throw new Error(
     "Hindsight append update mode is unsupported. Upgrade Hindsight or set retain.appendFallback to per-turn-documents.",
   );
+}
+
+export function isAppendUnsupportedError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const mentionsAppendMode = /append|update[_ ]?mode/i.test(message);
+  const explicitUnsupported =
+    /unsupported|invalid|unknown|unrecognized|not allowed|not permitted/i.test(message);
+  const validationUnsupported =
+    /update[_ ]?mode/i.test(message) &&
+    /append/i.test(message) &&
+    /input should be|expected|literal_error|permitted|allowed/i.test(message);
+  return mentionsAppendMode && (explicitUnsupported || validationUnsupported);
 }
 
 export async function detectAppendCapability(
@@ -55,9 +75,7 @@ export async function detectAppendCapability(
     return { appendUpdateMode: true, checkedAt, probeDocumentId: documentId };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const appendUnsupported =
-      /append|update[_ ]?mode/i.test(message) &&
-      /unsupported|invalid|unknown|unrecognized|not allowed|not permitted/i.test(message);
+    const appendUnsupported = isAppendUnsupportedError(error);
     return {
       appendUpdateMode: !appendUnsupported,
       checkedAt,
