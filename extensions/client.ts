@@ -30,31 +30,29 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
   });
   const timeoutMs = config.hindsight.timeoutMs;
   return {
-    retain: (bankId, content, options) => {
-      if (options?.observationScopes?.length) {
-        return withTimeout(
-          raw.retainBatch(
-            bankId,
-            [
-              {
-                content,
-                ...(options.timestamp ? { timestamp: options.timestamp } : {}),
-                ...(options.context ? { context: options.context } : {}),
-                ...(options.metadata ? { metadata: options.metadata } : {}),
-                ...(options.documentId ? { document_id: options.documentId } : {}),
-                ...(options.tags ? { tags: options.tags } : {}),
-                observation_scopes: options.observationScopes,
-                ...(options.updateMode ? { update_mode: options.updateMode } : {}),
-              },
-            ],
-            options.async !== undefined ? { async: options.async } : {},
-          ),
-          timeoutMs,
-          "hindsight retain",
-        );
-      }
-      return withTimeout(raw.retain(bankId, content, options), timeoutMs, "hindsight retain");
-    },
+    retain: (bankId, content, options) =>
+      withTimeout(
+        raw.retainBatch(
+          bankId,
+          [
+            {
+              content,
+              ...(options?.timestamp ? { timestamp: options.timestamp } : {}),
+              ...(options?.context ? { context: options.context } : {}),
+              ...(options?.metadata ? { metadata: options.metadata } : {}),
+              ...(options?.documentId ? { document_id: options.documentId } : {}),
+              ...(options?.tags ? { tags: options.tags } : {}),
+              ...(options?.observationScopes?.length
+                ? { observation_scopes: options.observationScopes }
+                : {}),
+              ...(options?.updateMode ? { update_mode: options.updateMode } : {}),
+            },
+          ],
+          options?.async !== undefined ? { async: options.async } : {},
+        ),
+        timeoutMs,
+        "hindsight retain",
+      ),
     retainBatch: (...args) =>
       withTimeout(raw.retainBatch(...args), timeoutMs, "hindsight retainBatch"),
     recall: (...args) => withTimeout(raw.recall(...args), timeoutMs, "hindsight recall"),
