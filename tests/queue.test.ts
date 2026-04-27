@@ -119,6 +119,27 @@ describe("retain queue", () => {
     expect((await readRetainQueue(path)).map((item) => item.id)).toEqual(["2", "3"]);
   });
 
+  it("stops bounded flushing between jobs instead of leaving background work", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
+    await enqueueRetainJob(path, { ...job, id: "1" });
+    await enqueueRetainJob(path, { ...job, id: "2" });
+    const calls: unknown[] = [];
+    const result = await flushRetainQueue(
+      path,
+      {
+        retain: async (...args: unknown[]) => {
+          calls.push(args);
+        },
+        recall: async () => [],
+        reflect: async () => ({}),
+      },
+      { maxElapsedMs: 0 },
+    );
+    expect(result.sent).toBe(0);
+    expect(calls).toHaveLength(0);
+    expect((await readRetainQueue(path)).map((item) => item.id)).toEqual(["1", "2"]);
+  });
+
   it("stops shutdown flushing after first failure", async () => {
     const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
     await enqueueRetainJob(path, { ...job, id: "1" });

@@ -66,20 +66,6 @@ function snapshotRuntime(ctx: RuntimeCtx): RuntimeSnapshot | undefined {
   }
 }
 
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  let timeout: NodeJS.Timeout | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_resolve, reject) => {
-        timeout = setTimeout(() => reject(new Error("Timed out flushing retain queue")), timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timeout) clearTimeout(timeout);
-  }
-}
-
 export function createMemoryLifecycle(initialCwd: string = process.cwd()): MemoryLifecycle {
   let config: ResolvedConfig = resolveConfig(initialCwd);
   let client: HindsightLikeClient = createHindsightClient(config);
@@ -269,13 +255,11 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       const runtime = snapshotRuntime(ctx);
       if (!runtime) return;
       try {
-        await withTimeout(
-          flushRetainQueue(resolveQueuePath(runtime.cwd, config.retain.queuePath), client, {
-            maxJobs: config.retain.shutdownFlushMaxJobs,
-            stopOnFirstFailure: true,
-          }),
-          config.retain.shutdownFlushTimeoutMs,
-        );
+        await flushRetainQueue(resolveQueuePath(runtime.cwd, config.retain.queuePath), client, {
+          maxJobs: config.retain.shutdownFlushMaxJobs,
+          maxElapsedMs: config.retain.shutdownFlushTimeoutMs,
+          stopOnFirstFailure: true,
+        });
       } catch {
         // Keep queue on disk for next run.
       }

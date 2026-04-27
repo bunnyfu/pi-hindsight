@@ -23,6 +23,23 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function writeQueueLockOwner(lockPath: string): Promise<void> {
+  await writeFile(
+    `${lockPath}/owner`,
+    JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString() }),
+    "utf8",
+  );
+}
+
+function startQueueLockHeartbeat(lockPath: string): NodeJS.Timeout {
+  const heartbeatMs = Math.max(1, Math.min(5_000, Math.floor(RETAIN_QUEUE_LOCK.staleMs / 2)));
+  const heartbeat = setInterval(() => {
+    void writeQueueLockOwner(lockPath).catch(() => undefined);
+  }, heartbeatMs);
+  heartbeat.unref?.();
+  return heartbeat;
+}
+
 export function isQueueLockOwnerStale(
   owner: QueueLockOwner | undefined,
   now = Date.now(),
@@ -57,12 +74,10 @@ async function acquireFileLock(path: string): Promise<() => Promise<void>> {
   while (true) {
     try {
       await mkdir(lockPath, { recursive: false });
-      await writeFile(
-        `${lockPath}/owner`,
-        JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString() }),
-        "utf8",
-      );
+      await writeQueueLockOwner(lockPath);
+      const heartbeat = startQueueLockHeartbeat(lockPath);
       return async () => {
+        clearInterval(heartbeat);
         await rm(lockPath, { recursive: true, force: true });
       };
     } catch (error) {
@@ -151,6 +166,7 @@ export type FlushRetainQueueOptions = {
   maxRetries?: number;
   maxJobs?: number;
   stopOnFirstFailure?: boolean;
+  maxElapsedMs?: number;
 };
 
 export interface FlushRetainQueueResult {
@@ -169,13 +185,15 @@ export async function flushRetainQueue(
       typeof options === "number" ? { maxRetries: options } : options;
     const maxRetries = resolvedOptions.maxRetries ?? 5;
     const maxJobs = resolvedOptions.maxJobs ?? Number.POSITIVE_INFINITY;
+    const maxElapsedMs = resolvedOptions.maxElapsedMs ?? Number.POSITIVE_INFINITY;
+    const started = Date.now();
     const jobs = await readRetainQueue(path);
     const remaining: RetainJob[] = [];
     const deadLetteredJobs: RetainJob[] = [];
     let sent = 0;
     for (const [index, job] of jobs.entries()) {
-      if (index >= maxJobs) {
-        remaining.push(job, ...jobs.slice(index + 1));
+      if (index >= maxJobs || Date.now() - started >= maxElapsedMs) {
+        remaining.push(...jobs.slice(index));
         break;
       }
       try {
