@@ -228,6 +228,41 @@ describe("extension hooks", () => {
     expect(contextResult.messages.at(-1)).toEqual(original[0]);
   });
 
+  it("does not append synthetic recall when transcript does not end with user", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    const handlers: Record<string, Array<(event: any, ctx: any) => Promise<any>>> = {};
+    const pi = {
+      on: vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+        handlers[name] = [...(handlers[name] ?? []), handler];
+      }),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    await handlers.session_start?.[0]?.({}, ctx);
+    const contextResult = await handlers.context?.[0]?.(
+      {
+        messages: [
+          { role: "user", content: "Use tools", timestamp: 1 },
+          { role: "assistant", content: "Calling tool", timestamp: 2 },
+          { role: "toolResult", content: "tool output", timestamp: 3 },
+        ],
+      },
+      ctx,
+    );
+
+    expect(contextResult).toBeUndefined();
+  });
+
   it("ensures global bank even when project bank is disabled", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
     mkdirSync(join(cwd, ".git"));

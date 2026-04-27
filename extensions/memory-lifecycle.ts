@@ -245,7 +245,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
           if (last && lastRole === "user") {
             return { messages: [...event.messages.slice(0, -1), recallMessage, last] };
           }
-          return { messages: [...event.messages, recallMessage] };
+          return undefined;
         }
         return { messages: [recallMessage, ...event.messages] };
       } catch {
