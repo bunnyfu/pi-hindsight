@@ -311,11 +311,10 @@ export interface FlushRetainQueueResult {
 export async function flushRetainQueue(
   path: string,
   client: HindsightLikeClient,
-  options: FlushRetainQueueOptions | number = {},
+  options: FlushRetainQueueOptions = {},
 ): Promise<FlushRetainQueueResult> {
   return withQueueLock(path, async () => {
-    const resolvedOptions: FlushRetainQueueOptions =
-      typeof options === "number" ? { maxRetries: options } : options;
+    const resolvedOptions = options;
     const maxRetries = resolvedOptions.maxRetries ?? 5;
     const maxJobs = resolvedOptions.maxJobs ?? Number.POSITIVE_INFINITY;
     const maxElapsedMs = resolvedOptions.maxElapsedMs ?? Number.POSITIVE_INFINITY;

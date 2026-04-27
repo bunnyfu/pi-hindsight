@@ -155,7 +155,7 @@ describe("retain queue", () => {
         recall: async () => [],
         reflect: async () => ({}),
       },
-      1,
+      { maxRetries: 1 },
     );
     expect(result).toMatchObject({ sent: 0, remaining: 0, deadLettered: 1 });
     expect(await readRetainQueue(path)).toHaveLength(0);

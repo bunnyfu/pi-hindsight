@@ -84,14 +84,7 @@ function truncateRecallQueryLines(
   return truncateRecallQuery(query, maxChars);
 }
 
-export function composeRecallQuery(
-  messages: AgentMessage[],
-  policyOrRecentTurns: RecallQueryPolicy | number,
-): string {
-  const policy =
-    typeof policyOrRecentTurns === "number"
-      ? { roles: ["user"] as RecallRole[], contextTurns: policyOrRecentTurns, maxQueryChars: 800 }
-      : policyOrRecentTurns;
+export function composeRecallQuery(messages: AgentMessage[], policy: RecallQueryPolicy): string {
   const allowedRoles = new Set<string>(policy.roles);
   const selectedLines = messages
     .filter((message) => allowedRoles.has(messageRole(message)))

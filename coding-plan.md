@@ -214,7 +214,7 @@ export interface ResolvedConfig {
     budget: "low" | "mid" | "high";
     maxTokens: number;
     types: Array<"world" | "experience" | "observation">;
-    recentTurnsForQuery: number;
+    contextTurns: number;
     injectionMode: "context";
     includeFactsInDebug: boolean;
   };
@@ -223,7 +223,11 @@ export interface ResolvedConfig {
     enabled: boolean;
     async: boolean;
     updateMode: "append" | "replace";
-    includeToolResults: "meaningful-only" | "all" | "none";
+    content: {
+      user: string[];
+      assistant: string[];
+      toolResult: string[];
+    };
     redactSecrets: boolean;
     queuePath: string;
   };
