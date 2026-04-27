@@ -53,6 +53,7 @@ describe("resolveConfig", () => {
           timeoutMs: 0,
           injectionPosition: "middle",
         },
+        observations: { enabled: true, scopes: [["repo:{repoKey}"], []] },
         retain: {
           includeToolResults: "sometimes",
           queuePath: "",
@@ -74,6 +75,8 @@ describe("resolveConfig", () => {
     expect(config.recall.budget).toBe("low");
     expect(config.recall.maxTokens).toBe(800);
     expect(config.recall.types).toEqual(["world", "experience", "observation"]);
+    expect(config.observations.enabled).toBe(true);
+    expect(config.observations.scopes).toEqual([["harness:pi"], ["repo:{repoKey}"]]);
     expect(config.recall.contextTurns).toBe(2);
     expect(config.recall.roles).toEqual(["user", "assistant"]);
     expect(config.recall.maxQueryChars).toBe(800);

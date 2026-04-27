@@ -118,6 +118,10 @@ Example project config:
     "timeoutMs": 10000,
     "injectionPosition": "prepend"
   },
+  "observations": {
+    "enabled": true,
+    "scopes": [["harness:pi"], ["repo:{repoKey}"]]
+  },
   "retain": {
     "queuePath": ".pi/hindsight/retain-queue.jsonl",
     "updateMode": "append",
@@ -153,6 +157,8 @@ Retain jobs are written to a JSONL queue before sending. If Hindsight is down, j
 Shutdown queue flushing is intentionally bounded by `retain.shutdownFlushMaxJobs` and `retain.shutdownFlushTimeoutMs`. The timeout is a soft bound checked between queued jobs so shutdown does not leave a background flush holding the queue lock. If jobs remain after shutdown, they stay on disk and are visible through `/hindsight:debug` queue length for later flushing.
 
 At session start, the extension shows the selected bank ID. If no bank ID is configured, it reports the automatically derived bank ID and how to override it. Project and global banks can define `mission` text; configured missions are sent to Hindsight as both `reflectMission` and `retainMission` during bank ensure so extraction and reflection stay aligned with the bank purpose. If no mission is configured, Pi-specific default missions are used.
+
+Observation scope configuration is explicit under `observations`. The current implementation validates and expands scope placeholders for diagnostics and passes `observations.enabled` to bank ensure as Hindsight `enableObservations`; it does not invent unsupported retain request fields. Supported placeholders are `{repoKey}`, `{sessionId}`, `{cwdHash}`, and `{projectBankId}`.
 
 The footer status is configurable with two independent knobs:
 

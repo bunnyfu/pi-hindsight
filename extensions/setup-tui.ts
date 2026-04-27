@@ -34,6 +34,7 @@ function statusLines(config: ResolvedConfig, projectBankId: string): string[] {
     `project mission: ${config.banks.project.mission ? "configured" : "default"}`,
     `global: ${config.banks.global.enabled ? (config.banks.global.bankId ?? "enabled, no id") : "disabled"}`,
     `global mission: ${config.banks.global.mission ? "configured" : "default"}`,
+    `observations: ${config.observations.enabled ? "enabled" : "disabled"}, scopes=${config.observations.scopes.length}`,
     `recall: ${config.recall.enabled}, ${config.recall.budget}, ${config.recall.maxTokens} tokens`,
     `retain: ${config.retain.enabled}, async=${config.retain.async}, update=${config.retain.updateMode}`,
     `queuePath: ${config.retain.queuePath}`,

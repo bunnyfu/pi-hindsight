@@ -158,7 +158,10 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       if (!config.enabled) return;
       if (config.banks.project.enabled) {
         try {
-          await ensureProjectBank(client, projectBankId, config.banks.project);
+          await ensureProjectBank(client, projectBankId, {
+            ...config.banks.project,
+            enableObservations: config.observations.enabled,
+          });
         } catch (error) {
           setMemoryStatus(runtime, "recall-failed");
           notify(
@@ -170,7 +173,10 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       }
       if (config.banks.global.enabled && config.banks.global.bankId) {
         try {
-          await ensureGlobalBank(client, config.banks.global.bankId, config.banks.global);
+          await ensureGlobalBank(client, config.banks.global.bankId, {
+            ...config.banks.global,
+            enableObservations: config.observations.enabled,
+          });
         } catch (error) {
           setMemoryStatus(runtime, "recall-failed");
           notify(

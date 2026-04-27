@@ -14,6 +14,7 @@ const DEFAULT_GLOBAL_RETAIN_MISSION =
 
 export interface BankMissionConfig {
   mission?: string;
+  enableObservations?: boolean;
 }
 
 export async function ensureProjectBank(
@@ -27,7 +28,7 @@ export async function ensureProjectBank(
     reflectMission: config.mission ?? DEFAULT_PROJECT_REFLECT_MISSION,
     retainMission: config.mission ?? DEFAULT_PROJECT_RETAIN_MISSION,
     retainExtractionMode: "concise",
-    enableObservations: true,
+    enableObservations: config.enableObservations ?? true,
   });
 }
 
@@ -42,6 +43,6 @@ export async function ensureGlobalBank(
     reflectMission: config.mission ?? DEFAULT_GLOBAL_REFLECT_MISSION,
     retainMission: config.mission ?? DEFAULT_GLOBAL_RETAIN_MISSION,
     retainExtractionMode: "concise",
-    enableObservations: true,
+    enableObservations: config.enableObservations ?? true,
   });
 }
