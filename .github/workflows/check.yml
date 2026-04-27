@@ -64,7 +64,7 @@ jobs:
           HINDSIGHT_BASE_URL: ${{ secrets.HINDSIGHT_BASE_URL }}
           HINDSIGHT_API_KEY: ${{ secrets.HINDSIGHT_API_KEY }}
           HINDSIGHT_SMOKE_ATTEMPTS: ${{ vars.HINDSIGHT_SMOKE_ATTEMPTS || '20' }}
-          PI_HINDSIGHT_SMOKE_BANK_ID: ${{ vars.PI_HINDSIGHT_SMOKE_BANK_ID || '' }}
+          PI_HINDSIGHT_SMOKE_BANK_ID: ${{ vars.PI_HINDSIGHT_SMOKE_BANK_ID }}
         run: |
           if [ -z "$HINDSIGHT_BASE_URL" ]; then
             echo "HINDSIGHT_BASE_URL secret is required for smoke-configured-server."

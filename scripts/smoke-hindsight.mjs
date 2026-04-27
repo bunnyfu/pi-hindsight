@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 import { HindsightClient } from "@vectorize-io/hindsight-client";
 
-const baseUrl = process.env.HINDSIGHT_BASE_URL ?? "http://localhost:8888";
-const apiKey = process.env.HINDSIGHT_API_KEY;
-const bankId = process.env.PI_HINDSIGHT_SMOKE_BANK_ID ?? `pi-hindsight-smoke-${Date.now()}`;
+function envValue(name) {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
+}
+
+const baseUrl = envValue("HINDSIGHT_BASE_URL") ?? "http://localhost:8888";
+const apiKey = envValue("HINDSIGHT_API_KEY");
+const bankId = envValue("PI_HINDSIGHT_SMOKE_BANK_ID") ?? `pi-hindsight-smoke-${Date.now()}`;
 const marker = `pi-hindsight-smoke-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 const client = new HindsightClient({
