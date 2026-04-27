@@ -19,7 +19,9 @@ describe("recall formatting", () => {
       },
       { role: "user", content: "second", timestamp: 3 },
     ] as unknown as AgentMessage[];
-    expect(composeRecallQuery(messages, 1)).toBe("user: second");
+    expect(
+      composeRecallQuery(messages, { roles: ["user"], contextTurns: 1, maxQueryChars: 800 }),
+    ).toBe("user: second");
   });
 
   it("respects roles, context turns, max query chars, and ignores injected memory", () => {

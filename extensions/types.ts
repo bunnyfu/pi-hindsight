@@ -27,7 +27,6 @@ export interface ResolvedConfig {
     budget: Budget;
     maxTokens: number;
     types: string[];
-    recentTurnsForQuery: number;
     contextTurns: number;
     roles: RecallRole[];
     maxQueryChars: number;
@@ -53,7 +52,6 @@ export interface ResolvedConfig {
     async: boolean;
     updateMode: UpdateMode;
     appendFallback: AppendFallback;
-    includeToolResults: "meaningful-only" | "all" | "none";
     content: {
       user: RetainUserContent[];
       assistant: RetainAssistantContent[];

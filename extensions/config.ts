@@ -14,7 +14,6 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     budget: "mid",
     maxTokens: 800,
     types: ["world", "experience", "observation"],
-    recentTurnsForQuery: 2,
     contextTurns: 2,
     roles: ["user", "assistant"],
     maxQueryChars: 800,
@@ -42,7 +41,6 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     async: true,
     updateMode: "append",
     appendFallback: "error",
-    includeToolResults: "meaningful-only",
     content: {
       user: ["text"],
       assistant: ["text", "toolCall"],
@@ -177,23 +175,6 @@ function toolNameFilter(
   };
 }
 
-function includeToolResultsToContent(
-  value: "meaningful-only" | "all" | "none",
-): Array<"error" | "summary" | "content"> {
-  if (value === "none") return [];
-  if (value === "all") return ["error", "summary", "content"];
-  return ["error"];
-}
-
-function hasConfiguredToolResultContent(rawConfig: unknown): boolean {
-  return (
-    isRecord(rawConfig) &&
-    isRecord(rawConfig.retain) &&
-    isRecord(rawConfig.retain.content) &&
-    "toolResult" in rawConfig.retain.content
-  );
-}
-
 function hasConfiguredRecallField(rawConfig: unknown, field: string): boolean {
   return isRecord(rawConfig) && isRecord(rawConfig.recall) && field in rawConfig.recall;
 }
@@ -249,14 +230,7 @@ export function normalizeConfig(config: ResolvedConfig, rawConfig?: unknown): Re
       ),
       maxTokens: positiveInt(config.recall?.maxTokens, DEFAULT_CONFIG.recall.maxTokens),
       types: stringArray(config.recall?.types, DEFAULT_CONFIG.recall.types),
-      recentTurnsForQuery: positiveInt(
-        config.recall?.recentTurnsForQuery,
-        DEFAULT_CONFIG.recall.recentTurnsForQuery,
-      ),
-      contextTurns: positiveInt(
-        config.recall?.contextTurns ?? config.recall?.recentTurnsForQuery,
-        DEFAULT_CONFIG.recall.contextTurns,
-      ),
+      contextTurns: positiveInt(config.recall?.contextTurns, DEFAULT_CONFIG.recall.contextTurns),
       roles: enumArray(
         config.recall?.roles,
         ["user", "assistant", "tool", "system"],
@@ -322,11 +296,6 @@ export function normalizeConfig(config: ResolvedConfig, rawConfig?: unknown): Re
         ["error", "per-turn-documents"],
         DEFAULT_CONFIG.retain.appendFallback,
       ),
-      includeToolResults: enumValue(
-        config.retain?.includeToolResults,
-        ["meaningful-only", "all", "none"],
-        DEFAULT_CONFIG.retain.includeToolResults,
-      ),
       content: {
         user: enumArray(config.retain?.content?.user, ["text"], DEFAULT_CONFIG.retain.content.user),
         assistant: enumArray(
@@ -335,17 +304,9 @@ export function normalizeConfig(config: ResolvedConfig, rawConfig?: unknown): Re
           DEFAULT_CONFIG.retain.content.assistant,
         ),
         toolResult: enumArray(
-          hasConfiguredToolResultContent(rawConfig)
-            ? config.retain?.content?.toolResult
-            : undefined,
+          config.retain?.content?.toolResult,
           ["error", "summary", "content"],
-          includeToolResultsToContent(
-            enumValue(
-              config.retain?.includeToolResults,
-              ["meaningful-only", "all", "none"],
-              DEFAULT_CONFIG.retain.includeToolResults,
-            ),
-          ),
+          DEFAULT_CONFIG.retain.content.toolResult,
         ),
       },
       toolFilter: {

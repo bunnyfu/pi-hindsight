@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG, resolveConfig } from "../extensions/config.js";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { DEFAULT_CONFIG } from "../extensions/config.js";
 import { buildRetainJob } from "../extensions/retain.js";
 import type { AgentEndEvent } from "@mariozechner/pi-coding-agent";
 
@@ -75,48 +72,6 @@ describe("buildRetainJob", () => {
     expect(retained.map((message) => message.content).join("\n")).toContain("failed");
     expect(retained.map((message) => message.content).join("\n")).not.toContain("huge file");
     expect(retained.map((message) => message.content).join("\n")).not.toContain("memory");
-  });
-
-  it("maps legacy includeToolResults all to full tool result content", () => {
-    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
-    mkdirSync(join(cwd, ".pi"));
-    writeFileSync(
-      join(cwd, ".pi", "hindsight.json"),
-      JSON.stringify({ retain: { includeToolResults: "all" } }),
-    );
-    const legacyConfig = resolveConfig(cwd);
-    const messages = [
-      {
-        role: "toolResult",
-        toolName: "bash",
-        isError: false,
-        content: "full output",
-        timestamp: Date.now(),
-      },
-    ] as unknown as AgentEndEvent["messages"];
-    const job = buildRetainJob({ config: legacyConfig, cwd: "/repo", bankId: "bank", messages });
-    expect(job?.item.content).toContain("full output");
-  });
-
-  it("maps legacy includeToolResults none to no tool result content", () => {
-    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
-    mkdirSync(join(cwd, ".pi"));
-    writeFileSync(
-      join(cwd, ".pi", "hindsight.json"),
-      JSON.stringify({ retain: { includeToolResults: "none" } }),
-    );
-    const config = resolveConfig(cwd);
-    const messages = [
-      {
-        role: "toolResult",
-        toolName: "bash",
-        isError: true,
-        content: "error output",
-        timestamp: Date.now(),
-      },
-    ] as unknown as AgentEndEvent["messages"];
-    const job = buildRetainJob({ config, cwd: "/repo", bankId: "bank", messages });
-    expect(job).toBeUndefined();
   });
 
   it("honors assistant text, toolCall, and thinking selectors", () => {
