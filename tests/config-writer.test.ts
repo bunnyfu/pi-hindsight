@@ -39,6 +39,7 @@ describe("config writer", () => {
     expect(
       buildProjectConfigPatch({
         timeoutMs: 1234,
+        apiKeyEnvVar: "HINDSIGHT_API_KEY",
         recallBudget: "mid",
         recallMaxTokens: 900,
         retainAsync: false,
@@ -51,13 +52,19 @@ describe("config writer", () => {
         notifyRetain: true,
       }),
     ).toEqual({
-      hindsight: { timeoutMs: 1234 },
+      hindsight: { timeoutMs: 1234, apiKey: { source: "env", name: "HINDSIGHT_API_KEY" } },
       recall: { budget: "mid", maxTokens: 900 },
       retain: { async: false },
       import: { includeBranches: "all-leaves" },
       status: { style: "emoji", detail: "activity", maxLength: 30, showActivity: false },
       notifications: { recall: true, retain: true },
     });
+  });
+
+  it("rejects invalid api key env var names", () => {
+    expect(() => buildProjectConfigPatch({ apiKeyEnvVar: "sk-secret" })).toThrow(
+      /environment variable name/,
+    );
   });
 
   it("deep merges without deleting existing config", () => {

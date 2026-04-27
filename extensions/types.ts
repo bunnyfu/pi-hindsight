@@ -12,7 +12,7 @@ export type RecallInjectionPosition = "prepend" | "append";
 
 export interface ResolvedConfig {
   enabled: boolean;
-  hindsight: { baseUrl: string; apiKey?: string; timeoutMs: number };
+  hindsight: { baseUrl: string; apiKey?: string; apiKeyRef?: string; timeoutMs: number };
   banks: {
     project: {
       enabled: boolean;

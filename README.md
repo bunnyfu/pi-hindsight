@@ -81,7 +81,7 @@ Inside Pi, open the interactive configuration TUI:
 /hindsight:setup
 ```
 
-The setup TUI lets you choose a deployment profile, edit the memory profile, project bank ID, Hindsight base URL, timeout, global bank, recall budget, token budget, retain settings, queue path, import branch mode, statusline display, and Pi window notifications. Deployment profile choices cover Hindsight Cloud, an existing local/external API, and local `hindsight-embed` guidance. The local `hindsight-embed` profile gives commands to run yourself and can set the base URL to `http://localhost:8888`; it does not manage daemons. It writes `.pi/hindsight.json` and reloads the extension config after each change. Active import config covers branch mode, replace-vs-append behavior, manifest path, checkpoint path, and resume behavior.
+The setup TUI lets you choose a deployment profile, edit the memory profile, project bank ID, Hindsight base URL, API key env reference, timeout, global bank, recall budget, token budget, retain settings, queue path, import branch mode, statusline display, and Pi window notifications. Deployment profile choices cover Hindsight Cloud, an existing local/external API, and local `hindsight-embed` guidance. The local `hindsight-embed` profile gives commands to run yourself and can set the base URL to `http://localhost:8888`; it does not manage daemons. It writes `.pi/hindsight.json` and reloads the extension config after each change. Active import config covers branch mode, replace-vs-append behavior, manifest path, checkpoint path, and resume behavior.
 
 Memory profiles make global memory explicit. Choose the narrowest route that fits the repo:
 
@@ -109,6 +109,10 @@ Supported environment overrides:
 ```bash
 export HINDSIGHT_BASE_URL=http://localhost:8888
 export HINDSIGHT_API_KEY=...
+# or point config/env at another env var without storing the raw key:
+export HINDSIGHT_API_KEY_REF=HINDSIGHT_API_KEY
+# project config SecretRef shape:
+# { "hindsight": { "apiKey": { "source": "env", "name": "HINDSIGHT_API_KEY" } } }
 export PI_HINDSIGHT_ENABLED=true
 export PI_HINDSIGHT_PROJECT_BANK_ID=pi-project-my-repo
 export PI_HINDSIGHT_GLOBAL_BANK_ID=pi-global

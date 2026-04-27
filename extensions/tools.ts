@@ -105,7 +105,7 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
             text: `Wrote ${result.path}\nProject bank: ${result.projectBankId}\nRun /hindsight:debug to verify.`,
           },
         ],
-        details: { path: result.path, projectBankId: result.projectBankId, config: result.config },
+        details: { path: result.path, projectBankId: result.projectBankId },
       };
     },
   });

@@ -75,6 +75,7 @@ export async function runHindsightSetupTui(
       "Choose deployment profile",
       "Set project bank ID",
       "Set Hindsight base URL",
+      "Set API key env reference",
       "Set timeout (ms)",
       config.enabled ? "Disable extension" : "Enable extension",
       "Set memory profile",
@@ -113,10 +114,9 @@ export async function runHindsightSetupTui(
         if (value === "Hindsight Cloud") {
           const baseUrl = await ctx.ui.input("Hindsight Cloud base URL", config.hindsight.baseUrl);
           if (baseUrl) await writeAndReload(ctx, deps, { baseUrl: baseUrl.trim() });
-          ctx.ui.notify(
-            "Cloud profile selected. Store API keys outside project config; SecretRef setup is a separate roadmap item.",
-            "info",
-          );
+          const envName = await ctx.ui.input("API key env var name", "HINDSIGHT_API_KEY");
+          if (envName) await writeAndReload(ctx, deps, { apiKeyEnvVar: envName.trim() });
+          ctx.ui.notify("Cloud profile selected. API key stored as env SecretRef.", "info");
         } else if (value === "Existing local/external API") {
           const baseUrl = await ctx.ui.input("Hindsight API base URL", config.hindsight.baseUrl);
           if (baseUrl) await writeAndReload(ctx, deps, { baseUrl: baseUrl.trim() });
@@ -136,6 +136,9 @@ export async function runHindsightSetupTui(
       } else if (choice === "Set Hindsight base URL") {
         const value = await ctx.ui.input("Hindsight base URL", config.hindsight.baseUrl);
         if (value) await writeAndReload(ctx, deps, { baseUrl: value.trim() });
+      } else if (choice === "Set API key env reference") {
+        const value = await ctx.ui.input("API key env var name", "HINDSIGHT_API_KEY");
+        if (value) await writeAndReload(ctx, deps, { apiKeyEnvVar: value.trim() });
       } else if (choice === "Set timeout (ms)") {
         const value = await ctx.ui.input(
           "Timeout in milliseconds",
