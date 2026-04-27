@@ -8,7 +8,7 @@ import {
   writeProjectConfig,
   type ProjectConfigPatchInput,
 } from "./config-writer.js";
-import { importPiSession } from "./import-sessions.js";
+import { importPiSession, importProjectSessions } from "./import-sessions.js";
 import {
   importManifestSummary,
   readImportManifest,
@@ -131,6 +131,28 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
       const bankId = args.bank || deps.getProjectBankId();
       const result = await importPiSession({
         sessionFile: args.sessionFile,
+        bankId,
+        client: deps.getClient(),
+        config: deps.getConfig(),
+        ...(args.dryRun !== undefined ? { dryRun: args.dryRun } : {}),
+        ...(args.includeBranches ? { includeBranches: args.includeBranches } : {}),
+      });
+      return { bankId, ...result };
+    },
+
+    async importProjectSessions(args: {
+      cwd: string;
+      currentSessionFile?: string;
+      searchDir?: string;
+      bank?: string;
+      dryRun?: boolean;
+      includeBranches?: ResolvedConfig["import"]["includeBranches"];
+    }) {
+      const bankId = args.bank || deps.getProjectBankId();
+      const result = await importProjectSessions({
+        cwd: args.cwd,
+        ...(args.currentSessionFile ? { currentSessionFile: args.currentSessionFile } : {}),
+        ...(args.searchDir ? { searchDir: args.searchDir } : {}),
         bankId,
         client: deps.getClient(),
         config: deps.getConfig(),

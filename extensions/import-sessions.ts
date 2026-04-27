@@ -1,5 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { readdir, readFile, stat } from "node:fs/promises";
+import { dirname, extname, join } from "node:path";
 import type { HindsightLikeClient, ResolvedConfig } from "./types.js";
 import { importDocumentId, stableSessionId } from "./session.js";
 import { parseImportSessionJsonl, parsePiSessionJsonl } from "./import-parser.js";
@@ -12,13 +12,75 @@ import {
   writeImportCheckpoint,
   type ImportCheckpoint,
 } from "./import-checkpoint.js";
-import { resolveImportManifestPath, upsertImportManifestEntries } from "./import-manifest.js";
+import {
+  hashImportContent,
+  resolveImportManifestPath,
+  upsertImportManifestEntries,
+} from "./import-manifest.js";
 import { previewImportBranch, retainImportBranch } from "./import-retain.js";
 
 export { parseImportSessionJsonl, parsePiSessionJsonl } from "./import-parser.js";
 export { selectImportBranches } from "./import-branches.js";
 export type { ImportBranch } from "./import-branches.js";
 export type { ParsedMessage, ParsedSession } from "./import-parser.js";
+
+function sameProjectCwd(sessionCwd: string | undefined, cwd: string): boolean {
+  if (!sessionCwd) return false;
+  return sessionCwd === cwd;
+}
+
+async function isFile(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function projectSessionCheckpointPath(basePath: string, sessionFile: string): string {
+  return `${basePath}.${hashImportContent(sessionFile).slice(0, 12)}.json`;
+}
+
+export async function discoverProjectSessionFiles(args: {
+  cwd: string;
+  currentSessionFile?: string;
+  searchDir?: string;
+}): Promise<ProjectSessionDiscoveryResult> {
+  const searchDir =
+    args.searchDir ?? (args.currentSessionFile ? dirname(args.currentSessionFile) : undefined);
+  if (!searchDir) return { sessionFiles: [], scanned: 0 };
+  const entries = await readdir(searchDir);
+  const candidates = entries
+    .filter((entry) => extname(entry) === ".jsonl")
+    .map((entry) => join(searchDir, entry));
+  const sessionFiles: string[] = [];
+  let scanned = 0;
+  for (const candidate of candidates) {
+    if (!(await isFile(candidate))) continue;
+    scanned += 1;
+    try {
+      const parsed = parseImportSessionJsonl(await readFile(candidate, "utf8"));
+      if (sameProjectCwd(parsed.cwd, args.cwd)) sessionFiles.push(candidate);
+    } catch {
+      // Ignore unrelated or malformed JSONL files during project-scoped discovery.
+    }
+  }
+  return { sessionFiles: sessionFiles.sort(), scanned };
+}
+
+export interface ProjectSessionDiscoveryResult {
+  sessionFiles: string[];
+  scanned: number;
+}
+
+export interface ImportProjectSessionsResult {
+  sessionFiles: string[];
+  scanned: number;
+  imported: ImportSessionResult[];
+  messageCount: number;
+  documentCount: number;
+  dryRun: boolean;
+}
 
 export interface ImportSessionDocumentResult {
   documentId: string;
@@ -205,5 +267,52 @@ export async function importPiSession(args: {
     checkpointPath,
     runId,
     documents,
+  };
+}
+
+export async function importProjectSessions(args: {
+  cwd: string;
+  currentSessionFile?: string;
+  searchDir?: string;
+  bankId: string;
+  client: HindsightLikeClient;
+  config: ResolvedConfig;
+  dryRun?: boolean;
+  includeBranches?: ResolvedConfig["import"]["includeBranches"];
+}): Promise<ImportProjectSessionsResult> {
+  const discovery = await discoverProjectSessionFiles({
+    cwd: args.cwd,
+    ...(args.currentSessionFile ? { currentSessionFile: args.currentSessionFile } : {}),
+    ...(args.searchDir ? { searchDir: args.searchDir } : {}),
+  });
+  const imported: ImportSessionResult[] = [];
+  for (const sessionFile of discovery.sessionFiles) {
+    imported.push(
+      await importPiSession({
+        sessionFile,
+        bankId: args.bankId,
+        client: args.client,
+        config: {
+          ...args.config,
+          import: {
+            ...args.config.import,
+            checkpointPath: projectSessionCheckpointPath(
+              args.config.import.checkpointPath,
+              sessionFile,
+            ),
+          },
+        },
+        ...(args.dryRun !== undefined ? { dryRun: args.dryRun } : {}),
+        ...(args.includeBranches ? { includeBranches: args.includeBranches } : {}),
+      }),
+    );
+  }
+  return {
+    sessionFiles: discovery.sessionFiles,
+    scanned: discovery.scanned,
+    imported,
+    messageCount: imported.reduce((count, result) => count + result.messageCount, 0),
+    documentCount: imported.reduce((count, result) => count + result.documents.length, 0),
+    dryRun: Boolean(args.dryRun),
   };
 }

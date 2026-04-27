@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../extensions/config.js";
 import {
+  discoverProjectSessionFiles,
   importPiSession,
+  importProjectSessions,
   parseImportSessionJsonl,
   parsePiSessionJsonl,
   selectImportBranches,
@@ -410,6 +412,154 @@ describe("Pi session import", () => {
     expect(calls).toHaveLength(1);
     expect(result.documents[0]).toMatchObject({ status: "completed", updateMode: "replace" });
     expect(result.runId).toContain(":replace:");
+  });
+
+  it("discovers only sessions scoped to the current project cwd", async () => {
+    const project = mkdtempSync(join(tmpdir(), "pi-hindsight-project-"));
+    const other = mkdtempSync(join(tmpdir(), "pi-hindsight-other-"));
+    const sessionsDir = mkdtempSync(join(tmpdir(), "pi-hindsight-sessions-"));
+    const current = join(sessionsDir, "current.jsonl");
+    const related = join(sessionsDir, "related.jsonl");
+    const unrelated = join(sessionsDir, "unrelated.jsonl");
+    writeFileSync(
+      current,
+      [
+        JSON.stringify({ type: "session", id: "current", cwd: project }),
+        JSON.stringify({ type: "message", id: "1", message: { role: "user", content: "c" } }),
+      ].join("\n"),
+    );
+    writeFileSync(
+      related,
+      [
+        JSON.stringify({ type: "session", id: "related", cwd: project }),
+        JSON.stringify({ type: "message", id: "1", message: { role: "user", content: "r" } }),
+      ].join("\n"),
+    );
+    writeFileSync(
+      unrelated,
+      [
+        JSON.stringify({ type: "session", id: "other", cwd: other }),
+        JSON.stringify({ type: "message", id: "1", message: { role: "user", content: "o" } }),
+      ].join("\n"),
+    );
+    writeFileSync(join(sessionsDir, "note.txt"), "ignore");
+
+    const result = await discoverProjectSessionFiles({ cwd: project, currentSessionFile: current });
+
+    expect(result.scanned).toBe(3);
+    expect(result.sessionFiles).toEqual([current, related].sort());
+  });
+
+  it("resumes project session imports with per-file checkpoints", async () => {
+    const project = mkdtempSync(join(tmpdir(), "pi-hindsight-project-"));
+    const sessionsDir = mkdtempSync(join(tmpdir(), "pi-hindsight-sessions-"));
+    const first = join(sessionsDir, "first.jsonl");
+    const second = join(sessionsDir, "second.jsonl");
+    writeFileSync(
+      first,
+      [
+        JSON.stringify({ type: "session", id: "first", cwd: project }),
+        JSON.stringify({ type: "message", id: "1", message: { role: "user", content: "first" } }),
+      ].join("\n"),
+    );
+    writeFileSync(
+      second,
+      [
+        JSON.stringify({ type: "session", id: "second", cwd: project }),
+        JSON.stringify({ type: "message", id: "1", message: { role: "user", content: "second" } }),
+      ].join("\n"),
+    );
+    const firstCalls: unknown[][] = [];
+    await expect(
+      importProjectSessions({
+        cwd: project,
+        currentSessionFile: first,
+        bankId: "bank",
+        config: {
+          ...DEFAULT_CONFIG,
+          import: { ...DEFAULT_CONFIG.import, replaceExistingImportedDocs: false },
+        },
+        client: {
+          retain: async (...args: unknown[]) => {
+            firstCalls.push(args);
+            if (firstCalls.length === 2) throw new Error("interrupted");
+          },
+          recall: async () => [],
+          reflect: async () => ({}),
+        },
+      }),
+    ).rejects.toThrow(/interrupted/);
+
+    const secondCalls: unknown[][] = [];
+    const result = await importProjectSessions({
+      cwd: project,
+      currentSessionFile: first,
+      bankId: "bank",
+      config: {
+        ...DEFAULT_CONFIG,
+        import: { ...DEFAULT_CONFIG.import, replaceExistingImportedDocs: false },
+      },
+      client: {
+        retain: async (...args: unknown[]) => {
+          secondCalls.push(args);
+        },
+        recall: async () => [],
+        reflect: async () => ({}),
+      },
+    });
+
+    expect(secondCalls).toHaveLength(1);
+    const retainedOptions = secondCalls[0]?.[2] as { documentId: string };
+    expect(retainedOptions.documentId).toBe("pi-import:second:leaf:1");
+    expect(result.imported.map((item) => [item.sessionFile, item.documents[0]?.status])).toEqual([
+      [first, "skipped"],
+      [second, "completed"],
+    ]);
+    expect(result.imported[0]?.checkpointPath).not.toBe(result.imported[1]?.checkpointPath);
+  });
+
+  it("dry-runs project session import without writing unrelated sessions", async () => {
+    const project = mkdtempSync(join(tmpdir(), "pi-hindsight-project-"));
+    const sessionsDir = mkdtempSync(join(tmpdir(), "pi-hindsight-sessions-"));
+    const current = join(sessionsDir, "current.jsonl");
+    const unrelated = join(sessionsDir, "unrelated.jsonl");
+    writeFileSync(
+      current,
+      [
+        JSON.stringify({ type: "session", id: "current", cwd: project }),
+        JSON.stringify({ type: "message", id: "1", message: { role: "user", content: "c" } }),
+      ].join("\n"),
+    );
+    writeFileSync(
+      unrelated,
+      [
+        JSON.stringify({ type: "session", id: "other", cwd: "/other" }),
+        JSON.stringify({ type: "message", id: "1", message: { role: "user", content: "o" } }),
+      ].join("\n"),
+    );
+    const calls: unknown[][] = [];
+
+    const result = await importProjectSessions({
+      cwd: project,
+      currentSessionFile: current,
+      bankId: "bank",
+      config: DEFAULT_CONFIG,
+      dryRun: true,
+      client: {
+        retain: async (...args: unknown[]) => {
+          calls.push(args);
+        },
+        recall: async () => [],
+        reflect: async () => ({}),
+      },
+    });
+
+    expect(result.dryRun).toBe(true);
+    expect(result.scanned).toBe(2);
+    expect(result.sessionFiles).toEqual([current]);
+    expect(result.documentCount).toBe(1);
+    expect(result.messageCount).toBe(1);
+    expect(calls).toHaveLength(0);
   });
 
   it("selects import branches without retaining or writing manifests", () => {
