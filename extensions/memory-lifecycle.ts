@@ -220,9 +220,14 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       if (!sessionMemory.recall) return undefined;
       const scopes = selectMemoryScopes(runtime.cwd, config);
       if (scopes.length === 0) return undefined;
+      if (config.recall.injectionPosition === "append") {
+        const last = event.messages[event.messages.length - 1];
+        const lastRole = (last as unknown as { role?: string } | undefined)?.role;
+        if (!last || lastRole !== "user") return undefined;
+      }
       try {
         setMemoryStatus(runtime, "recalling");
-        const { rendered, blocks } = await recallForContext({
+        const { rendered, blocks, failed } = await recallForContext({
           client,
           config,
           scopes,
@@ -230,17 +235,23 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
           cwd: runtime.cwd,
         });
         const memoryCount = blocks.reduce((count, block) => count + block.memoryCount, 0);
-        setMemoryStatus(runtime, memoryCount > 0 ? "recalled" : "recall-empty", memoryCount);
+        setMemoryStatus(
+          runtime,
+          memoryCount > 0 ? "recalled" : failed > 0 ? "recall-failed" : "recall-empty",
+          memoryCount,
+        );
         if (config.notifications.recall) {
           notify(
             runtime,
             memoryCount > 0
-              ? `Hindsight recalled ${memoryCount} memory item${memoryCount === 1 ? "" : "s"} from ${blocks.map((block) => block.bankId).join(", ")}`
-              : "Hindsight recalled no matching memory",
-            "info",
+              ? `Hindsight recalled ${memoryCount} memory item${memoryCount === 1 ? "" : "s"} from ${blocks.map((block) => block.bankId).join(", ")}${failed > 0 ? `; ${failed} bank${failed === 1 ? "" : "s"} failed` : ""}`
+              : failed > 0
+                ? `Hindsight recall failed for ${failed} bank${failed === 1 ? "" : "s"}`
+                : "Hindsight recalled no matching memory",
+            failed > 0 && memoryCount === 0 ? "warning" : "info",
           );
         }
-        if (config.recall.storeLastRecall) {
+        if (config.recall.storeLastRecall && (rendered || failed === 0)) {
           try {
             await writeLastRecallSnapshot(runtime.cwd, config.recall.lastRecallPath, {
               query: blocks[0]?.query ?? "",

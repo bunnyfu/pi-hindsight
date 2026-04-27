@@ -25,6 +25,10 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function removeDirectory(path: string): Promise<void> {
+  await rm(path, { recursive: true, force: true, maxRetries: 3, retryDelay: 10 });
+}
+
 function isAppendUnsupportedError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   const mentionsAppendMode = /append|update[_ ]?mode/i.test(message);
@@ -104,7 +108,7 @@ async function isQueueLockStale(lockPath: string, owner: QueueLockOwner): Promis
 
 async function removeLockIfOwned(lockPath: string, token: string): Promise<void> {
   const owner = await readQueueLockOwner(lockPath);
-  if (owner?.token === token) await rm(lockPath, { recursive: true, force: true });
+  if (owner?.token === token) await removeDirectory(lockPath);
 }
 
 function staleClaimPath(lockPath: string): string {
@@ -116,7 +120,7 @@ async function isStaleCleanupClaimActive(lockPath: string): Promise<boolean> {
   try {
     const info = await stat(claimPath);
     if (Date.now() - info.mtimeMs <= RETAIN_QUEUE_LOCK.staleMs) return true;
-    await rm(claimPath, { recursive: true, force: true });
+    await removeDirectory(claimPath);
     return false;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
@@ -138,7 +142,7 @@ async function withStaleCleanupClaim<T>(
   try {
     return await fn();
   } finally {
-    await rm(claimPath, { recursive: true, force: true });
+    await removeDirectory(claimPath);
   }
 }
 
@@ -150,7 +154,7 @@ async function removeLockIfStillStale(lockPath: string): Promise<boolean> {
         ? await isQueueLockStale(lockPath, owner)
         : await isOwnerlessLockDirectoryStale(lockPath);
       if (!stale) return false;
-      await rm(lockPath, { recursive: true, force: true });
+      await removeDirectory(lockPath);
       return true;
     })) ?? false
   );
@@ -173,7 +177,7 @@ async function acquireFileLock(path: string): Promise<() => Promise<void>> {
       try {
         await writeQueueLockOwner(lockPath, token);
       } catch (error) {
-        await rm(lockPath, { recursive: true, force: true });
+        await removeDirectory(lockPath);
         if (["ENOENT", "EINVAL"].includes((error as NodeJS.ErrnoException).code ?? "")) continue;
         throw error;
       }

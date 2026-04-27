@@ -362,6 +362,7 @@ describe("extension hooks", () => {
     const { default: hindsightExtension } = await import("../extensions/index.js");
     hindsightExtension(pi as any);
     await handlers.session_start?.[0]?.({}, ctx);
+    const beforeCalls = mocked.client.recall.mock.calls.length;
     const contextResult = await handlers.context?.[0]?.(
       {
         messages: [
@@ -374,6 +375,7 @@ describe("extension hooks", () => {
     );
 
     expect(contextResult).toBeUndefined();
+    expect(mocked.client.recall).toHaveBeenCalledTimes(beforeCalls);
   });
 
   it("ensures global bank even when project bank is disabled", async () => {

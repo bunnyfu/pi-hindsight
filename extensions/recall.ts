@@ -167,8 +167,9 @@ export async function recallForContext(args: {
   scopes: RecallScope[];
   messages: AgentMessage[];
   cwd?: string;
-}): Promise<{ rendered: string; blocks: RecallBlock[] }> {
+}): Promise<{ rendered: string; blocks: RecallBlock[]; failed: number }> {
   const blocks: RecallBlock[] = [];
+  let failed = 0;
   for (const scope of args.scopes) {
     const query = composeRecallQuery(args.messages, {
       roles: args.config.recall.roles,
@@ -178,25 +179,29 @@ export async function recallForContext(args: {
       includeDate: args.config.recall.includeDateInQuery,
       hints: args.cwd ? queryHints(args.cwd, args.config, scope) : [],
     });
-    const response = await withTimeout(
-      args.client.recall(scope.bankId, query, {
-        budget: args.config.recall.budget,
-        maxTokens: args.config.recall.maxTokens,
-        types: args.config.recall.types,
-        ...(scope.tags ? { tags: scope.tags } : {}),
-        ...(scope.tagsMatch ? { tagsMatch: scope.tagsMatch } : {}),
-      }),
-      args.config.recall.timeoutMs,
-    );
-    const results = textFromRecallResponse(response);
-    blocks.push({
-      bankId: scope.bankId,
-      query,
-      results,
-      memoryCount: results.length,
-      rendered: "",
-    });
+    try {
+      const response = await withTimeout(
+        args.client.recall(scope.bankId, query, {
+          budget: args.config.recall.budget,
+          maxTokens: args.config.recall.maxTokens,
+          types: args.config.recall.types,
+          ...(scope.tags ? { tags: scope.tags } : {}),
+          ...(scope.tagsMatch ? { tagsMatch: scope.tagsMatch } : {}),
+        }),
+        args.config.recall.timeoutMs,
+      );
+      const results = textFromRecallResponse(response);
+      blocks.push({
+        bankId: scope.bankId,
+        query,
+        results,
+        memoryCount: results.length,
+        rendered: "",
+      });
+    } catch {
+      failed += 1;
+    }
   }
   const rendered = renderRecallBlocks(blocks, args.config.recall.topK);
-  return { rendered, blocks: blocks.map((block) => ({ ...block, rendered })) };
+  return { rendered, blocks: blocks.map((block) => ({ ...block, rendered })), failed };
 }
