@@ -266,7 +266,16 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
         await readSessionMemoryMeta(runtime.cwd, runtime.sessionFile),
       );
       if (!sessionMemory.retain) {
-        await markRetainedMessages(runtime, event.messages);
+        try {
+          await markRetainedMessages(runtime, event.messages);
+        } catch (error) {
+          setMemoryStatus(runtime, "retain-failed");
+          notify(
+            runtime,
+            `Hindsight retain cursor update failed: ${(error as Error).message}`,
+            "warning",
+          );
+        }
         return { queued: false, sent: 0, remaining: 0 };
       }
       const messages = await newRetainMessages(runtime, event.messages);

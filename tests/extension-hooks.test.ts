@@ -426,6 +426,42 @@ describe("extension hooks", () => {
     expect(retainCalls[0]?.[2]).toMatchObject({ tags: expect.arrayContaining(["domain:test"]) });
   });
 
+  it("does not reject when skipped-message cursor update fails", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi", "hindsight"), { recursive: true });
+    writeFileSync(join(cwd, ".pi", "hindsight", "retain-cursors.json"), "not json");
+    const sessionFile = join(cwd, "session.jsonl");
+    await setSessionMemoryMode(cwd, sessionFile, "read-only");
+    const handlers: Record<string, Array<(event: any, ctx: any) => Promise<any>>> = {};
+    const pi = {
+      on: vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+        handlers[name] = [...(handlers[name] ?? []), handler];
+      }),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => sessionFile },
+    };
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    await handlers.session_start?.[0]?.({}, ctx);
+
+    await expect(
+      handlers.agent_end?.[0]?.(
+        { messages: [{ role: "user", content: "private", timestamp: 1 }] },
+        ctx,
+      ),
+    ).resolves.toBeUndefined();
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining("Hindsight retain cursor update failed"),
+      "warning",
+    );
+  });
+
   it("does not later retain overlapping messages skipped while read-only", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
     mkdirSync(join(cwd, ".git"));

@@ -168,7 +168,13 @@ export async function setSessionMemoryMode(
   mode: SessionMemoryMode,
 ): Promise<HindsightSessionMeta> {
   const meta = await readSessionMemoryMeta(cwd, sessionFile);
-  return writeSessionMemoryMeta(cwd, sessionFile, { ...meta, mode });
+  const updates: Partial<HindsightSessionMeta> = { mode };
+  if (mode === "normal" || mode === "read-only") updates.recallMode = "normal";
+  if (mode === "normal") {
+    updates.retained = true;
+    updates.retainMode = "normal";
+  }
+  return writeSessionMemoryMeta(cwd, sessionFile, { ...meta, ...updates });
 }
 
 export async function setSessionRetainEnabled(
