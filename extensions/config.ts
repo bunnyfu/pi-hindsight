@@ -155,8 +155,13 @@ function toolNameFilter(
   fallback: { include?: string[]; exclude?: string[] },
 ): { include?: string[]; exclude?: string[] } {
   if (!isRecord(value)) return fallback;
+  const hasInclude = "include" in value;
+  const hasExclude = "exclude" in value;
   const include = optionalStringArray(value.include);
   const exclude = optionalStringArray(value.exclude);
+  if ((hasInclude && !include) || (hasExclude && !exclude) || (!hasInclude && !hasExclude)) {
+    return fallback;
+  }
   return {
     ...(include ? { include } : {}),
     ...(exclude ? { exclude } : {}),

@@ -60,6 +60,7 @@ describe("resolveConfig", () => {
           appendFallback: "overwrite",
           shutdownFlushMaxJobs: -1,
           shutdownFlushTimeoutMs: 0,
+          toolFilter: { toolCall: { include: [42] }, toolResult: { exclude: "read" } },
         },
         import: {
           includeBranches: "all-the-branches",
@@ -86,7 +87,9 @@ describe("resolveConfig", () => {
     expect(config.retain.appendFallback).toBe("error");
     expect(config.retain.includeToolResults).toBe("meaningful-only");
     expect(config.retain.content.toolResult).toEqual(["error"]);
+    expect(config.retain.toolFilter.toolCall.exclude).toContain("hindsight_retain");
     expect(config.retain.toolFilter.toolResult.exclude).toContain("hindsight_recall");
+    expect(config.retain.toolFilter.toolResult.exclude).toContain("read");
     expect(config.retain.strip.message).toContain("usage");
     expect(config.retain.queuePath).toBe(".pi/hindsight/retain-queue.jsonl");
     expect(config.retain.shutdownFlushMaxJobs).toBe(10);
