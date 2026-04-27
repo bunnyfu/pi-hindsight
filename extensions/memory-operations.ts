@@ -15,9 +15,9 @@ import {
   resolveImportManifestPath,
 } from "./import-manifest.js";
 import { recallScopeTags } from "./banking.js";
-import { redactSecrets } from "./sanitize.js";
 import { stableSessionId } from "./session.js";
 import { explicitRetainTags } from "./memory-identity.js";
+import { retainDurably } from "./retain-durable.js";
 
 export interface MemoryOperationsDeps {
   getClient(): HindsightLikeClient;
@@ -64,16 +64,23 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
       const config = deps.getConfig();
       const bankId = args.bank || deps.getProjectBankId();
       const tags = explicitRetainTags(args.cwd, args.sessionFile, args.tags);
-      await deps
-        .getClient()
-        .retain(bankId, config.retain.redactSecrets ? redactSecrets(args.content) : args.content, {
-          context: args.context,
-          async: config.retain.async,
-          tags,
-          updateMode: "append",
-          documentId: `pi-explicit:${stableSessionId(args.sessionFile, args.cwd)}`,
-        });
-      return { bankId, tags };
+      const result = await retainDurably({
+        cwd: args.cwd,
+        config,
+        client: deps.getClient(),
+        bankId,
+        content: args.content,
+        context: args.context,
+        tags,
+        updateMode: "append",
+        documentId: `pi-explicit:${stableSessionId(args.sessionFile, args.cwd)}`,
+        metadata: {
+          cwd: args.cwd,
+          ...(args.sessionFile ? { pi_session_file: args.sessionFile } : {}),
+        },
+        source: "tool",
+      });
+      return { bankId, tags, ...result, queued: result.enqueued };
     },
 
     async configure(cwd: string, args: ConfigureMemoryArgs) {

@@ -41,7 +41,7 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
       const sessionFile = ctx.sessionManager.getSessionFile?.();
-      const { bankId, tags } = await operations.retainExplicit({
+      const result = await operations.retainExplicit({
         cwd: ctx.cwd,
         content: params.content,
         context: params.context,
@@ -49,9 +49,13 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
         ...(params.bank ? { bank: params.bank } : {}),
         ...(params.tags ? { tags: params.tags } : {}),
       });
+      const status =
+        result.remaining > 0
+          ? `Queued for ${result.bankId}; ${result.remaining} job${result.remaining === 1 ? "" : "s"} pending.`
+          : `Retained in ${result.bankId}.`;
       return {
-        content: [{ type: "text", text: `Retained in ${bankId}.` }],
-        details: { bankId, tags },
+        content: [{ type: "text", text: status }],
+        details: result,
       };
     },
   });
