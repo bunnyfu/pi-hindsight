@@ -68,6 +68,23 @@ describe("resolveConfig", () => {
     expect(config.hindsight.apiKeyRef).toBeUndefined();
   });
 
+  it("ignores invalid apiKeyRef strings and prefers valid SecretRef objects", () => {
+    const cwd = tmp();
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({
+        hindsight: {
+          apiKeyRef: "env:sk-secret",
+          apiKey: { source: "env", name: "PROJECT_KEY" },
+        },
+      }),
+    );
+    const config = resolveConfig(cwd, { PROJECT_KEY: "project-secret" });
+    expect(config.hindsight.apiKey).toBe("project-secret");
+    expect(config.hindsight.apiKeyRef).toBe("env:PROJECT_KEY");
+  });
+
   it("keeps direct apiKey strings even if they start with env prefix", () => {
     const cwd = tmp();
     mkdirSync(join(cwd, ".pi"));

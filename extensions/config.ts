@@ -131,6 +131,12 @@ export function validEnvVarName(value: string): boolean {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(value);
 }
 
+function normalizeApiKeyRefString(value: unknown): string | undefined {
+  if (typeof value !== "string" || !value.startsWith("env:")) return undefined;
+  const name = value.slice("env:".length);
+  return validEnvVarName(name) ? value : undefined;
+}
+
 function normalizeApiKeyRef(value: unknown): string | undefined {
   if (!isRecord(value)) return undefined;
   if (value.source !== "env" || typeof value.name !== "string" || !validEnvVarName(value.name))
@@ -209,8 +215,9 @@ export function normalizeConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): ResolvedConfig {
   const apiKeyRef =
-    optionalString(config.hindsight?.apiKeyRef, DEFAULT_CONFIG.hindsight.apiKeyRef) ??
-    normalizeApiKeyRef(config.hindsight?.apiKey);
+    normalizeApiKeyRef(config.hindsight?.apiKey) ??
+    normalizeApiKeyRefString(config.hindsight?.apiKeyRef) ??
+    normalizeApiKeyRefString(DEFAULT_CONFIG.hindsight.apiKeyRef);
   const apiKey =
     directApiKey(config.hindsight?.apiKey, DEFAULT_CONFIG.hindsight.apiKey) ??
     resolveApiKeyRef(apiKeyRef, env);
