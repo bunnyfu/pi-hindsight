@@ -166,6 +166,30 @@ describe("recall formatting", () => {
     expect(queries[1]).toContain("scope:global");
   });
 
+  it("keeps successful bank recall when another bank fails", async () => {
+    const result = await recallForContext({
+      client: {
+        retain: async () => undefined,
+        recall: async (bankId) => {
+          if (bankId === "project-bank") throw new Error("timeout");
+          return { results: [{ text: "global memory" }] };
+        },
+        reflect: async () => ({}),
+      },
+      config: DEFAULT_CONFIG,
+      scopes: [
+        { kind: "project", bankId: "project-bank" },
+        { kind: "global", bankId: "global-bank" },
+      ],
+      cwd: "/repo/project",
+      messages: [{ role: "user", content: "q", timestamp: 1 }] as unknown as AgentMessage[],
+    });
+
+    expect(result.failed).toBe(1);
+    expect(result.rendered).toContain("global memory");
+    expect(result.blocks.map((block) => block.bankId)).toEqual(["global-bank"]);
+  });
+
   it("uses bank-aware preambles and query hints", async () => {
     const queries: string[] = [];
     await recallForContext({
@@ -232,21 +256,21 @@ describe("recall formatting", () => {
     expect(rendered).not.toContain("two");
   });
 
-  it("times out slow recall", async () => {
-    await expect(
-      recallForContext({
-        client: {
-          retain: async () => undefined,
-          recall: async () => new Promise(() => undefined),
-          reflect: async () => ({}),
-        },
-        config: {
-          ...DEFAULT_CONFIG,
-          recall: { ...DEFAULT_CONFIG.recall, timeoutMs: 5 },
-        },
-        scopes: [{ bankId: "b" }],
-        messages: [{ role: "user", content: "q", timestamp: 1 }] as unknown as AgentMessage[],
-      }),
-    ).rejects.toThrow(/timed out/);
+  it("records slow recall as failed without throwing", async () => {
+    const result = await recallForContext({
+      client: {
+        retain: async () => undefined,
+        recall: async () => new Promise(() => undefined),
+        reflect: async () => ({}),
+      },
+      config: {
+        ...DEFAULT_CONFIG,
+        recall: { ...DEFAULT_CONFIG.recall, timeoutMs: 5 },
+      },
+      scopes: [{ bankId: "b" }],
+      messages: [{ role: "user", content: "q", timestamp: 1 }] as unknown as AgentMessage[],
+    });
+
+    expect(result).toMatchObject({ rendered: "", blocks: [], failed: 1 });
   });
 });
