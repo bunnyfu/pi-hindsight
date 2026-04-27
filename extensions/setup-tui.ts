@@ -1,7 +1,11 @@
 import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 import type { ResolvedConfig } from "./types.js";
 import { createMemoryOperations, type MemoryOperationsDeps } from "./memory-operations.js";
-import type { ProjectConfigPatchInput } from "./config-writer.js";
+import {
+  DEFAULT_GLOBAL_BANK_ID,
+  type MemoryProfile,
+  type ProjectConfigPatchInput,
+} from "./config-writer.js";
 
 type Deps = MemoryOperationsDeps;
 
@@ -25,11 +29,18 @@ async function writeAndReload(
   ctx.ui.notify(`Wrote ${result.path}`, "info");
 }
 
+function memoryProfileLabel(config: ResolvedConfig): MemoryProfile {
+  if (!config.banks.project.enabled) return "global-only";
+  if (config.banks.global.enabled) return "project+global";
+  return "project-only";
+}
+
 function statusLines(config: ResolvedConfig, projectBankId: string): string[] {
   return [
     `enabled: ${config.enabled}`,
     `baseUrl: ${config.hindsight.baseUrl}`,
     `timeoutMs: ${config.hindsight.timeoutMs}`,
+    `memory profile: ${memoryProfileLabel(config)}`,
     `projectBankId: ${projectBankId}${config.banks.project.bankId ? " (configured)" : " (auto)"}`,
     `project mission: ${config.banks.project.mission ? "configured" : "default"}`,
     `global: ${config.banks.global.enabled ? (config.banks.global.bankId ?? "enabled, no id") : "disabled"}`,
@@ -58,6 +69,7 @@ export async function runHindsightSetupTui(
       "Set Hindsight base URL",
       "Set timeout (ms)",
       config.enabled ? "Disable extension" : "Enable extension",
+      "Set memory profile",
       config.banks.global.enabled ? "Disable global bank" : "Enable global bank",
       "Set global bank ID",
       config.recall.enabled ? "Disable recall" : "Enable recall",
@@ -98,6 +110,19 @@ export async function runHindsightSetupTui(
         if (timeoutMs !== undefined) await writeAndReload(ctx, deps, { timeoutMs });
       } else if (choice === "Disable extension" || choice === "Enable extension") {
         await writeAndReload(ctx, deps, { enabled: choice === "Enable extension" });
+      } else if (choice === "Set memory profile") {
+        const value = await ctx.ui.select("Memory profile", [
+          "project-only",
+          "project+global",
+          "global-only",
+          CANCEL,
+        ]);
+        if (value && value !== CANCEL) {
+          await writeAndReload(ctx, deps, {
+            memoryProfile: value as MemoryProfile,
+            globalBankId: config.banks.global.bankId ?? DEFAULT_GLOBAL_BANK_ID,
+          });
+        }
       } else if (choice === "Disable global bank" || choice === "Enable global bank") {
         await writeAndReload(ctx, deps, { enableGlobalBank: choice === "Enable global bank" });
       } else if (choice === "Set global bank ID") {

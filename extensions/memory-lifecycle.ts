@@ -187,7 +187,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
           );
         }
       }
-      if (config.retain.enabled) {
+      if (config.retain.enabled && config.banks.project.enabled) {
         try {
           capabilities = await detectAppendCapability(client, projectBankId);
         } catch (error) {
@@ -258,7 +258,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       event: AgentEndEvent,
       ctx: RuntimeCtx,
     ): Promise<{ queued: boolean; sent: number; remaining: number }> {
-      if (!config.enabled || !config.retain.enabled)
+      if (!config.enabled || !config.retain.enabled || !config.banks.project.enabled)
         return { queued: false, sent: 0, remaining: 0 };
       const runtime = snapshotRuntime(ctx);
       if (!runtime) return { queued: false, sent: 0, remaining: 0 };

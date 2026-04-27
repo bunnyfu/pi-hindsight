@@ -48,6 +48,8 @@ describe("diagnostics", () => {
       appendUpdateMode: "not checked",
       appendFallback: "error",
     });
+    expect(report.memoryProfile).toBe("project-only");
+    expect(report.memoryRoutes).toEqual({ recall: ["project"], autoRetain: "project" });
     expect(report.bankMissions).toEqual({ projectConfigured: false, globalConfigured: false });
     const retain = report.retain as Record<string, any>;
     expect(retain.content.toolResult).toEqual(["error"]);
@@ -58,6 +60,26 @@ describe("diagnostics", () => {
     });
     expect(report.overrideProjectBankId).toContain("PI_HINDSIGHT_PROJECT_BANK_ID");
     expect(report.tags).toEqual(expect.arrayContaining(["source:pi"]));
+  });
+
+  it("formats global-only memory routes", () => {
+    const report = JSON.parse(
+      formatDebugReport({
+        cwd: process.cwd(),
+        projectBankId: "project-bank",
+        config: {
+          ...DEFAULT_CONFIG,
+          banks: {
+            project: { enabled: false, derive: "repo" },
+            global: { enabled: true, bankId: "global-bank" },
+          },
+        },
+        queueLength: 0,
+      }),
+    ) as Record<string, unknown>;
+
+    expect(report.memoryProfile).toBe("global-only");
+    expect(report.memoryRoutes).toEqual({ recall: ["global"], autoRetain: null });
   });
 
   it("formats observation scope diagnostics", () => {

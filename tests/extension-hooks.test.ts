@@ -538,6 +538,42 @@ describe("extension hooks", () => {
     expect(mocked.client.retain).not.toHaveBeenCalled();
   });
 
+  it("does not auto-retain when project bank is disabled", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({
+        banks: { project: { enabled: false }, global: { enabled: true, bankId: "global-bank" } },
+      }),
+    );
+    const handlers: Record<string, Array<(event: any, ctx: any) => Promise<any>>> = {};
+    const pi = {
+      on: vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+        handlers[name] = [...(handlers[name] ?? []), handler];
+      }),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    await handlers.session_start?.[0]?.({}, ctx);
+    expect(mocked.client.retain).not.toHaveBeenCalled();
+    await handlers.agent_end?.[0]?.(
+      { messages: [{ role: "user", content: "remember", timestamp: 1 }] },
+      ctx,
+    );
+
+    expect(mocked.client.retain).not.toHaveBeenCalled();
+  });
+
   it("does not emit retain status when retain is disabled", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
     mkdirSync(join(cwd, ".git"));

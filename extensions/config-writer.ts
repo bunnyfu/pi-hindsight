@@ -2,6 +2,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+export type MemoryProfile = "project-only" | "project+global" | "global-only";
+
+export const DEFAULT_GLOBAL_BANK_ID = "pi-global";
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -36,6 +40,7 @@ export interface ProjectConfigPatchInput {
   projectBankId?: string;
   globalBankId?: string;
   enableGlobalBank?: boolean;
+  memoryProfile?: MemoryProfile;
   recallEnabled?: boolean;
   recallBudget?: "low" | "mid" | "high";
   recallMaxTokens?: number;
@@ -63,13 +68,29 @@ export function buildProjectConfigPatch(input: ProjectConfigPatchInput): Record<
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
     };
   }
-  if (input.projectBankId) {
+  if (input.memoryProfile) {
+    const globalBankId = input.globalBankId || DEFAULT_GLOBAL_BANK_ID;
+    if (input.memoryProfile === "project-only") {
+      patch.banks = { project: { enabled: true }, global: { enabled: false } };
+    } else if (input.memoryProfile === "project+global") {
+      patch.banks = {
+        project: { enabled: true },
+        global: { enabled: true, bankId: globalBankId },
+      };
+    } else {
+      patch.banks = {
+        project: { enabled: false },
+        global: { enabled: true, bankId: globalBankId },
+      };
+    }
+  }
+  if (input.projectBankId && input.memoryProfile !== "global-only") {
     patch.banks = {
       ...(isRecord(patch.banks) ? patch.banks : {}),
       project: { enabled: true, derive: "manual", bankId: input.projectBankId },
     };
   }
-  if (input.globalBankId || input.enableGlobalBank !== undefined) {
+  if (!input.memoryProfile && (input.globalBankId || input.enableGlobalBank !== undefined)) {
     patch.banks = {
       ...(isRecord(patch.banks) ? patch.banks : {}),
       global: {

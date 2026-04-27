@@ -17,6 +17,24 @@ describe("config writer", () => {
     });
   });
 
+  it("builds memory profile patches", () => {
+    expect(buildProjectConfigPatch({ memoryProfile: "project-only" })).toEqual({
+      banks: { project: { enabled: true }, global: { enabled: false } },
+    });
+    expect(buildProjectConfigPatch({ memoryProfile: "project+global" })).toEqual({
+      banks: { project: { enabled: true }, global: { enabled: true, bankId: "pi-global" } },
+    });
+    expect(
+      buildProjectConfigPatch({
+        memoryProfile: "global-only",
+        projectBankId: "project",
+        globalBankId: "shared",
+      }),
+    ).toEqual({
+      banks: { project: { enabled: false }, global: { enabled: true, bankId: "shared" } },
+    });
+  });
+
   it("builds extended setup patches", () => {
     expect(
       buildProjectConfigPatch({
