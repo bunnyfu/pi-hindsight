@@ -159,15 +159,35 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       if (config.banks.project.enabled) {
         try {
           await ensureProjectBank(client, projectBankId, config.banks.project);
-          if (config.banks.global.enabled && config.banks.global.bankId)
-            await ensureGlobalBank(client, config.banks.global.bankId, config.banks.global);
-          if (config.retain.enabled)
-            capabilities = await detectAppendCapability(client, projectBankId);
         } catch (error) {
           setMemoryStatus(runtime, "recall-failed");
           notify(
             runtime,
-            `Hindsight bank ensure/capability check failed: ${error instanceof Error ? error.message : String(error)}`,
+            `Hindsight project bank ensure failed: ${error instanceof Error ? error.message : String(error)}`,
+            "warning",
+          );
+        }
+      }
+      if (config.banks.global.enabled && config.banks.global.bankId) {
+        try {
+          await ensureGlobalBank(client, config.banks.global.bankId, config.banks.global);
+        } catch (error) {
+          setMemoryStatus(runtime, "recall-failed");
+          notify(
+            runtime,
+            `Hindsight global bank ensure failed: ${error instanceof Error ? error.message : String(error)}`,
+            "warning",
+          );
+        }
+      }
+      if (config.retain.enabled) {
+        try {
+          capabilities = await detectAppendCapability(client, projectBankId);
+        } catch (error) {
+          setMemoryStatus(runtime, "recall-failed");
+          notify(
+            runtime,
+            `Hindsight capability check failed: ${error instanceof Error ? error.message : String(error)}`,
             "warning",
           );
         }
