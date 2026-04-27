@@ -19,8 +19,11 @@ const mocked = vi.hoisted(() => ({
 
 vi.mock("../extensions/client.js", () => ({
   createHindsightClient: () => mocked.client,
-  ensureProjectBank: mocked.ensureProjectBank,
   checkHindsight: mocked.checkHindsight,
+}));
+
+vi.mock("../extensions/bank-operations.js", () => ({
+  ensureProjectBank: mocked.ensureProjectBank,
 }));
 
 describe("extension hooks", () => {
@@ -244,6 +247,43 @@ describe("extension hooks", () => {
     await handlers.session_start?.[0]?.({}, ctx);
     await handlers.agent_end?.[0]?.({ messages: [u1, a1] }, ctx);
     await handlers.agent_end?.[0]?.({ messages: [u1, a1, u2, a2] }, ctx);
+
+    expect(mocked.client.retain).toHaveBeenCalledTimes(2);
+    const secondContent = mocked.client.retain.mock.calls[1]?.[1] as string;
+    expect(secondContent).toContain("u2");
+    expect(secondContent).toContain("a2");
+    expect(secondContent).not.toContain("u1");
+    expect(secondContent).not.toContain("a1");
+  });
+
+  it("retains only new messages after lifecycle restart", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ hindsight: { baseUrl: "http://unused.test" } }),
+    );
+    const sessionFile = join(cwd, "session.jsonl");
+    const u1 = { role: "user", content: "u1", timestamp: 1 };
+    const a1 = { role: "assistant", content: "a1", timestamp: 2 };
+    const u2 = { role: "user", content: "u2", timestamp: 3 };
+    const a2 = { role: "assistant", content: "a2", timestamp: 4 };
+
+    const { createMemoryLifecycle } = await import("../extensions/memory-lifecycle.js");
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => sessionFile },
+    };
+
+    const first = createMemoryLifecycle(cwd);
+    await first.initialize(ctx);
+    await first.retain({ messages: [u1, a1] } as any, ctx);
+
+    const second = createMemoryLifecycle(cwd);
+    await second.initialize(ctx);
+    await second.retain({ messages: [u1, a1, u2, a2] } as any, ctx);
 
     expect(mocked.client.retain).toHaveBeenCalledTimes(2);
     const secondContent = mocked.client.retain.mock.calls[1]?.[1] as string;

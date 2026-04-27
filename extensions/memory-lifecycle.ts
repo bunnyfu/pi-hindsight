@@ -1,9 +1,9 @@
-import { createHash } from "node:crypto";
 import type { AgentEndEvent } from "@mariozechner/pi-coding-agent";
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { resolveConfig } from "./config.js";
 import { deriveProjectBankId } from "./banking.js";
-import { createHindsightClient, ensureProjectBank } from "./client.js";
+import { createHindsightClient } from "./client.js";
+import { ensureProjectBank } from "./bank-operations.js";
 import { recallForContext } from "./recall.js";
 import { enqueueRetainFromAgentEnd } from "./retain.js";
 import { flushRetainQueue, resolveQueuePath } from "./queue.js";
@@ -12,6 +12,11 @@ import { bankSelectionMessage } from "./diagnostics.js";
 import { formatHindsightStatus, type HindsightActivity } from "./status.js";
 import { projectMessages } from "./messages.js";
 import { selectMemoryScopes } from "./memory-scope.js";
+import {
+  addRetainFingerprints,
+  messageFingerprint,
+  readRetainFingerprints,
+} from "./retain-cursor.js";
 import type { HindsightLikeClient, ResolvedConfig } from "./types.js";
 
 export type RuntimeCtx = {
@@ -61,21 +66,6 @@ function snapshotRuntime(ctx: RuntimeCtx): RuntimeSnapshot | undefined {
   }
 }
 
-function messageFingerprint(message: AgentMessage): string {
-  const m = message as unknown as Record<string, unknown>;
-  const stable = {
-    id: m.id,
-    role: m.role,
-    timestamp: m.timestamp,
-    content: m.content,
-    toolName: m.toolName,
-    isError: m.isError,
-    model: m.model,
-    stopReason: m.stopReason,
-  };
-  return createHash("sha256").update(JSON.stringify(stable)).digest("hex");
-}
-
 export function createMemoryLifecycle(initialCwd: string = process.cwd()): MemoryLifecycle {
   let config: ResolvedConfig = resolveConfig(initialCwd);
   let client: HindsightLikeClient = createHindsightClient(config);
@@ -118,25 +108,29 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
     }
   };
 
-  const newRetainMessages = (
+  const newRetainMessages = async (
     runtime: RuntimeSnapshot,
     messages: AgentEndEvent["messages"],
-  ): AgentEndEvent["messages"] => {
+  ): Promise<AgentEndEvent["messages"]> => {
     const sessionId = stableSessionId(runtime.sessionFile, runtime.cwd);
-    const seen = retainedBySession.get(sessionId) ?? new Set<string>();
+    const seen =
+      retainedBySession.get(sessionId) ?? (await readRetainFingerprints(runtime.cwd, sessionId));
+    retainedBySession.set(sessionId, seen);
     return messages.filter(
       (message) => !seen.has(messageFingerprint(message as AgentMessage)),
     ) as AgentEndEvent["messages"];
   };
 
-  const markRetainedMessages = (
+  const markRetainedMessages = async (
     runtime: RuntimeSnapshot,
     messages: AgentEndEvent["messages"],
-  ): void => {
+  ): Promise<void> => {
     const sessionId = stableSessionId(runtime.sessionFile, runtime.cwd);
     const seen = retainedBySession.get(sessionId) ?? new Set<string>();
-    for (const message of messages) seen.add(messageFingerprint(message as AgentMessage));
+    const fingerprints = messages.map((message) => messageFingerprint(message as AgentMessage));
+    for (const fingerprint of fingerprints) seen.add(fingerprint);
     retainedBySession.set(sessionId, seen);
+    await addRetainFingerprints(runtime.cwd, sessionId, fingerprints);
   };
 
   const hasRetainableMessages = (messages: AgentEndEvent["messages"]): boolean =>
@@ -206,7 +200,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
         return { queued: false, sent: 0, remaining: 0 };
       const runtime = snapshotRuntime(ctx);
       if (!runtime) return { queued: false, sent: 0, remaining: 0 };
-      const messages = newRetainMessages(runtime, event.messages);
+      const messages = await newRetainMessages(runtime, event.messages);
       if (!hasRetainableMessages(messages)) return { queued: false, sent: 0, remaining: 0 };
       try {
         setMemoryStatus(runtime, "retaining");
@@ -218,7 +212,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
           client,
           bankId: projectBankId,
         });
-        if (result.queued) markRetainedMessages(runtime, messages);
+        if (result.queued) await markRetainedMessages(runtime, messages);
         setMemoryStatus(
           runtime,
           result.remaining > 0 ? "retain-queued" : "retained",

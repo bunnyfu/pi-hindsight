@@ -1,8 +1,42 @@
-import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
 import type { HindsightLikeClient, RetainJob } from "./types.js";
 
 const queueLocks = new Map<string, Promise<void>>();
+
+const LOCK_RETRY_MS = 25;
+const LOCK_TIMEOUT_MS = 5_000;
+const LOCK_STALE_MS = 30_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function acquireFileLock(path: string): Promise<() => Promise<void>> {
+  const lockPath = `${path}.lock`;
+  const started = Date.now();
+  await mkdir(dirname(path), { recursive: true });
+  while (true) {
+    try {
+      await mkdir(lockPath, { recursive: false });
+      await writeFile(
+        `${lockPath}/owner`,
+        JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString() }),
+        "utf8",
+      );
+      return async () => {
+        await rm(lockPath, { recursive: true, force: true });
+      };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      if (Date.now() - started > LOCK_STALE_MS)
+        await rm(lockPath, { recursive: true, force: true });
+      if (Date.now() - started > LOCK_TIMEOUT_MS)
+        throw new Error(`Timed out waiting for retain queue lock ${lockPath}`);
+      await sleep(LOCK_RETRY_MS);
+    }
+  }
+}
 
 async function withQueueLock<T>(path: string, fn: () => Promise<T>): Promise<T> {
   const previous = queueLocks.get(path) ?? Promise.resolve();
@@ -13,11 +47,16 @@ async function withQueueLock<T>(path: string, fn: () => Promise<T>): Promise<T> 
   const lock = previous.catch(() => undefined).then(() => next);
   queueLocks.set(path, lock);
   await previous.catch(() => undefined);
+  const releaseFileLock = await acquireFileLock(path);
   try {
     return await fn();
   } finally {
-    release();
-    if (queueLocks.get(path) === lock) queueLocks.delete(path);
+    try {
+      await releaseFileLock();
+    } finally {
+      release();
+      if (queueLocks.get(path) === lock) queueLocks.delete(path);
+    }
   }
 }
 

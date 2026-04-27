@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { createHindsightClient, ensureProjectBank } from "../extensions/client.js";
+import { createHindsightClient } from "../extensions/client.js";
+import { ensureProjectBank } from "../extensions/bank-operations.js";
 import { DEFAULT_CONFIG } from "../extensions/config.js";
 
 interface CapturedRequest {
