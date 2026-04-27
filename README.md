@@ -103,7 +103,13 @@ Example project config:
   },
   "recall": {
     "budget": "low",
-    "maxTokens": 800
+    "maxTokens": 800,
+    "roles": ["user", "assistant"],
+    "contextTurns": 2,
+    "maxQueryChars": 800,
+    "topK": 8,
+    "timeoutMs": 10000,
+    "injectionPosition": "prepend"
   },
   "retain": {
     "queuePath": ".pi/hindsight/retain-queue.jsonl",
@@ -131,7 +137,7 @@ Example project config:
 
 ## Memory behavior
 
-Automatic recall runs in the `context` hook and injects an ephemeral `<hindsight-memory>` message into the provider context. Project bank recall is scoped by the current repo tag. If a global bank is enabled, global recall uses an explicit non-repo `source:pi` scope so cross-project memories can be found without requiring the current repo tag. The injected memory block is not written to the Pi transcript by this extension.
+Automatic recall runs in the `context` hook and injects an ephemeral `<hindsight-memory>` message into the provider context. Project bank recall is scoped by the current repo tag. If a global bank is enabled, global recall uses an explicit non-repo `source:pi` scope so cross-project memories can be found without requiring the current repo tag. Recall query composition is bounded by `recall.roles`, `recall.contextTurns`, and `recall.maxQueryChars`; slow recalls are bounded by `recall.timeoutMs`. `recall.topK` limits injected results per bank. The injected memory block is not written to the Pi transcript by this extension.
 
 Automatic retain runs in the `agent_end` hook. It stores a structured JSON projection of new messages, not a summary. Live sessions use stable `documentId` values and `updateMode: "append"`. On startup, the extension probes append support with a deterministic `pi-hindsight-capability:append:<bank>` document tagged `test:capability` and `feature:append-probe`. If append is known unsupported, `retain.appendFallback: "error"` refuses retain clearly; `"per-turn-documents"` uses deterministic per-delta document IDs with `updateMode: "replace"` to avoid overwriting earlier turns. A persisted retain cursor under `.pi/hindsight/retain-cursors.json` prevents duplicate appends when Pi provides overlapping transcripts, including after extension restart. Explicit retain tool tags are merged with the base `source:pi`, repo, and session tags so manually retained memories remain visible to default project recall.
 

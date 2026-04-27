@@ -113,6 +113,12 @@ export function formatDebugReport(args: DebugReportArgs): string {
         maxTokens: args.config.recall.maxTokens,
         types: args.config.recall.types,
         recentTurnsForQuery: args.config.recall.recentTurnsForQuery,
+        contextTurns: args.config.recall.contextTurns,
+        roles: args.config.recall.roles,
+        maxQueryChars: args.config.recall.maxQueryChars,
+        topK: args.config.recall.topK,
+        timeoutMs: args.config.recall.timeoutMs,
+        injectionPosition: args.config.recall.injectionPosition,
       },
       retain: {
         enabled: args.config.retain.enabled,

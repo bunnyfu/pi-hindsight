@@ -74,7 +74,13 @@ async function acquireFileLock(path: string): Promise<() => Promise<void>> {
   while (true) {
     try {
       await mkdir(lockPath, { recursive: false });
-      await writeQueueLockOwner(lockPath);
+      try {
+        await writeQueueLockOwner(lockPath);
+      } catch (error) {
+        await rm(lockPath, { recursive: true, force: true });
+        if (["ENOENT", "EINVAL"].includes((error as NodeJS.ErrnoException).code ?? "")) continue;
+        throw error;
+      }
       const heartbeat = startQueueLockHeartbeat(lockPath);
       return async () => {
         clearInterval(heartbeat);
