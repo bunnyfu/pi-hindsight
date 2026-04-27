@@ -1,3 +1,4 @@
+import { basename } from "node:path";
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import type {
   HindsightLikeClient,
@@ -8,8 +9,10 @@ import type {
   TagsMatch,
 } from "./types.js";
 import { projectMessage } from "./messages.js";
+import { createMemoryIdentity } from "./memory-identity.js";
 
 export interface RecallScope {
+  kind?: "project" | "global";
   bankId: string;
   tags?: string[];
   tagsMatch?: TagsMatch;
@@ -38,6 +41,7 @@ export interface RecallQueryPolicy {
   preamble?: string;
   includeDate?: boolean;
   now?: Date;
+  hints?: string[];
 }
 
 function messageRole(message: AgentMessage): string {
@@ -63,6 +67,23 @@ export function truncateRecallQuery(query: string, maxChars: number): string {
   return query.slice(query.length - maxChars).trimStart();
 }
 
+function truncateRecallQueryLines(
+  prefixLines: string[],
+  messageLines: string[],
+  maxChars: number,
+): string {
+  const lines = [...prefixLines, ...messageLines];
+  const query = lines.join("\n\n").trim();
+  if (query.length <= maxChars) return query;
+  const prefix = prefixLines.join("\n\n").trim();
+  if (!prefix) return truncateRecallQuery(query, maxChars);
+  const separator = "\n\n";
+  const remaining = maxChars - prefix.length - separator.length;
+  if (remaining >= 20)
+    return `${prefix}${separator}${truncateRecallQuery(messageLines.join("\n\n"), remaining)}`;
+  return truncateRecallQuery(query, maxChars);
+}
+
 export function composeRecallQuery(
   messages: AgentMessage[],
   policyOrRecentTurns: RecallQueryPolicy | number,
@@ -78,14 +99,18 @@ export function composeRecallQuery(
     .map(formatQueryMessage)
     .filter((line): line is string => Boolean(line))
     .slice(-Math.max(1, policy.contextTurns));
-  const lines = [
+  const prefixLines = [
     ...(policy.preamble?.trim() ? [policy.preamble.trim()] : []),
     ...(policy.includeDate
       ? [`Current date: ${(policy.now ?? new Date()).toISOString().slice(0, 10)}`]
       : []),
-    ...(selectedLines.length ? selectedLines : ["current Pi coding task"]),
+    ...(policy.hints?.length ? [`Context hints: ${policy.hints.join("; ")}`] : []),
   ];
-  return truncateRecallQuery(lines.join("\n\n").trim(), policy.maxQueryChars);
+  return truncateRecallQueryLines(
+    prefixLines,
+    selectedLines.length ? selectedLines : ["current Pi coding task"],
+    policy.maxQueryChars,
+  );
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
@@ -123,21 +148,36 @@ export function renderRecallBlocks(blocks: RecallBlock[], topK = 12): string {
   return lines.join("\n");
 }
 
+function preambleForScope(config: ResolvedConfig, scope: RecallScope): string {
+  if (scope.kind === "project") return config.recall.projectQueryPreamble;
+  if (scope.kind === "global") return config.recall.globalQueryPreamble;
+  return config.recall.queryPreamble;
+}
+
+function queryHints(cwd: string, config: ResolvedConfig, scope: RecallScope): string[] {
+  const hints = scope.kind ? [`scope:${scope.kind}`] : [];
+  if (!config.recall.includeRepoHintsInQuery || scope.kind === "global") return hints;
+  const identity = createMemoryIdentity(cwd, config);
+  return [...hints, `repo:${identity.repoKey}`, `cwd:${basename(cwd)}`];
+}
+
 export async function recallForContext(args: {
   client: HindsightLikeClient;
   config: ResolvedConfig;
   scopes: RecallScope[];
   messages: AgentMessage[];
+  cwd?: string;
 }): Promise<{ rendered: string; blocks: RecallBlock[] }> {
-  const query = composeRecallQuery(args.messages, {
-    roles: args.config.recall.roles,
-    contextTurns: args.config.recall.contextTurns,
-    maxQueryChars: args.config.recall.maxQueryChars,
-    preamble: args.config.recall.queryPreamble,
-    includeDate: args.config.recall.includeDateInQuery,
-  });
   const blocks: RecallBlock[] = [];
   for (const scope of args.scopes) {
+    const query = composeRecallQuery(args.messages, {
+      roles: args.config.recall.roles,
+      contextTurns: args.config.recall.contextTurns,
+      maxQueryChars: args.config.recall.maxQueryChars,
+      preamble: preambleForScope(args.config, scope),
+      includeDate: args.config.recall.includeDateInQuery,
+      hints: args.cwd ? queryHints(args.cwd, args.config, scope) : [],
+    });
     const response = await withTimeout(
       args.client.recall(scope.bankId, query, {
         budget: args.config.recall.budget,

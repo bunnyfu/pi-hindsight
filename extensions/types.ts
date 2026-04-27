@@ -32,7 +32,10 @@ export interface ResolvedConfig {
     roles: RecallRole[];
     maxQueryChars: number;
     queryPreamble: string;
+    projectQueryPreamble: string;
+    globalQueryPreamble: string;
     includeDateInQuery: boolean;
+    includeRepoHintsInQuery: boolean;
     storeLastRecall: boolean;
     lastRecallPath: string;
     topK: number;

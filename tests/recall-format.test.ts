@@ -84,6 +84,123 @@ describe("recall formatting", () => {
     ).toBe("current Pi coding task");
   });
 
+  it("adds deterministic context hints", () => {
+    const messages = [
+      { role: "user", content: "ship it", timestamp: 1 },
+    ] as unknown as AgentMessage[];
+
+    expect(
+      composeRecallQuery(messages, {
+        roles: ["user"],
+        contextTurns: 1,
+        maxQueryChars: 300,
+        preamble: "Find memory.",
+        hints: ["scope:project", "repo:abc", "cwd:repo"],
+      }),
+    ).toBe("Find memory.\n\nContext hints: scope:project; repo:abc; cwd:repo\n\nuser: ship it");
+  });
+
+  it("keeps preamble and hints when truncating long message text", () => {
+    const messages = [
+      { role: "user", content: `prefix ${"x".repeat(200)} suffix`, timestamp: 1 },
+    ] as unknown as AgentMessage[];
+
+    const query = composeRecallQuery(messages, {
+      roles: ["user"],
+      contextTurns: 1,
+      maxQueryChars: 120,
+      preamble: "Find memory.",
+      hints: ["scope:project"],
+    });
+
+    expect(query).toContain("Find memory.");
+    expect(query).toContain("scope:project");
+    expect(query).toContain("suffix");
+  });
+
+  it("keeps preamble and hints when earlier selected turn is long", () => {
+    const messages = [
+      { role: "assistant", content: `long ${"x".repeat(300)}`, timestamp: 1 },
+      { role: "user", content: "current question", timestamp: 2 },
+    ] as unknown as AgentMessage[];
+
+    const query = composeRecallQuery(messages, {
+      roles: ["user", "assistant"],
+      contextTurns: 2,
+      maxQueryChars: 130,
+      preamble: "Find memory.",
+      hints: ["scope:project"],
+    });
+
+    expect(query).toContain("Find memory.");
+    expect(query).toContain("scope:project");
+    expect(query).toContain("current question");
+  });
+
+  it("keeps scope hints when repo hints are disabled", async () => {
+    const queries: string[] = [];
+    await recallForContext({
+      client: {
+        retain: async () => undefined,
+        recall: async (_bankId, query) => {
+          queries.push(query);
+          return { results: [] };
+        },
+        reflect: async () => ({}),
+      },
+      config: {
+        ...DEFAULT_CONFIG,
+        recall: { ...DEFAULT_CONFIG.recall, includeRepoHintsInQuery: false },
+      },
+      scopes: [
+        { kind: "project", bankId: "project-bank" },
+        { kind: "global", bankId: "global-bank" },
+      ],
+      cwd: "/repo/project",
+      messages: [{ role: "user", content: "q", timestamp: 1 }] as unknown as AgentMessage[],
+    });
+
+    expect(queries[0]).toContain("scope:project");
+    expect(queries[0]).not.toContain("repo:");
+    expect(queries[0]).not.toContain("cwd:");
+    expect(queries[1]).toContain("scope:global");
+  });
+
+  it("uses bank-aware preambles and query hints", async () => {
+    const queries: string[] = [];
+    await recallForContext({
+      client: {
+        retain: async () => undefined,
+        recall: async (_bankId, query) => {
+          queries.push(query);
+          return { results: [] };
+        },
+        reflect: async () => ({}),
+      },
+      config: {
+        ...DEFAULT_CONFIG,
+        recall: {
+          ...DEFAULT_CONFIG.recall,
+          projectQueryPreamble: "Project lookup.",
+          globalQueryPreamble: "Global lookup.",
+        },
+      },
+      scopes: [
+        { kind: "project", bankId: "project-bank" },
+        { kind: "global", bankId: "global-bank" },
+      ],
+      cwd: "/repo/project",
+      messages: [{ role: "user", content: "q", timestamp: 1 }] as unknown as AgentMessage[],
+    });
+
+    expect(queries[0]).toContain("Project lookup.");
+    expect(queries[0]).toContain("scope:project");
+    expect(queries[1]).toContain("Global lookup.");
+    expect(queries[1]).toContain("scope:global");
+    expect(queries[1]).not.toContain("repo:");
+    expect(queries[1]).not.toContain("cwd:");
+  });
+
   it("renders memory block", () => {
     const rendered = renderRecallBlocks([
       {

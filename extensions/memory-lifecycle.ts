@@ -227,6 +227,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
           config,
           scopes,
           messages: event.messages,
+          cwd: runtime.cwd,
         });
         const memoryCount = blocks.reduce((count, block) => count + block.memoryCount, 0);
         setMemoryStatus(runtime, memoryCount > 0 ? "recalled" : "recall-empty", memoryCount);

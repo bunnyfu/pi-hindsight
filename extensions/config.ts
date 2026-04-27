@@ -19,7 +19,12 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     roles: ["user", "assistant"],
     maxQueryChars: 800,
     queryPreamble: "Pi coding task memory lookup.",
+    projectQueryPreamble:
+      "Project memory lookup for current repo architecture, tasks, bugs, decisions, and constraints.",
+    globalQueryPreamble:
+      "Global memory lookup for durable user preferences, recurring workflows, coding habits, and cross-project context.",
     includeDateInQuery: false,
+    includeRepoHintsInQuery: true,
     storeLastRecall: false,
     lastRecallPath: ".pi/hindsight/last-recall.json",
     topK: 8,
@@ -189,6 +194,10 @@ function hasConfiguredToolResultContent(rawConfig: unknown): boolean {
   );
 }
 
+function hasConfiguredRecallField(rawConfig: unknown, field: string): boolean {
+  return isRecord(rawConfig) && isRecord(rawConfig.recall) && field in rawConfig.recall;
+}
+
 export function normalizeConfig(config: ResolvedConfig, rawConfig?: unknown): ResolvedConfig {
   const apiKey = optionalString(config.hindsight?.apiKey, DEFAULT_CONFIG.hindsight.apiKey);
   const projectBankId = optionalString(
@@ -258,9 +267,29 @@ export function normalizeConfig(config: ResolvedConfig, rawConfig?: unknown): Re
         typeof config.recall?.queryPreamble === "string"
           ? config.recall.queryPreamble
           : DEFAULT_CONFIG.recall.queryPreamble,
+      projectQueryPreamble:
+        hasConfiguredRecallField(rawConfig, "projectQueryPreamble") &&
+        typeof config.recall?.projectQueryPreamble === "string"
+          ? config.recall.projectQueryPreamble
+          : hasConfiguredRecallField(rawConfig, "queryPreamble") &&
+              typeof config.recall?.queryPreamble === "string"
+            ? config.recall.queryPreamble
+            : DEFAULT_CONFIG.recall.projectQueryPreamble,
+      globalQueryPreamble:
+        hasConfiguredRecallField(rawConfig, "globalQueryPreamble") &&
+        typeof config.recall?.globalQueryPreamble === "string"
+          ? config.recall.globalQueryPreamble
+          : hasConfiguredRecallField(rawConfig, "queryPreamble") &&
+              typeof config.recall?.queryPreamble === "string"
+            ? config.recall.queryPreamble
+            : DEFAULT_CONFIG.recall.globalQueryPreamble,
       includeDateInQuery: bool(
         config.recall?.includeDateInQuery,
         DEFAULT_CONFIG.recall.includeDateInQuery,
+      ),
+      includeRepoHintsInQuery: bool(
+        config.recall?.includeRepoHintsInQuery,
+        DEFAULT_CONFIG.recall.includeRepoHintsInQuery,
       ),
       storeLastRecall: bool(config.recall?.storeLastRecall, DEFAULT_CONFIG.recall.storeLastRecall),
       lastRecallPath:
