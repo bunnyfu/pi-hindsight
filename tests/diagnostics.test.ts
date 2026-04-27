@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { bankSelectionMessage, formatDebugReport, safeConfig } from "../extensions/diagnostics.js";
+import {
+  bankSelectionMessage,
+  formatDebugReport,
+  observationScopeDiagnostics,
+  safeConfig,
+} from "../extensions/diagnostics.js";
 
 describe("diagnostics", () => {
   it("explains automatic bank selection and override", () => {
@@ -58,6 +63,8 @@ describe("diagnostics", () => {
     expect(report.observations).toEqual({
       enabled: true,
       scopes: [["harness:pi"], [expect.stringMatching(/^repo:/)]],
+      error: null,
+      action: null,
     });
     expect(report.overrideProjectBankId).toContain("PI_HINDSIGHT_PROJECT_BANK_ID");
     expect(report.tags).toEqual(expect.arrayContaining(["source:pi"]));
@@ -98,6 +105,22 @@ describe("diagnostics", () => {
 
     expect(report.observations.enabled).toBe(true);
     expect(report.observations.scopes).toEqual([[expect.stringMatching(/^repo:/)], ["bank:bank"]]);
+    expect(report.observations.error).toBeNull();
+  });
+
+  it("reports invalid observation scope diagnostics with action", () => {
+    const result = observationScopeDiagnostics({
+      cwd: process.cwd(),
+      projectBankId: "bank",
+      config: {
+        ...DEFAULT_CONFIG,
+        observations: { enabled: true, scopes: [["user:{userId}"]] },
+      },
+    });
+
+    expect(result.scopes).toBeNull();
+    expect(result.error).toContain("Unknown observation scope placeholder");
+    expect(result.action).toContain("observations.scopes");
   });
 
   it("formats append capability diagnostics", () => {

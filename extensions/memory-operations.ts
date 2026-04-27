@@ -2,7 +2,7 @@ import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 import type { HindsightCapabilities, HindsightLikeClient, ResolvedConfig } from "./types.js";
 import { checkHindsight } from "./client.js";
 import { readRetainQueue, flushRetainQueue, resolveQueuePath } from "./queue.js";
-import { formatDebugReport, safeConfig } from "./diagnostics.js";
+import { formatDebugReport, observationScopeDiagnostics, safeConfig } from "./diagnostics.js";
 import {
   buildProjectConfigPatch,
   writeProjectConfig,
@@ -200,6 +200,11 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
         ...(deps.getCapabilities?.() ? { capabilities: deps.getCapabilities() } : {}),
         queueLength: queue.length,
         imports: importManifestSummary(manifest),
+        observations: observationScopeDiagnostics({
+          cwd,
+          projectBankId: deps.getProjectBankId(),
+          config,
+        }),
       };
     },
 
