@@ -20,17 +20,30 @@ export interface ImportRetainArgs {
   branch: ImportBranch;
 }
 
+export interface ImportDocumentPreview {
+  documentId: string;
+  leafId: string;
+  messageCount: number;
+  contentHash: string;
+  contentBytes: number;
+  tags: string[];
+  updateMode: "append" | "replace";
+  bankId: string;
+  wouldWrite: boolean;
+}
+
 export interface ImportRetainResult {
-  document: {
-    documentId: string;
-    leafId: string;
-    messageCount: number;
-    contentHash: string;
-  };
+  document: ImportDocumentPreview;
   manifestEntry: ImportManifestEntry;
 }
 
-export async function retainImportBranch(args: ImportRetainArgs): Promise<ImportRetainResult> {
+interface ImportBranchBuildResult extends ImportRetainResult {
+  content: string;
+  context: string;
+  observationScopes: string[][];
+}
+
+function buildImportBranch(args: Omit<ImportRetainArgs, "client">): ImportBranchBuildResult {
   const leafId = args.branch.leafId;
   const branchMessages = args.branch.messages;
   const documentId = importDocumentId(args.sessionId, leafId);
@@ -64,37 +77,62 @@ export async function retainImportBranch(args: ImportRetainArgs): Promise<Import
         projectBankId: args.bankId,
       })
     : [];
-  await args.client.retain(args.bankId, content, {
-    context: `Historical Pi session import from ${args.sessionFile}, branch ${leafId}`,
+  const document: ImportDocumentPreview = {
     documentId,
-    updateMode,
-    async: args.config.retain.async,
+    leafId,
+    messageCount: branchMessages.length,
+    contentHash,
+    contentBytes: Buffer.byteLength(content, "utf8"),
     tags,
+    updateMode,
+    bankId: args.bankId,
+    wouldWrite: true,
+  };
+  const manifestEntry: ImportManifestEntry = {
+    documentId,
+    bankId: args.bankId,
+    sourceFile: args.sessionFile,
+    importedAt: new Date().toISOString(),
+    contentHash,
+    messageCount: branchMessages.length,
+    leafId,
+    sessionId: args.sessionId,
+    cwd: args.cwd,
+    includeBranches: args.config.import.includeBranches,
+    updateMode,
+  };
+  return {
+    document,
+    manifestEntry,
+    content,
+    context: `Historical Pi session import from ${args.sessionFile}, branch ${leafId}`,
+    observationScopes,
+  };
+}
+
+export function previewImportBranch(args: Omit<ImportRetainArgs, "client">): ImportRetainResult {
+  const built = buildImportBranch(args);
+  return { document: { ...built.document, wouldWrite: false }, manifestEntry: built.manifestEntry };
+}
+
+export async function retainImportBranch(args: ImportRetainArgs): Promise<ImportRetainResult> {
+  const built = buildImportBranch(args);
+  await args.client.retain(args.bankId, built.content, {
+    context: built.context,
+    documentId: built.document.documentId,
+    updateMode: built.document.updateMode,
+    async: args.config.retain.async,
+    tags: built.document.tags,
     metadata: {
       pi_session_file: args.sessionFile,
       imported: "true",
       cwd: args.cwd,
       session_id: args.sessionId,
-      branch_leaf_id: leafId,
+      branch_leaf_id: built.document.leafId,
       include_branches: args.config.import.includeBranches,
       ...(args.parsed.sessionTimestamp ? { session_timestamp: args.parsed.sessionTimestamp } : {}),
     },
-    ...(observationScopes.length ? { observationScopes } : {}),
+    ...(built.observationScopes.length ? { observationScopes: built.observationScopes } : {}),
   });
-  return {
-    document: { documentId, leafId, messageCount: branchMessages.length, contentHash },
-    manifestEntry: {
-      documentId,
-      bankId: args.bankId,
-      sourceFile: args.sessionFile,
-      importedAt: new Date().toISOString(),
-      contentHash,
-      messageCount: branchMessages.length,
-      leafId,
-      sessionId: args.sessionId,
-      cwd: args.cwd,
-      includeBranches: args.config.import.includeBranches,
-      updateMode,
-    },
-  };
+  return { document: built.document, manifestEntry: built.manifestEntry };
 }

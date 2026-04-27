@@ -78,12 +78,17 @@ describe("Pi session import", () => {
     expect(result.messageCount).toBe(2);
     expect(result.documentId).toBe("pi-import:session-1:leaf:current");
     expect(result.documents).toEqual([
-      {
+      expect.objectContaining({
         documentId: "pi-import:session-1:leaf:current",
         leafId: "current",
         messageCount: 2,
         contentHash: expect.any(String),
-      },
+        contentBytes: expect.any(Number),
+        tags: expect.arrayContaining(["import:historical"]),
+        updateMode: "replace",
+        bankId: "bank",
+        wouldWrite: true,
+      }),
     ]);
     const manifest = await readImportManifest(result.manifestPath);
     expect(manifest.imports[result.documentId]).toMatchObject({
@@ -171,24 +176,97 @@ describe("Pi session import", () => {
       },
     });
     expect(result.documents).toEqual([
-      {
+      expect.objectContaining({
         documentId: "pi-import:session-2:leaf:a",
         leafId: "a",
         messageCount: 2,
         contentHash: expect.any(String),
-      },
-      {
+      }),
+      expect.objectContaining({
         documentId: "pi-import:session-2:leaf:b",
         leafId: "b",
         messageCount: 2,
         contentHash: expect.any(String),
-      },
+      }),
     ]);
     expect(calls).toHaveLength(2);
     expect(calls.map((call) => (call[2] as { documentId: string }).documentId)).toEqual([
       "pi-import:session-2:leaf:a",
       "pi-import:session-2:leaf:b",
     ]);
+  });
+
+  it("previews import without retaining or writing manifests", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-"));
+    mkdirSync(join(dir, ".git"));
+    const sessionFile = join(dir, "session.jsonl");
+    writeFileSync(
+      sessionFile,
+      [
+        JSON.stringify({ type: "session", id: "session-preview", cwd: dir }),
+        JSON.stringify({
+          type: "message",
+          id: "root",
+          parentId: null,
+          message: { role: "user", content: "root" },
+        }),
+        JSON.stringify({
+          type: "message",
+          id: "a",
+          parentId: "root",
+          message: { role: "assistant", content: "a" },
+        }),
+        JSON.stringify({
+          type: "message",
+          id: "b",
+          parentId: "root",
+          message: { role: "assistant", content: "b" },
+        }),
+      ].join("\n"),
+    );
+    const calls: unknown[][] = [];
+
+    const result = await importPiSession({
+      sessionFile,
+      bankId: "bank",
+      config: DEFAULT_CONFIG,
+      includeBranches: "all-leaves",
+      dryRun: true,
+      client: {
+        retain: async (...args: unknown[]) => {
+          calls.push(args);
+        },
+        recall: async () => [],
+        reflect: async () => ({}),
+      },
+    });
+
+    expect(result.retained).toBe(false);
+    expect(result.dryRun).toBe(true);
+    expect(result.messageCount).toBe(4);
+    expect(result.documents).toEqual([
+      expect.objectContaining({
+        documentId: "pi-import:session-preview:leaf:a",
+        leafId: "a",
+        messageCount: 2,
+        contentBytes: expect.any(Number),
+        tags: expect.arrayContaining(["import:historical", "forked:true"]),
+        updateMode: "replace",
+        bankId: "bank",
+        wouldWrite: false,
+      }),
+      expect.objectContaining({
+        documentId: "pi-import:session-preview:leaf:b",
+        leafId: "b",
+        messageCount: 2,
+        wouldWrite: false,
+      }),
+    ]);
+    expect(calls).toHaveLength(0);
+    await expect(readImportManifest(result.manifestPath)).resolves.toEqual({
+      version: 1,
+      imports: {},
+    });
   });
 
   it("selects import branches without retaining or writing manifests", () => {

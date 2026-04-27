@@ -16,6 +16,12 @@ function secondArg(args: unknown): string | undefined {
   return undefined;
 }
 
+function argList(args: unknown): string[] {
+  if (Array.isArray(args)) return args.filter((arg): arg is string => typeof arg === "string");
+  if (typeof args === "string") return args.split(/\s+/).filter(Boolean);
+  return [];
+}
+
 function sessionFile(ctx: {
   sessionManager?: { getSessionFile?: () => string | undefined };
 }): string | undefined {
@@ -31,7 +37,7 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
 
   pi.registerCommand("hindsight:status", {
     description: "Show Hindsight extension status.",
-    handler: async (_args, ctx) => {
+    handler: async (args, ctx) => {
       const status = await operations.status(ctx.cwd);
       const bank = status.config.banks.project.enabled
         ? status.bankId
@@ -50,7 +56,7 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
 
   pi.registerCommand("hindsight:doctor", {
     description: "Check Hindsight connectivity and queue.",
-    handler: async (_args, ctx) => {
+    handler: async (args, ctx) => {
       const doctor = await operations.doctor(ctx.cwd);
       const append = doctor.capabilities
         ? doctor.capabilities.appendUpdateMode
@@ -99,7 +105,7 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
 
   pi.registerCommand("hindsight:import", {
     description: "Import the current Pi session JSONL into Hindsight.",
-    handler: async (_args, ctx) => {
+    handler: async (args, ctx) => {
       const sessionFile = ctx.sessionManager.getSessionFile?.();
       if (!sessionFile) {
         ctx.ui.notify(
@@ -108,9 +114,16 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
         );
         return;
       }
-      const result = await operations.importSession({ sessionFile });
+      const flags = new Set(argList(args));
+      const result = await operations.importSession({
+        sessionFile,
+        dryRun: flags.has("--dry-run") || flags.has("--preview"),
+        ...(flags.has("--all-leaves") ? { includeBranches: "all-leaves" } : {}),
+      });
       ctx.ui.notify(
-        `Imported ${result.messageCount} messages as ${result.documentId}; manifest ${result.manifestPath}`,
+        result.dryRun
+          ? `Import preview: ${result.messageCount} messages across ${result.documents.length} document${result.documents.length === 1 ? "" : "s"}; first ${result.documentId}; manifest unchanged ${result.manifestPath}`
+          : `Imported ${result.messageCount} messages as ${result.documentId}; manifest ${result.manifestPath}`,
         "info",
       );
     },

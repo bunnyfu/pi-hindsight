@@ -122,13 +122,20 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
       return { ...result, projectBankId };
     },
 
-    async importSession(args: { sessionFile: string; bank?: string }) {
+    async importSession(args: {
+      sessionFile: string;
+      bank?: string;
+      dryRun?: boolean;
+      includeBranches?: ResolvedConfig["import"]["includeBranches"];
+    }) {
       const bankId = args.bank || deps.getProjectBankId();
       const result = await importPiSession({
         sessionFile: args.sessionFile,
         bankId,
         client: deps.getClient(),
         config: deps.getConfig(),
+        ...(args.dryRun !== undefined ? { dryRun: args.dryRun } : {}),
+        ...(args.includeBranches ? { includeBranches: args.includeBranches } : {}),
       });
       return { bankId, ...result };
     },
