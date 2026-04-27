@@ -124,6 +124,7 @@ describe("Hindsight client adapter integration", () => {
       ],
       async: true,
     });
+    expect(JSON.stringify(requests[1]?.body)).not.toContain("observation_scopes");
     expect(requests[2]?.body).toMatchObject({
       items: [
         {
