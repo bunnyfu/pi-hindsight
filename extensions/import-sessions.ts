@@ -12,7 +12,11 @@ import {
   writeImportCheckpoint,
   type ImportCheckpoint,
 } from "./import-checkpoint.js";
-import { resolveImportManifestPath, upsertImportManifestEntries } from "./import-manifest.js";
+import {
+  hashImportContent,
+  resolveImportManifestPath,
+  upsertImportManifestEntries,
+} from "./import-manifest.js";
 import { previewImportBranch, retainImportBranch } from "./import-retain.js";
 
 export { parseImportSessionJsonl, parsePiSessionJsonl } from "./import-parser.js";
@@ -31,6 +35,10 @@ async function isFile(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function projectSessionCheckpointPath(basePath: string, sessionFile: string): string {
+  return `${basePath}.${hashImportContent(sessionFile).slice(0, 12)}.json`;
 }
 
 export async function discoverProjectSessionFiles(args: {
@@ -284,7 +292,16 @@ export async function importProjectSessions(args: {
         sessionFile,
         bankId: args.bankId,
         client: args.client,
-        config: args.config,
+        config: {
+          ...args.config,
+          import: {
+            ...args.config.import,
+            checkpointPath: projectSessionCheckpointPath(
+              args.config.import.checkpointPath,
+              sessionFile,
+            ),
+          },
+        },
         ...(args.dryRun !== undefined ? { dryRun: args.dryRun } : {}),
         ...(args.includeBranches ? { includeBranches: args.includeBranches } : {}),
       }),
