@@ -49,8 +49,9 @@ function messageContent(message: AgentMessage): string {
   return typeof content === "string" ? content : JSON.stringify(content ?? "");
 }
 
-function formatQueryMessage(message: AgentMessage): string {
-  return `${messageRole(message)}: ${messageContent(message)}`;
+function formatQueryMessage(message: AgentMessage): string | undefined {
+  const content = messageContent(message).trim();
+  return content ? `${messageRole(message)}: ${content}` : undefined;
 }
 
 function isInjectedHindsightMemory(message: AgentMessage): boolean {
@@ -71,16 +72,18 @@ export function composeRecallQuery(
       ? { roles: ["user"] as RecallRole[], contextTurns: policyOrRecentTurns, maxQueryChars: 800 }
       : policyOrRecentTurns;
   const allowedRoles = new Set<string>(policy.roles);
-  const selected = messages
+  const selectedLines = messages
     .filter((message) => allowedRoles.has(messageRole(message)))
     .filter((message) => !isInjectedHindsightMemory(message))
+    .map(formatQueryMessage)
+    .filter((line): line is string => Boolean(line))
     .slice(-Math.max(1, policy.contextTurns));
   const lines = [
     ...(policy.preamble?.trim() ? [policy.preamble.trim()] : []),
     ...(policy.includeDate
       ? [`Current date: ${(policy.now ?? new Date()).toISOString().slice(0, 10)}`]
       : []),
-    ...(selected.length ? selected.map(formatQueryMessage) : ["current Pi coding task"]),
+    ...(selectedLines.length ? selectedLines : ["current Pi coding task"]),
   ];
   return truncateRecallQuery(lines.join("\n\n").trim(), policy.maxQueryChars);
 }

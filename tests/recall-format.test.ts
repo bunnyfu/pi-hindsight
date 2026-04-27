@@ -70,6 +70,20 @@ describe("recall formatting", () => {
     ).toBe("Find relevant project memory.\n\nCurrent date: 2026-04-27\n\nuser: ship it");
   });
 
+  it("falls back when selected turns have no text", () => {
+    const messages = [
+      { role: "assistant", content: [], timestamp: 1 },
+    ] as unknown as AgentMessage[];
+
+    expect(
+      composeRecallQuery(messages, {
+        roles: ["assistant"],
+        contextTurns: 1,
+        maxQueryChars: 200,
+      }),
+    ).toBe("current Pi coding task");
+  });
+
   it("renders memory block", () => {
     const rendered = renderRecallBlocks([
       {
