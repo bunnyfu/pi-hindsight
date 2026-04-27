@@ -78,7 +78,7 @@ Inside Pi, open the interactive configuration TUI:
 /hindsight:setup
 ```
 
-The setup TUI lets you edit the memory profile, project bank ID, Hindsight base URL, timeout, global bank, recall budget, token budget, retain settings, queue path, import branch mode, statusline display, and Pi window notifications. It writes `.pi/hindsight.json` and reloads the extension config after each change. Active import config covers branch mode, replace-vs-append behavior, manifest path, checkpoint path, and resume behavior.
+The setup TUI lets you choose a deployment profile, edit the memory profile, project bank ID, Hindsight base URL, timeout, global bank, recall budget, token budget, retain settings, queue path, import branch mode, statusline display, and Pi window notifications. Deployment profile choices cover Hindsight Cloud, an existing local/external API, and local `hindsight-embed` guidance. The local `hindsight-embed` profile gives commands to run yourself and can set the base URL to `http://localhost:8888`; it does not manage daemons. It writes `.pi/hindsight.json` and reloads the extension config after each change. Active import config covers branch mode, replace-vs-append behavior, manifest path, checkpoint path, and resume behavior.
 
 Memory profiles make global memory explicit. Choose the narrowest route that fits the repo:
 
