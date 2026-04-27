@@ -28,6 +28,16 @@ describe("bank operations", () => {
     );
   });
 
+  it("passes configured observation enablement", async () => {
+    const createBank = vi.fn(async () => undefined);
+    await ensureProjectBank(client(createBank), "project-bank", { enableObservations: false });
+
+    expect(createBank).toHaveBeenCalledWith(
+      "project-bank",
+      expect.objectContaining({ enableObservations: false }),
+    );
+  });
+
   it("uses configured global mission when global bank is ensured", async () => {
     const createBank = vi.fn(async () => undefined);
     await ensureGlobalBank(client(createBank), "global-bank", { mission: "Global mission" });

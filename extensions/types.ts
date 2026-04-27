@@ -34,6 +34,10 @@ export interface ResolvedConfig {
     injectionPosition: RecallInjectionPosition;
     includeFactsInDebug: boolean;
   };
+  observations: {
+    enabled: boolean;
+    scopes: string[][];
+  };
   retain: {
     enabled: boolean;
     async: boolean;

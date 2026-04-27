@@ -1,6 +1,8 @@
 import type { HindsightCapabilities, ResolvedConfig } from "./types.js";
 import { baseTags, findRepoRoot } from "./banking.js";
 import { stableSessionId } from "./session.js";
+import { createMemoryIdentity } from "./memory-identity.js";
+import { expandObservationScopes } from "./observation-scopes.js";
 import type { ImportManifestEntry } from "./import-manifest.js";
 import {
   formatHindsightActivity,
@@ -44,6 +46,18 @@ export function safeConfig(config: ResolvedConfig): ResolvedConfig {
 export function formatDebugReport(args: DebugReportArgs): string {
   const sessionId = stableSessionId(args.sessionFile, args.cwd);
   const tags = baseTags(args.cwd, sessionId);
+  const identity = {
+    ...createMemoryIdentity(args.cwd, args.config, args.sessionFile),
+    projectBankId: args.projectBankId,
+  };
+  let observationScopes: string[][] | { error: string } = [];
+  try {
+    observationScopes = args.config.observations.enabled
+      ? expandObservationScopes(args.config.observations.scopes, identity)
+      : [];
+  } catch (error) {
+    observationScopes = { error: error instanceof Error ? error.message : String(error) };
+  }
   const health = args.health
     ? args.health.ok
       ? "reachable"
@@ -65,6 +79,10 @@ export function formatDebugReport(args: DebugReportArgs): string {
       bankMissions: {
         projectConfigured: Boolean(args.config.banks.project.mission),
         globalConfigured: Boolean(args.config.banks.global.mission),
+      },
+      observations: {
+        enabled: args.config.observations.enabled,
+        scopes: observationScopes,
       },
       overrideProjectBankId:
         "Set PI_HINDSIGHT_PROJECT_BANK_ID or .pi/hindsight.json banks.project.bankId",

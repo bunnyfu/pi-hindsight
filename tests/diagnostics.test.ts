@@ -49,8 +49,26 @@ describe("diagnostics", () => {
       appendFallback: "error",
     });
     expect(report.bankMissions).toEqual({ projectConfigured: false, globalConfigured: false });
+    expect(report.observations).toEqual({ enabled: false, scopes: [] });
     expect(report.overrideProjectBankId).toContain("PI_HINDSIGHT_PROJECT_BANK_ID");
     expect(report.tags).toEqual(expect.arrayContaining(["source:pi"]));
+  });
+
+  it("formats observation scope diagnostics", () => {
+    const report = JSON.parse(
+      formatDebugReport({
+        cwd: process.cwd(),
+        projectBankId: "bank",
+        config: {
+          ...DEFAULT_CONFIG,
+          observations: { enabled: true, scopes: [["repo:{repoKey}"], ["bank:{projectBankId}"]] },
+        },
+        queueLength: 0,
+      }),
+    ) as Record<string, any>;
+
+    expect(report.observations.enabled).toBe(true);
+    expect(report.observations.scopes).toEqual([[expect.stringMatching(/^repo:/)], ["bank:bank"]]);
   });
 
   it("formats append capability diagnostics", () => {

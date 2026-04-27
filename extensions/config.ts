@@ -24,6 +24,10 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     injectionPosition: "prepend",
     includeFactsInDebug: false,
   },
+  observations: {
+    enabled: false,
+    scopes: [["harness:pi"], ["repo:{repoKey}"]],
+  },
   retain: {
     enabled: true,
     async: true,
@@ -103,6 +107,16 @@ function stringArray(value: unknown, fallback: string[]): string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string") ? value : fallback;
 }
 
+function stringMatrix(value: unknown, fallback: string[][]): string[][] {
+  return Array.isArray(value) &&
+    value.every(
+      (scope) =>
+        Array.isArray(scope) && scope.length > 0 && scope.every((item) => typeof item === "string"),
+    )
+    ? value
+    : fallback;
+}
+
 function enumArray<T extends string>(value: unknown, allowed: readonly T[], fallback: T[]): T[] {
   return Array.isArray(value) && value.every((item) => allowed.includes(item as T))
     ? (value as T[])
@@ -146,6 +160,10 @@ export function normalizeConfig(config: ResolvedConfig): ResolvedConfig {
           ? { mission: config.banks.global.mission }
           : {}),
       },
+    },
+    observations: {
+      enabled: bool(config.observations?.enabled, DEFAULT_CONFIG.observations.enabled),
+      scopes: stringMatrix(config.observations?.scopes, DEFAULT_CONFIG.observations.scopes),
     },
     recall: {
       enabled: bool(config.recall?.enabled, DEFAULT_CONFIG.recall.enabled),
