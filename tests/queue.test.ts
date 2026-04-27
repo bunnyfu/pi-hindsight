@@ -74,6 +74,25 @@ describe("retain queue", () => {
     expect(calls[0]).toMatchObject(["b", "raw", { async: true }]);
   });
 
+  it("forwards queued observation scopes to retain", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
+    await enqueueRetainJob(path, {
+      ...job,
+      item: { ...job.item, observationScopes: [["repo:abc"], ["bank:b"]] },
+    });
+    const calls: unknown[] = [];
+
+    await flushRetainQueue(path, {
+      retain: async (...args: unknown[]) => {
+        calls.push(args);
+      },
+      recall: async () => [],
+      reflect: async () => ({}),
+    });
+
+    expect(calls[0]).toMatchObject(["b", "raw", { observationScopes: [["repo:abc"], ["bank:b"]] }]);
+  });
+
   it("moves exhausted failed jobs to the dead-letter queue", async () => {
     const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
     await enqueueRetainJob(path, job);

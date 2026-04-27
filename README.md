@@ -194,7 +194,7 @@ Shutdown queue flushing is intentionally bounded by `retain.shutdownFlushMaxJobs
 
 At session start, the extension shows the selected bank ID. If no bank ID is configured, it reports the automatically derived bank ID and how to override it. Project and global banks can define `mission` text; configured missions are sent to Hindsight as both `reflectMission` and `retainMission` during bank ensure so extraction and reflection stay aligned with the bank purpose. If no mission is configured, Pi-specific default missions are used.
 
-Observation scope configuration is explicit under `observations`. The current implementation validates and expands scope placeholders for diagnostics and passes `observations.enabled` to bank ensure as Hindsight `enableObservations`; it does not invent unsupported retain request fields. Supported placeholders are `{repoKey}`, `{sessionId}`, `{cwdHash}`, and `{projectBankId}`.
+Observation scope configuration is explicit under `observations`. The extension validates and expands scope placeholders for diagnostics, passes `observations.enabled` to bank ensure as Hindsight `enableObservations`, and stores expanded scopes on queued retain jobs so retries preserve the scope policy active when the job was created. The official Hindsight client exposes retain observation scopes through batch retain; the adapter uses that path only when scopes are present. Supported placeholders are `{repoKey}`, `{sessionId}`, `{cwdHash}`, and `{projectBankId}`.
 
 The footer status is configurable with two independent knobs:
 

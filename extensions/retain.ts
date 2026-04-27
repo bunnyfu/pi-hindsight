@@ -12,6 +12,8 @@ import { redactSecrets } from "./sanitize.js";
 import { contextLabel, liveDocumentId, stableSessionId } from "./session.js";
 import { enqueueRetainJob, flushRetainQueue, resolveQueuePath } from "./queue.js";
 import { resolveRetainDocumentTarget } from "./capabilities.js";
+import { createMemoryIdentity } from "./memory-identity.js";
+import { expandObservationScopes } from "./observation-scopes.js";
 
 export function buildRetainJob(args: {
   config: ResolvedConfig;
@@ -28,6 +30,13 @@ export function buildRetainJob(args: {
     ? redactSecrets(JSON.stringify(projected, null, 2))
     : JSON.stringify(projected, null, 2);
   const sessionId = stableSessionId(args.sessionFile, args.cwd);
+  const identity = createMemoryIdentity(args.cwd, args.config, args.sessionFile);
+  const observationScopes = args.config.observations.enabled
+    ? expandObservationScopes(args.config.observations.scopes, {
+        ...identity,
+        projectBankId: args.bankId,
+      })
+    : [];
   const baseDocumentId = liveDocumentId(args.sessionFile, args.cwd);
   const target = resolveRetainDocumentTarget({
     config: args.config,
@@ -53,6 +62,7 @@ export function buildRetainJob(args: {
         imported: "false",
         ...(args.sessionFile ? { pi_session_file: args.sessionFile } : {}),
       },
+      ...(observationScopes.length ? { observationScopes } : {}),
     },
     retries: 0,
   };

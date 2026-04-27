@@ -119,6 +119,7 @@ export interface RetainJob {
     async?: boolean;
     tags?: string[];
     metadata?: Record<string, string>;
+    observationScopes?: string[][];
   };
   retries: number;
   lastError?: string;
@@ -145,7 +146,23 @@ export interface HindsightLikeClient {
       async?: boolean;
       tags?: string[];
       updateMode?: UpdateMode;
+      observationScopes?: string[][];
     },
+  ): Promise<unknown>;
+  retainBatch?(
+    bankId: string,
+    items: Array<{
+      content: string;
+      timestamp?: Date | string;
+      context?: string;
+      metadata?: Record<string, string>;
+      document_id?: string;
+      entities?: Array<{ text: string; type?: string }>;
+      tags?: string[];
+      observation_scopes?: string[][];
+      update_mode?: UpdateMode;
+    }>,
+    options?: { documentId?: string; documentTags?: string[]; async?: boolean },
   ): Promise<unknown>;
   recall(
     bankId: string,
