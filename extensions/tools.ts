@@ -122,6 +122,10 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
       bank: Type.Optional(
         Type.String({ description: "Optional bank id. Defaults to project bank." }),
       ),
+      dryRun: Type.Optional(Type.Boolean({ description: "Preview import without writing." })),
+      allLeaves: Type.Optional(
+        Type.Boolean({ description: "Import or preview all branch leaves." }),
+      ),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
       const sessionFile = params.sessionFile || ctx.sessionManager.getSessionFile?.();
@@ -129,12 +133,18 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
       const result = await operations.importSession({
         sessionFile,
         ...(params.bank ? { bank: params.bank } : {}),
+        ...(params.dryRun !== undefined ? { dryRun: params.dryRun } : {}),
+        ...(params.allLeaves !== undefined
+          ? { includeBranches: params.allLeaves ? "all-leaves" : "current-only" }
+          : {}),
       });
       return {
         content: [
           {
             type: "text",
-            text: `Imported ${result.messageCount} messages into ${result.bankId} as ${result.documentId}. Manifest: ${result.manifestPath}.`,
+            text: result.dryRun
+              ? `Import preview: ${result.messageCount} messages would write ${result.documents.length} document${result.documents.length === 1 ? "" : "s"} to ${result.bankId}. First document: ${result.documentId}. Manifest unchanged: ${result.manifestPath}.`
+              : `Imported ${result.messageCount} messages into ${result.bankId} as ${result.documentId}. Manifest: ${result.manifestPath}.`,
           },
         ],
         details: result,
