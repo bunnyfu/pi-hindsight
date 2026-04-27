@@ -6,6 +6,10 @@
 
 - implement Pi Hindsight MVP ([ec7e749](https://github.com/luxus/pi-hindsight/commit/ec7e749d34a9548b38c34226aa886faac7a9090a))
 
+### Bug Fixes
+
+- ignore empty smoke test env values ([ae32865](https://github.com/luxus/pi-hindsight/commit/ae32865372a6d585d91c24b3eb6dddc34cfa3abe))
+
 ### Refactoring
 
 - close memory hardening gaps ([6069534](https://github.com/luxus/pi-hindsight/commit/6069534742cb7b249ffd72161e4b1dc13d406381))
@@ -15,6 +19,7 @@
 ### Documentation
 
 - generate changelog ([433e90c](https://github.com/luxus/pi-hindsight/commit/433e90ce1dfa757c0cf24a7e988f43ee892ea468))
+- update changelog ([1acb50d](https://github.com/luxus/pi-hindsight/commit/1acb50df6a9739221d9fb86b444c3dad92bcacdb))
 - update changelog ([5c35c36](https://github.com/luxus/pi-hindsight/commit/5c35c36cbec4fea1b4139c371db52a5cbf80d384))
 
 ### CI
