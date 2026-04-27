@@ -135,7 +135,10 @@ describe("extension hooks", () => {
     expect(contextResult.messages[0].content).toContain("global-bank memory");
     expect(mocked.client.recall).toHaveBeenCalledTimes(2);
     expect(mocked.client.recall.mock.calls[0]?.[0]).toMatch(/^pi-project-/);
+    expect(mocked.client.recall.mock.calls[0]?.[1]).toBe("What do I know?");
     expect(mocked.client.recall.mock.calls[0]?.[2]).toMatchObject({
+      maxTokens: 800,
+      types: ["world", "experience", "observation"],
       tags: [expect.stringMatching(/^repo:/)],
       tagsMatch: "any_strict",
     });
@@ -144,6 +147,38 @@ describe("extension hooks", () => {
       tags: ["source:pi"],
       tagsMatch: "any_strict",
     });
+  });
+
+  it("honors append recall injection position", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ recall: { injectionPosition: "append" } }),
+    );
+    const handlers: Record<string, Array<(event: any, ctx: any) => Promise<any>>> = {};
+    const pi = {
+      on: vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+        handlers[name] = [...(handlers[name] ?? []), handler];
+      }),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    await handlers.session_start?.[0]?.({}, ctx);
+    const original = [{ role: "user", content: "q", timestamp: 1 }];
+    const contextResult = await handlers.context?.[0]?.({ messages: original }, ctx);
+
+    expect(contextResult.messages[0]).toEqual(original[0]);
+    expect(contextResult.messages[1].content).toContain("<hindsight-memory>");
   });
 
   it("explicit retain keeps base tags when extra tags are provided", async () => {

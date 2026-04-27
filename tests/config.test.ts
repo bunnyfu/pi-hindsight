@@ -38,7 +38,17 @@ describe("resolveConfig", () => {
     writeFileSync(
       join(cwd, ".pi", "hindsight.json"),
       JSON.stringify({
-        recall: { budget: "huge", maxTokens: -1, types: ["world", 42] },
+        recall: {
+          budget: "huge",
+          maxTokens: -1,
+          types: ["world", 42],
+          contextTurns: 0,
+          roles: ["user", "alien"],
+          maxQueryChars: 0,
+          topK: -1,
+          timeoutMs: 0,
+          injectionPosition: "middle",
+        },
         retain: {
           includeToolResults: "sometimes",
           queuePath: "",
@@ -60,6 +70,12 @@ describe("resolveConfig", () => {
     expect(config.recall.budget).toBe("low");
     expect(config.recall.maxTokens).toBe(800);
     expect(config.recall.types).toEqual(["world", "experience", "observation"]);
+    expect(config.recall.contextTurns).toBe(2);
+    expect(config.recall.roles).toEqual(["user", "assistant"]);
+    expect(config.recall.maxQueryChars).toBe(800);
+    expect(config.recall.topK).toBe(8);
+    expect(config.recall.timeoutMs).toBe(10_000);
+    expect(config.recall.injectionPosition).toBe("prepend");
     expect(config.retain.appendFallback).toBe("error");
     expect(config.retain.includeToolResults).toBe("meaningful-only");
     expect(config.retain.queuePath).toBe(".pi/hindsight/retain-queue.jsonl");

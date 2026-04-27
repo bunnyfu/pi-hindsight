@@ -4,6 +4,8 @@ export type AppendFallback = "error" | "per-turn-documents";
 export type TagsMatch = "any" | "all" | "any_strict" | "all_strict";
 export type StatusStyle = "off" | "text" | "emoji" | "nerdfont";
 export type StatusDetail = "minimal" | "project" | "activity" | "verbose";
+export type RecallRole = "user" | "assistant" | "tool" | "system";
+export type RecallInjectionPosition = "prepend" | "append";
 
 export interface ResolvedConfig {
   enabled: boolean;
@@ -18,7 +20,13 @@ export interface ResolvedConfig {
     maxTokens: number;
     types: string[];
     recentTurnsForQuery: number;
+    contextTurns: number;
+    roles: RecallRole[];
+    maxQueryChars: number;
+    topK: number;
+    timeoutMs: number;
     injectionMode: "context";
+    injectionPosition: RecallInjectionPosition;
     includeFactsInDebug: boolean;
   };
   retain: {

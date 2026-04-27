@@ -15,7 +15,13 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     maxTokens: 800,
     types: ["world", "experience", "observation"],
     recentTurnsForQuery: 2,
+    contextTurns: 2,
+    roles: ["user", "assistant"],
+    maxQueryChars: 800,
+    topK: 8,
+    timeoutMs: 10_000,
     injectionMode: "context",
+    injectionPosition: "prepend",
     includeFactsInDebug: false,
   },
   retain: {
@@ -97,6 +103,12 @@ function stringArray(value: unknown, fallback: string[]): string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string") ? value : fallback;
 }
 
+function enumArray<T extends string>(value: unknown, allowed: readonly T[], fallback: T[]): T[] {
+  return Array.isArray(value) && value.every((item) => allowed.includes(item as T))
+    ? (value as T[])
+    : fallback;
+}
+
 export function normalizeConfig(config: ResolvedConfig): ResolvedConfig {
   const apiKey = optionalString(config.hindsight?.apiKey, DEFAULT_CONFIG.hindsight.apiKey);
   const projectBankId = optionalString(
@@ -142,7 +154,24 @@ export function normalizeConfig(config: ResolvedConfig): ResolvedConfig {
         config.recall?.recentTurnsForQuery,
         DEFAULT_CONFIG.recall.recentTurnsForQuery,
       ),
+      contextTurns: positiveInt(
+        config.recall?.contextTurns ?? config.recall?.recentTurnsForQuery,
+        DEFAULT_CONFIG.recall.contextTurns,
+      ),
+      roles: enumArray(
+        config.recall?.roles,
+        ["user", "assistant", "tool", "system"],
+        DEFAULT_CONFIG.recall.roles,
+      ),
+      maxQueryChars: positiveInt(config.recall?.maxQueryChars, DEFAULT_CONFIG.recall.maxQueryChars),
+      topK: positiveInt(config.recall?.topK, DEFAULT_CONFIG.recall.topK),
+      timeoutMs: positiveInt(config.recall?.timeoutMs, DEFAULT_CONFIG.recall.timeoutMs),
       injectionMode: "context",
+      injectionPosition: enumValue(
+        config.recall?.injectionPosition,
+        ["prepend", "append"],
+        DEFAULT_CONFIG.recall.injectionPosition,
+      ),
       includeFactsInDebug: bool(
         config.recall?.includeFactsInDebug,
         DEFAULT_CONFIG.recall.includeFactsInDebug,
