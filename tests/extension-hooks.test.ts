@@ -1,0 +1,255 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const mocked = vi.hoisted(() => ({
+  client: {
+    retain: vi.fn(async (..._args: unknown[]) => undefined),
+    recall: vi.fn(async (..._args: unknown[]) => ({
+      results: [{ text: "repo-specific remembered fact" }],
+    })),
+    reflect: vi.fn(async (..._args: unknown[]) => ({})),
+    createBank: vi.fn(async (..._args: unknown[]) => undefined),
+    getBankProfile: vi.fn(async (..._args: unknown[]) => ({})),
+  },
+  ensureProjectBank: vi.fn(async () => undefined),
+  checkHindsight: vi.fn(async () => ({ ok: true })),
+}));
+
+vi.mock("../extensions/client.js", () => ({
+  createHindsightClient: () => mocked.client,
+  ensureProjectBank: mocked.ensureProjectBank,
+  checkHindsight: mocked.checkHindsight,
+}));
+
+describe("extension hooks", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocked.client.recall.mockImplementation(async (..._args: unknown[]) => ({
+      results: [{ text: "repo-specific remembered fact" }],
+    }));
+    mocked.client.retain.mockImplementation(async (..._args: unknown[]) => undefined);
+  });
+
+  it("prepends recalled memory in context and keeps that block out of retained transcript content", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ hindsight: { baseUrl: "http://unused.test" } }),
+    );
+    const sessionFile = join(cwd, "session.jsonl");
+
+    const handlers: Record<string, Array<(event: any, ctx: any) => Promise<any>>> = {};
+    const pi = {
+      on: vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+        handlers[name] = [...(handlers[name] ?? []), handler];
+      }),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => sessionFile },
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+
+    await handlers.session_start?.[0]?.({}, ctx);
+    const originalMessages = [
+      { role: "user", content: "What did we decide?", timestamp: Date.now() },
+    ];
+    const contextResult = await handlers.context?.[0]?.({ messages: originalMessages }, ctx);
+
+    expect(contextResult.messages[0].content).toContain("<hindsight-memory>");
+    expect(contextResult.messages[0].content).toContain("repo-specific remembered fact");
+    expect(contextResult.messages.slice(1)).toEqual(originalMessages);
+
+    await handlers.agent_end?.[0]?.(
+      {
+        messages: [
+          contextResult.messages[0],
+          ...originalMessages,
+          { role: "assistant", content: "Decision still stands.", timestamp: Date.now() },
+        ],
+      },
+      ctx,
+    );
+
+    expect(mocked.client.retain).toHaveBeenCalledTimes(1);
+    const retainCalls = mocked.client.retain.mock.calls as unknown[][];
+    const retainedContent = retainCalls[0]?.[1] as string;
+    expect(retainedContent).toContain("What did we decide?");
+    expect(retainedContent).toContain("Decision still stands.");
+    expect(retainedContent).not.toContain("<hindsight-memory>");
+    expect(retainedContent).not.toContain("repo-specific remembered fact");
+  });
+
+  it("uses repo scope for project recall and source scope for global recall", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ banks: { global: { enabled: true, bankId: "global-bank" } } }),
+    );
+    mocked.client.recall.mockImplementation(async (...args: unknown[]) => ({
+      results: [{ text: `${String(args[0])} memory` }],
+    }));
+
+    const handlers: Record<string, Array<(event: any, ctx: any) => Promise<any>>> = {};
+    const pi = {
+      on: vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+        handlers[name] = [...(handlers[name] ?? []), handler];
+      }),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+
+    await handlers.session_start?.[0]?.({}, ctx);
+    const contextResult = await handlers.context?.[0]?.(
+      { messages: [{ role: "user", content: "What do I know?", timestamp: 1 }] },
+      ctx,
+    );
+
+    expect(contextResult.messages[0].content).toContain("global-bank memory");
+    expect(mocked.client.recall).toHaveBeenCalledTimes(2);
+    expect(mocked.client.recall.mock.calls[0]?.[0]).toMatch(/^pi-project-/);
+    expect(mocked.client.recall.mock.calls[0]?.[2]).toMatchObject({
+      tags: [expect.stringMatching(/^repo:/)],
+      tagsMatch: "any_strict",
+    });
+    expect(mocked.client.recall.mock.calls[1]?.[0]).toBe("global-bank");
+    expect(mocked.client.recall.mock.calls[1]?.[2]).toMatchObject({
+      tags: ["source:pi"],
+      tagsMatch: "any_strict",
+    });
+  });
+
+  it("explicit retain keeps base tags when extra tags are provided", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-tools-"));
+    mkdirSync(join(cwd, ".git"));
+    const sessionFile = join(cwd, "session.jsonl");
+    const tools: Record<string, any> = {};
+    const pi = {
+      on: vi.fn(),
+      registerTool: vi.fn((tool: any) => {
+        tools[tool.name] = tool;
+      }),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => sessionFile },
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    await tools.hindsight_retain.execute(
+      "tool-call",
+      { content: "Remember config decision", context: "test", tags: ["decision:config"] },
+      undefined,
+      undefined,
+      ctx,
+    );
+
+    const retainOptions = mocked.client.retain.mock.calls[0]?.[2] as { tags?: string[] };
+    expect(retainOptions.tags).toEqual(
+      expect.arrayContaining([
+        "source:pi",
+        "decision:config",
+        expect.stringMatching(/^repo:/),
+        expect.stringMatching(/^session:/),
+      ]),
+    );
+  });
+
+  it("does not emit retain status when retain is disabled", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ retain: { enabled: false } }),
+    );
+    const handlers: Record<string, Array<(event: any, ctx: any) => Promise<any>>> = {};
+    const pi = {
+      on: vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+        handlers[name] = [...(handlers[name] ?? []), handler];
+      }),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    await handlers.session_start?.[0]?.({}, ctx);
+    ctx.ui.setStatus.mockClear();
+
+    await handlers.agent_end?.[0]?.(
+      { messages: [{ role: "user", content: "hi", timestamp: 1 }] },
+      ctx,
+    );
+
+    expect(mocked.client.retain).not.toHaveBeenCalled();
+    expect(ctx.ui.setStatus).not.toHaveBeenCalled();
+  });
+
+  it("retains only new messages when agent_end receives overlapping transcripts", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ hindsight: { baseUrl: "http://unused.test" } }),
+    );
+    const handlers: Record<string, Array<(event: any, ctx: any) => Promise<any>>> = {};
+    const pi = {
+      on: vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+        handlers[name] = [...(handlers[name] ?? []), handler];
+      }),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+    const u1 = { role: "user", content: "u1", timestamp: 1 };
+    const a1 = { role: "assistant", content: "a1", timestamp: 2 };
+    const u2 = { role: "user", content: "u2", timestamp: 3 };
+    const a2 = { role: "assistant", content: "a2", timestamp: 4 };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    await handlers.session_start?.[0]?.({}, ctx);
+    await handlers.agent_end?.[0]?.({ messages: [u1, a1] }, ctx);
+    await handlers.agent_end?.[0]?.({ messages: [u1, a1, u2, a2] }, ctx);
+
+    expect(mocked.client.retain).toHaveBeenCalledTimes(2);
+    const secondContent = mocked.client.retain.mock.calls[1]?.[1] as string;
+    expect(secondContent).toContain("u2");
+    expect(secondContent).toContain("a2");
+    expect(secondContent).not.toContain("u1");
+    expect(secondContent).not.toContain("a1");
+  });
+});

@@ -1,0 +1,70 @@
+import { HindsightClient } from "@vectorize-io/hindsight-client";
+import type { HindsightLikeClient, ResolvedConfig } from "./types.js";
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  operation: string,
+): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`${operation} timed out after ${timeoutMs}ms`)),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+export function createHindsightClient(config: ResolvedConfig): HindsightLikeClient {
+  const raw = new HindsightClient({
+    baseUrl: config.hindsight.baseUrl,
+    ...(config.hindsight.apiKey ? { apiKey: config.hindsight.apiKey } : {}),
+    userAgent: "pi-hindsight/0.1.0",
+  });
+  const timeoutMs = config.hindsight.timeoutMs;
+  return {
+    retain: (...args) => withTimeout(raw.retain(...args), timeoutMs, "hindsight retain"),
+    recall: (...args) => withTimeout(raw.recall(...args), timeoutMs, "hindsight recall"),
+    reflect: (...args) => withTimeout(raw.reflect(...args), timeoutMs, "hindsight reflect"),
+    createBank: (...args) =>
+      withTimeout(raw.createBank(...args), timeoutMs, "hindsight createBank"),
+    getBankProfile: (...args) =>
+      withTimeout(raw.getBankProfile(...args), timeoutMs, "hindsight getBankProfile"),
+  };
+}
+
+export async function ensureProjectBank(
+  client: HindsightLikeClient,
+  bankId: string,
+): Promise<void> {
+  if (!client.createBank) return;
+  await client.createBank(bankId, {
+    name: bankId,
+    reflectMission:
+      "Help a Pi coding agent recall project-specific engineering decisions, conventions, tasks, and debugging lessons.",
+    retainMission:
+      "Extract durable project facts, user preferences, decisions, bugs, and lessons from raw Pi coding sessions. Ignore transient chatter and secrets.",
+    retainExtractionMode: "concise",
+    enableObservations: true,
+  });
+}
+
+export async function checkHindsight(
+  client: HindsightLikeClient,
+  bankId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    if (client.getBankProfile) await client.getBankProfile(bankId);
+    else await client.recall(bankId, "health check", { maxTokens: 1, budget: "low" });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}

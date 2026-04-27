@@ -1,0 +1,8 @@
+node_modules/
+.pi/hindsight/retain-queue.jsonl
+.pi/hindsight/import-manifest.json
+coverage/
+dist/
+tmp/
+.env
+.env.*

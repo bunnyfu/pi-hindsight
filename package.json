@@ -1,0 +1,56 @@
+{
+  "name": "pi-hindsight",
+  "version": "0.1.0",
+  "description": "Pi extension for durable Hindsight-backed memory.",
+  "keywords": [
+    "hindsight",
+    "memory",
+    "pi",
+    "pi-package"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsgo -p tsconfig.json --noEmit",
+    "typecheck:tsc": "tsc --noEmit",
+    "lint": "oxlint --type-aware --type-check extensions tests",
+    "lint:fix": "oxlint --type-aware --type-check --fix extensions tests",
+    "format": "oxfmt --check --no-error-on-unmatched-pattern \"extensions/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.mjs\" \"docs/**/*.md\" \"README.md\" \"CHANGELOG.md\" \"package.json\" \"package-lock.json\" \"tsconfig.json\" \".oxfmtrc.json\" \".commitlintrc.json\" \"*.yml\" \".github/**/*.yml\"",
+    "format:fix": "oxfmt --write --no-error-on-unmatched-pattern \"extensions/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.mjs\" \"docs/**/*.md\" \"README.md\" \"CHANGELOG.md\" \"package.json\" \"package-lock.json\" \"tsconfig.json\" \".oxfmtrc.json\" \".commitlintrc.json\" \"*.yml\" \".github/**/*.yml\"",
+    "check": "npm run format && npm run lint && npm run typecheck && npm test",
+    "check:ci": "npm run check",
+    "install-hooks": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
+    "prepare": "npm run install-hooks",
+    "precommit": "npm run check",
+    "test": "vitest run",
+    "smoke:hindsight": "node scripts/smoke-hindsight.mjs",
+    "changelog": "node scripts/generate-changelog.mjs",
+    "version": "npm run changelog && git add CHANGELOG.md"
+  },
+  "dependencies": {
+    "@vectorize-io/hindsight-client": "^0.5.4"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.5.2",
+    "@commitlint/config-conventional": "^20.5.0",
+    "@mariozechner/pi-coding-agent": "*",
+    "@types/node": "^22.15.3",
+    "@typescript/native-preview": "^7.0.0-dev.20260426.1",
+    "conventional-changelog": "^7.2.0",
+    "oxfmt": "^0.46.0",
+    "oxlint": "^1.61.0",
+    "oxlint-tsgolint": "^0.22.0",
+    "typebox": "^1.0.55",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.2"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  }
+}
