@@ -15,3 +15,8 @@
 ### Documentation
 
 - generate changelog ([433e90c](https://github.com/luxus/pi-hindsight/commit/433e90ce1dfa757c0cf24a7e988f43ee892ea468))
+- update changelog ([5c35c36](https://github.com/luxus/pi-hindsight/commit/5c35c36cbec4fea1b4139c371db52a5cbf80d384))
+
+### CI
+
+- add configured Hindsight smoke workflow ([2d3d837](https://github.com/luxus/pi-hindsight/commit/2d3d837aa00443e2bc95b398f408c16e03678b18))
