@@ -1,6 +1,9 @@
 export type Budget = "low" | "mid" | "high";
 export type UpdateMode = "append" | "replace";
 export type AppendFallback = "error" | "per-turn-documents";
+export type RetainUserContent = "text";
+export type RetainAssistantContent = "text" | "toolCall" | "thinking";
+export type RetainToolResultContent = "error" | "summary" | "content";
 export type TagsMatch = "any" | "all" | "any_strict" | "all_strict";
 export type StatusStyle = "off" | "text" | "emoji" | "nerdfont";
 export type StatusDetail = "minimal" | "project" | "activity" | "verbose";
@@ -44,6 +47,19 @@ export interface ResolvedConfig {
     updateMode: UpdateMode;
     appendFallback: AppendFallback;
     includeToolResults: "meaningful-only" | "all" | "none";
+    content: {
+      user: RetainUserContent[];
+      assistant: RetainAssistantContent[];
+      toolResult: RetainToolResultContent[];
+    };
+    toolFilter: {
+      toolCall: { include?: string[]; exclude?: string[] };
+      toolResult: { include?: string[]; exclude?: string[] };
+    };
+    strip: {
+      message: string[];
+      topLevel: string[];
+    };
     redactSecrets: boolean;
     queuePath: string;
     shutdownFlushMaxJobs: number;

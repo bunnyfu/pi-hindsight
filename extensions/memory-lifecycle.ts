@@ -138,7 +138,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
   };
 
   const retainableMessageCount = (messages: AgentEndEvent["messages"]): number =>
-    projectMessages(messages as AgentMessage[], config.retain.includeToolResults).length;
+    projectMessages(messages as AgentMessage[], config).length;
 
   const deps: MemoryLifecycleDeps = {
     getClient: () => client,
