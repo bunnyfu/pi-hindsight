@@ -6,6 +6,10 @@ import { DEFAULT_CONFIG } from "../extensions/config.js";
 import { createMemoryOperations } from "../extensions/memory-operations.js";
 import { flushRetainQueue, readRetainQueue, resolveQueuePath } from "../extensions/queue.js";
 import type { HindsightLikeClient, ResolvedConfig } from "../extensions/types.js";
+import {
+  setSessionMemoryMode,
+  setSessionRetainEnabled,
+} from "../extensions/session-memory-meta.js";
 
 function testConfig(queuePath = ".pi/hindsight/q.jsonl"): ResolvedConfig {
   return {
@@ -163,6 +167,31 @@ describe("durable explicit retain", () => {
     expect(queued).toHaveLength(1);
     expect(queued[0]?.documentId).toMatch(/^pi-explicit:.*:delta:/);
     expect(queued[0]?.updateMode).toBe("replace");
+  });
+
+  it("blocks explicit recall and retain when session governance disables them", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
+    const sessionFile = "/tmp/session.jsonl";
+    const config = testConfig();
+    const operations = createMemoryOperations({
+      getClient: () => client(async () => undefined),
+      getConfig: () => config,
+      getProjectBankId: () => "project-bank",
+    });
+
+    await setSessionMemoryMode(cwd, sessionFile, "ignored");
+    await expect(operations.recall(cwd, "q", undefined, sessionFile)).rejects.toThrow(
+      /recall is disabled/,
+    );
+    await expect(
+      operations.retainExplicit({ cwd, sessionFile, content: "x", context: "ctx" }),
+    ).rejects.toThrow(/retain is disabled/);
+
+    await setSessionMemoryMode(cwd, sessionFile, "normal");
+    await setSessionRetainEnabled(cwd, sessionFile, false);
+    await expect(
+      operations.retainExplicit({ cwd, sessionFile, content: "x", context: "ctx" }),
+    ).rejects.toThrow(/retain is disabled/);
   });
 
   it("sends explicit retain immediately after enqueue when Hindsight is up", async () => {

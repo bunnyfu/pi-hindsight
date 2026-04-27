@@ -20,6 +20,7 @@ export function buildRetainJob(args: {
   bankId: string;
   messages: AgentEndEvent["messages"];
   capabilities?: HindsightCapabilities;
+  extraTags?: string[];
 }): RetainJob | undefined {
   const projected = projectMessages(args.messages, args.config);
   if (projected.length === 0) return undefined;
@@ -46,7 +47,7 @@ export function buildRetainJob(args: {
       context: contextLabel(args.cwd, args.sessionFile),
       timestamp: new Date().toISOString(),
       async: args.config.retain.async,
-      tags: baseTags(args.cwd, sessionId),
+      tags: [...new Set([...baseTags(args.cwd, sessionId), ...(args.extraTags ?? [])])],
       metadata: {
         cwd: args.cwd,
         imported: "false",
@@ -65,6 +66,7 @@ export async function enqueueRetainFromAgentEnd(args: {
   client: HindsightLikeClient;
   bankId: string;
   capabilities?: HindsightCapabilities;
+  extraTags?: string[];
 }): Promise<{ queued: boolean; sent: number; remaining: number }> {
   if (!args.config.enabled || !args.config.retain.enabled)
     return { queued: false, sent: 0, remaining: 0 };
@@ -75,6 +77,7 @@ export async function enqueueRetainFromAgentEnd(args: {
     bankId: args.bankId,
     messages: args.event.messages,
     ...(args.capabilities ? { capabilities: args.capabilities } : {}),
+    ...(args.extraTags ? { extraTags: args.extraTags } : {}),
   });
   if (!job) return { queued: false, sent: 0, remaining: 0 };
   const queuePath = resolveQueuePath(args.cwd, args.config.retain.queuePath);
