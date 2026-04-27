@@ -137,6 +137,35 @@ describe("recall formatting", () => {
     expect(query).toContain("current question");
   });
 
+  it("keeps scope hints when repo hints are disabled", async () => {
+    const queries: string[] = [];
+    await recallForContext({
+      client: {
+        retain: async () => undefined,
+        recall: async (_bankId, query) => {
+          queries.push(query);
+          return { results: [] };
+        },
+        reflect: async () => ({}),
+      },
+      config: {
+        ...DEFAULT_CONFIG,
+        recall: { ...DEFAULT_CONFIG.recall, includeRepoHintsInQuery: false },
+      },
+      scopes: [
+        { kind: "project", bankId: "project-bank" },
+        { kind: "global", bankId: "global-bank" },
+      ],
+      cwd: "/repo/project",
+      messages: [{ role: "user", content: "q", timestamp: 1 }] as unknown as AgentMessage[],
+    });
+
+    expect(queries[0]).toContain("scope:project");
+    expect(queries[0]).not.toContain("repo:");
+    expect(queries[0]).not.toContain("cwd:");
+    expect(queries[1]).toContain("scope:global");
+  });
+
   it("uses bank-aware preambles and query hints", async () => {
     const queries: string[] = [];
     await recallForContext({

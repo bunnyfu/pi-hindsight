@@ -60,6 +60,19 @@ describe("resolveConfig", () => {
     expect(config.recall.includeRepoHintsInQuery).toBe(false);
   });
 
+  it("maps generic query preamble to bank-specific preambles when specific fields are absent", () => {
+    const cwd = tmp();
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ recall: { queryPreamble: "Generic tuned lookup." } }),
+    );
+
+    const config = resolveConfig(cwd);
+    expect(config.recall.projectQueryPreamble).toBe("Generic tuned lookup.");
+    expect(config.recall.globalQueryPreamble).toBe("Generic tuned lookup.");
+  });
+
   it("normalizes invalid config values back to defaults", () => {
     const cwd = tmp();
     mkdirSync(join(cwd, ".pi"));

@@ -155,9 +155,8 @@ function preambleForScope(config: ResolvedConfig, scope: RecallScope): string {
 }
 
 function queryHints(cwd: string, config: ResolvedConfig, scope: RecallScope): string[] {
-  if (!config.recall.includeRepoHintsInQuery) return [];
   const hints = scope.kind ? [`scope:${scope.kind}`] : [];
-  if (scope.kind === "global") return hints;
+  if (!config.recall.includeRepoHintsInQuery || scope.kind === "global") return hints;
   const identity = createMemoryIdentity(cwd, config);
   return [...hints, `repo:${identity.repoKey}`, `cwd:${basename(cwd)}`];
 }

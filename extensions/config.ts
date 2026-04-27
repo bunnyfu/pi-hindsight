@@ -194,6 +194,10 @@ function hasConfiguredToolResultContent(rawConfig: unknown): boolean {
   );
 }
 
+function hasConfiguredRecallField(rawConfig: unknown, field: string): boolean {
+  return isRecord(rawConfig) && isRecord(rawConfig.recall) && field in rawConfig.recall;
+}
+
 export function normalizeConfig(config: ResolvedConfig, rawConfig?: unknown): ResolvedConfig {
   const apiKey = optionalString(config.hindsight?.apiKey, DEFAULT_CONFIG.hindsight.apiKey);
   const projectBankId = optionalString(
@@ -264,13 +268,21 @@ export function normalizeConfig(config: ResolvedConfig, rawConfig?: unknown): Re
           ? config.recall.queryPreamble
           : DEFAULT_CONFIG.recall.queryPreamble,
       projectQueryPreamble:
+        hasConfiguredRecallField(rawConfig, "projectQueryPreamble") &&
         typeof config.recall?.projectQueryPreamble === "string"
           ? config.recall.projectQueryPreamble
-          : DEFAULT_CONFIG.recall.projectQueryPreamble,
+          : hasConfiguredRecallField(rawConfig, "queryPreamble") &&
+              typeof config.recall?.queryPreamble === "string"
+            ? config.recall.queryPreamble
+            : DEFAULT_CONFIG.recall.projectQueryPreamble,
       globalQueryPreamble:
+        hasConfiguredRecallField(rawConfig, "globalQueryPreamble") &&
         typeof config.recall?.globalQueryPreamble === "string"
           ? config.recall.globalQueryPreamble
-          : DEFAULT_CONFIG.recall.globalQueryPreamble,
+          : hasConfiguredRecallField(rawConfig, "queryPreamble") &&
+              typeof config.recall?.queryPreamble === "string"
+            ? config.recall.queryPreamble
+            : DEFAULT_CONFIG.recall.globalQueryPreamble,
       includeDateInQuery: bool(
         config.recall?.includeDateInQuery,
         DEFAULT_CONFIG.recall.includeDateInQuery,
