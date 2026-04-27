@@ -18,6 +18,7 @@ import { recallScopeTags } from "./banking.js";
 import { stableSessionId } from "./session.js";
 import { explicitRetainTags } from "./memory-identity.js";
 import { retainDurably } from "./retain-durable.js";
+import { readLastRecallSnapshot, resolveLastRecallPath } from "./recall-visibility.js";
 import {
   addSessionMemoryTag,
   getEffectiveSessionMemoryMode,
@@ -231,6 +232,13 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
     async removeSessionTag(cwd: string, sessionFile: string | undefined, tag: string) {
       const meta = await removeSessionMemoryTag(cwd, sessionFile, tag);
       return { meta, effective: getEffectiveSessionMemoryMode(meta) };
+    },
+
+    async lastRecall(cwd: string) {
+      const config = deps.getConfig();
+      const path = resolveLastRecallPath(cwd, config.recall.lastRecallPath);
+      const snapshot = await readLastRecallSnapshot(cwd, config.recall.lastRecallPath);
+      return { path, snapshot };
     },
 
     async flush(cwd: string) {

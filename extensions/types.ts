@@ -33,6 +33,8 @@ export interface ResolvedConfig {
     maxQueryChars: number;
     queryPreamble: string;
     includeDateInQuery: boolean;
+    storeLastRecall: boolean;
+    lastRecallPath: string;
     topK: number;
     timeoutMs: number;
     injectionMode: "context";

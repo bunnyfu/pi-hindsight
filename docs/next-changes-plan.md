@@ -2024,3 +2024,136 @@ Decision:
    - sidecar or custom filtered message
    - never retained and never provider-visible by default
 7. PR 14+: Resume existing import dry-run, checkpointing, setup profiles, SecretRef, smoke/doctor work.
+
+---
+
+# Maintainer Feedback Addendum 2: RetainBatch, Bank Strategy, Recall Visibility Tradeoffs, and Query V2
+
+## Source and stance
+
+Follow-up feedback from `noctuid/pi-hindsight` adds useful implementation details and product tradeoffs. These comments mostly reinforce the current direction: keep safe official-integration defaults, but support power-user/global-bank workflows through explicit profiles and knobs.
+
+## Accepted additions
+
+### 1. Track upstream gap: `retain()` lacks observation scopes, `retainBatch()` supports them
+
+The official Hindsight TypeScript client currently exposes `observation_scopes` on batch retain item input, but not on the single-memory `retain()` helper. This is likely an API/client ergonomics gap.
+
+Current repo status:
+
+- PR 12 already uses the safe path: internal `observationScopes` are mapped to official `retainBatch()` `observation_scopes` only when scopes are present.
+- Integration tests assert the wire payload uses snake_case `observation_scopes` and does not leak camelCase fields.
+- No unsupported `retain()` request field is invented.
+
+Decision:
+
+- Open an upstream Hindsight issue requesting `retain()` support for observation scopes or documenting that `retainBatch()` is the canonical path.
+- Consider a small adapter-cleanup PR later to use `retainBatch()` for all retain writes, even single-item writes, if this simplifies behavior and stays compatible.
+- Do not block current work on upstream API changes.
+
+Roadmap impact:
+
+- Add a follow-up PR after current memory-quality work: “standardize retain transport on retainBatch or document mixed retain/retainBatch adapter behavior.”
+
+### 2. Support one-bank workflows with tags/scopes, but keep project banks as safe default
+
+The feedback is correct that many isolation needs can be solved inside one bank with strict tags and observation scopes. Multiple banks are not the only valid model.
+
+Decision:
+
+- Keep project banks as the safest default because they provide a clear privacy boundary, easier per-repo deletion/export/debugging, and project-specific bank missions.
+- Keep `project+global` as the recommended balanced profile for personal coding workflows.
+- Keep `global-only` as the explicit one-bank/power-user workflow for users who prefer tags and observation scopes over per-project bank creation.
+- Improve docs to explain when to choose each model:
+  - `project-only`: sensitive repos and strong separation.
+  - `project+global`: most personal coding use; project facts plus durable global preferences.
+  - `global-only`: users who intentionally isolate with tags/scopes inside one shared bank.
+
+Roadmap impact:
+
+- Add docs/tests refinement later for profile guidance and visibility of active recall/retain routes.
+- Do not remove project bank derivation or automatic bank creation.
+
+### 3. Transcript-persisted recall visibility remains opt-in only and needs cleanup tooling
+
+Persisting recalls into normal conversation history has one benefit: if a user later removes or disables the extension, old recalls remain visible in session history. The tradeoff is high: persisted recall blocks may leak into provider context, be retained back into Hindsight, or require the extension to stay installed solely to filter them out.
+
+Current repo status:
+
+- PR 14 adds sidecar recall visibility instead of transcript persistence.
+- Default remains off.
+- Sidecar snapshots are not provider-visible and not auto-retained.
+
+Decision:
+
+- Keep sidecar/debug recall visibility as the default visibility model.
+- Do not persist recall blocks into normal Pi transcript history by default.
+- If transcript-persisted recall visibility is ever added, it must be:
+  - explicitly opt-in
+  - clearly labeled as provider/retain contamination risk
+  - filterable from provider serialization and automatic retain
+  - paired with a confirmable cleanup command before release
+
+Potential cleanup command:
+
+- `/hindsight:recall-history scan`
+  - dry-run count of persisted synthetic recall messages in current session or selected sessions
+- `/hindsight:recall-history prune`
+  - confirmable removal of synthetic recall messages from session JSONL files
+  - default current session only
+  - alternate branch/session cleanup explicit
+
+Roadmap impact:
+
+- Add transcript recall visibility only as a later optional feature after Pi serialization/filtering behavior is proven.
+- If not proven safe, keep sidecar-only indefinitely.
+
+### 4. Recall query construction V2: bank-aware deterministic query shaping
+
+The current recall query work in PR 13 is already useful and worth sharing with the other maintainer:
+
+- deterministic query builder
+- role-labeled message lines
+- configurable `recall.queryPreamble`
+- optional `recall.includeDateInQuery`
+- role/context/max-character bounds
+- injected-memory filtering
+- empty-turn fallback after Codex feedback
+- no reflect/LLM dependency in automatic recall path
+
+Next improvement should preserve determinism while making queries bank-aware.
+
+Decision:
+
+- Add a Recall Query V2 PR after PR 14 / recall visibility work.
+- Shape project-bank and global-bank queries differently:
+  - project bank: current task, repo identity, branch, cwd/module hints, recent relevant user/assistant context
+  - global bank: durable user preferences, recurring workflows, style, coding habits, cross-project decisions
+- Consider config:
+  - `recall.projectQueryPreamble`
+  - `recall.globalQueryPreamble`
+  - optional inclusion of repo/branch/cwd metadata in query
+- Keep bounded and deterministic:
+  - no automatic `reflect` query generation
+  - no unbounded transcript dump
+  - no same-turn retain dependency
+  - tests for truncation, role filtering, bank-specific preambles, metadata inclusion, and global/project behavior
+
+Roadmap impact:
+
+- Insert Recall Query V2 before larger import/setup polish if current PR sequence allows.
+- Update maintainer notes after implemented so `noctuid` can compare approaches.
+
+## Updated later PR backlog
+
+1. Finish PR 14: opt-in recall visibility sidecar.
+2. Recall Query V2: bank-aware deterministic query shaping.
+3. Retain transport cleanup / upstream issue:
+   - open Hindsight issue for single retain observation scopes
+   - optionally standardize adapter on `retainBatch()` for all retain writes
+4. Profile docs refinement:
+   - explain project-only vs project+global vs global-only
+   - emphasize one-bank workflows via tags/scopes are supported through global-only
+5. Optional transcript recall visibility spike:
+   - only if Pi serialization and retain filtering can be proven safe
+   - must include scan/prune cleanup command before release

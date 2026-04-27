@@ -20,6 +20,8 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     maxQueryChars: 800,
     queryPreamble: "Pi coding task memory lookup.",
     includeDateInQuery: false,
+    storeLastRecall: false,
+    lastRecallPath: ".pi/hindsight/last-recall.json",
     topK: 8,
     timeoutMs: 10_000,
     injectionMode: "context",
@@ -260,6 +262,11 @@ export function normalizeConfig(config: ResolvedConfig, rawConfig?: unknown): Re
         config.recall?.includeDateInQuery,
         DEFAULT_CONFIG.recall.includeDateInQuery,
       ),
+      storeLastRecall: bool(config.recall?.storeLastRecall, DEFAULT_CONFIG.recall.storeLastRecall),
+      lastRecallPath:
+        typeof config.recall?.lastRecallPath === "string" && config.recall.lastRecallPath.trim()
+          ? config.recall.lastRecallPath
+          : DEFAULT_CONFIG.recall.lastRecallPath,
       topK: positiveInt(config.recall?.topK, DEFAULT_CONFIG.recall.topK),
       timeoutMs: positiveInt(config.recall?.timeoutMs, DEFAULT_CONFIG.recall.timeoutMs),
       injectionMode: "context",
