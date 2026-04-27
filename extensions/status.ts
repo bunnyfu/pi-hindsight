@@ -34,7 +34,7 @@ function shortBank(bankId: string, max: number): string {
   return truncate(bankId.replace(/^pi-project-/, ""), max);
 }
 
-function activityText(
+export function formatHindsightActivity(
   activity: HindsightActivity,
   memoryCount?: number,
   queueRemaining?: number,
@@ -86,7 +86,7 @@ export function formatHindsightStatus(
   const p = prefix(style, state.activity);
   const project = shortProject(state.cwd, Math.max(4, maxLength));
   const activity = showActivity
-    ? activityText(state.activity, state.memoryCount, state.queueRemaining)
+    ? formatHindsightActivity(state.activity, state.memoryCount, state.queueRemaining)
     : "ready";
 
   let body: string;

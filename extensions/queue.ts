@@ -8,6 +8,12 @@ const LOCK_RETRY_MS = 25;
 const LOCK_TIMEOUT_MS = 5_000;
 const LOCK_STALE_MS = 30_000;
 
+export const RETAIN_QUEUE_LOCK = {
+  retryMs: LOCK_RETRY_MS,
+  timeoutMs: LOCK_TIMEOUT_MS,
+  staleMs: LOCK_STALE_MS,
+};
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -29,11 +35,11 @@ async function acquireFileLock(path: string): Promise<() => Promise<void>> {
       };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      if (Date.now() - started > LOCK_STALE_MS)
-        await rm(lockPath, { recursive: true, force: true });
-      if (Date.now() - started > LOCK_TIMEOUT_MS)
+      const age = Date.now() - started;
+      if (age > RETAIN_QUEUE_LOCK.staleMs) await rm(lockPath, { recursive: true, force: true });
+      if (age > RETAIN_QUEUE_LOCK.timeoutMs)
         throw new Error(`Timed out waiting for retain queue lock ${lockPath}`);
-      await sleep(LOCK_RETRY_MS);
+      await sleep(RETAIN_QUEUE_LOCK.retryMs);
     }
   }
 }

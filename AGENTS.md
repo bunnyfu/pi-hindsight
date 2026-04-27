@@ -88,25 +88,31 @@ Use:
 - npm package
 - `extensions/` directory
 - one main entrypoint: `extensions/index.ts`
-- focused modules for config, banking, client, recall, retain, queue, import, tools, commands, renderers
+- `memory-lifecycle.ts` for one-turn hook policy
+- `memory-operations.ts` for shared tool/command/setup intents
+- `memory-identity.ts` and `memory-scope.ts` for repo/session/bank/document/tag policy
+- `retain-cursor.ts` for persisted duplicate-retain prevention
+- focused modules for config, config writing, client transport, bank operations, recall formatting, retain job building, queue durability, import parsing/branches/retain orchestration, tools, commands, diagnostics, status, and setup TUI
 
 ### Hook mapping
 
-- `session_start`:
+- `session_start` delegates to `memory-lifecycle.initialize`:
   - load config
   - initialize runtime
-  - restore state
   - ensure bank settings if appropriate
-- `context`:
+  - update status
+- `context` delegates to `memory-lifecycle.recall`:
+  - select project/global memory scopes
   - compose fresh recall query
-  - fetch from project bank
-  - optionally fetch from global bank
+  - fetch memory
   - inject ephemeral memory block
-- `agent_end`:
+- `agent_end` delegates to `memory-lifecycle.retain`:
+  - gate retain by config
+  - filter already retained messages using persisted cursor
   - build structured retain delta
   - sanitize
-  - enqueue retain job
-- `session_shutdown`:
+  - enqueue retain job before flush
+- `session_shutdown` delegates to `memory-lifecycle.shutdown`:
   - flush queue best effort
 
 ### Explicit tools

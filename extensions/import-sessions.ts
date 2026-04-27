@@ -2,16 +2,10 @@ import { readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { HindsightLikeClient, ResolvedConfig } from "./types.js";
 import { importDocumentId, stableSessionId } from "./session.js";
-import { baseTags } from "./banking.js";
-import { redactSecrets } from "./sanitize.js";
 import { parseImportSessionJsonl, parsePiSessionJsonl } from "./import-parser.js";
 import { leafIds, selectImportBranches } from "./import-branches.js";
-import {
-  hashImportContent,
-  resolveImportManifestPath,
-  upsertImportManifestEntries,
-  type ImportManifestEntry,
-} from "./import-manifest.js";
+import { resolveImportManifestPath, upsertImportManifestEntries } from "./import-manifest.js";
+import { retainImportBranch } from "./import-retain.js";
 
 export { parseImportSessionJsonl, parsePiSessionJsonl } from "./import-parser.js";
 export { selectImportBranches } from "./import-branches.js";
@@ -46,69 +40,29 @@ export async function importPiSession(args: {
   const sessionId = parsed.sessionId ?? stableSessionId(args.sessionFile, cwd);
   const leaves = leafIds(parsed.messages);
   const branches = selectImportBranches(parsed, args.config.import.includeBranches);
-  const documents: ImportSessionDocumentResult[] = [];
-  const manifestEntries: ImportManifestEntry[] = [];
   const manifestPath = resolveImportManifestPath(cwd, args.config.import.manifestPath);
 
-  for (const branch of branches) {
-    const leafId = branch.leafId;
-    const branchMessages = branch.messages;
-    const documentId = importDocumentId(sessionId, leafId);
-    const updateMode = args.config.import.replaceExistingImportedDocs ? "replace" : "append";
-    const contentRaw = JSON.stringify(
-      {
-        source: "pi-session-import",
+  const retained = await Promise.all(
+    branches.map((branch) =>
+      retainImportBranch({
         sessionFile: args.sessionFile,
-        cwd: parsed.cwd,
-        sessionId,
-        branchLeafId: leafId,
-        messages: branchMessages.map((message) => message.data),
-      },
-      null,
-      2,
-    );
-    const content = args.config.retain.redactSecrets ? redactSecrets(contentRaw) : contentRaw;
-    const contentHash = hashImportContent(content);
-    const tags = [
-      ...baseTags(cwd, sessionId, leafId),
-      "import:historical",
-      "imported:true",
-      `document:${documentId}`,
-    ];
-    if (leaves.length > 1) tags.push("forked:true");
-    await args.client.retain(args.bankId, content, {
-      context: `Historical Pi session import from ${args.sessionFile}, branch ${leafId}`,
-      documentId,
-      updateMode,
-      async: args.config.retain.async,
-      tags,
-      metadata: {
-        pi_session_file: args.sessionFile,
-        imported: "true",
+        bankId: args.bankId,
+        client: args.client,
+        config: args.config,
+        parsed,
         cwd,
-        session_id: sessionId,
-        branch_leaf_id: leafId,
-        include_branches: args.config.import.includeBranches,
-        ...(parsed.sessionTimestamp ? { session_timestamp: parsed.sessionTimestamp } : {}),
-      },
-    });
-    documents.push({ documentId, leafId, messageCount: branchMessages.length, contentHash });
-    manifestEntries.push({
-      documentId,
-      bankId: args.bankId,
-      sourceFile: args.sessionFile,
-      importedAt: new Date().toISOString(),
-      contentHash,
-      messageCount: branchMessages.length,
-      leafId,
-      sessionId,
-      cwd,
-      includeBranches: args.config.import.includeBranches,
-      updateMode,
-    });
-  }
+        sessionId,
+        leaves,
+        branch,
+      }),
+    ),
+  );
 
-  await upsertImportManifestEntries(manifestPath, manifestEntries);
+  const documents = retained.map((result) => result.document);
+  await upsertImportManifestEntries(
+    manifestPath,
+    retained.map((result) => result.manifestEntry),
+  );
 
   const first = documents[0] ?? {
     documentId: importDocumentId(sessionId, "root"),

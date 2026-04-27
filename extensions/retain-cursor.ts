@@ -7,6 +7,10 @@ export interface RetainCursorStore {
   sessions: Record<string, string[]>;
 }
 
+export const RETAIN_CURSOR_LIMITS = {
+  maxFingerprintsPerSession: 2_000,
+};
+
 export function retainCursorPath(cwd: string): string {
   return join(cwd, ".pi", "hindsight", "retain-cursors.json");
 }
@@ -67,6 +71,8 @@ export async function addRetainFingerprints(
 ): Promise<void> {
   const path = retainCursorPath(cwd);
   const store = await readRetainCursorStore(path);
-  store.sessions[sessionId] = [...new Set([...(store.sessions[sessionId] ?? []), ...fingerprints])];
+  store.sessions[sessionId] = [
+    ...new Set([...(store.sessions[sessionId] ?? []), ...fingerprints]),
+  ].slice(-RETAIN_CURSOR_LIMITS.maxFingerprintsPerSession);
   await writeRetainCursorStore(path, store);
 }

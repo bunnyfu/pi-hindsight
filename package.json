@@ -19,6 +19,7 @@
     "format:fix": "oxfmt --write --no-error-on-unmatched-pattern \"extensions/**/*.ts\" \"tests/**/*.ts\" \"scripts/**/*.mjs\" \"docs/**/*.md\" \"README.md\" \"CHANGELOG.md\" \"package.json\" \"package-lock.json\" \"tsconfig.json\" \".oxfmtrc.json\" \".commitlintrc.json\" \"*.yml\" \".github/**/*.yml\"",
     "check": "npm run format && npm run lint && npm run typecheck && npm test",
     "check:ci": "npm run check",
+    "check:release": "npm run check && npm run typecheck:tsc && npm run smoke:hindsight",
     "install-hooks": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
     "prepare": "npm run install-hooks",
     "precommit": "npm run check",

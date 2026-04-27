@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawn } from "node:child_process";
 import {
   enqueueRetainJob,
   flushRetainQueue,
   readDeadLetterQueue,
   readRetainQueue,
+  RETAIN_QUEUE_LOCK,
   resolveDeadLetterQueuePath,
   resolveQueuePath,
 } from "../extensions/queue.js";
@@ -21,6 +23,24 @@ const job: RetainJob = {
   item: { content: "raw", context: "ctx", async: true, tags: ["source:pi"] },
   retries: 0,
 };
+
+function runWorker(mode: string, path: string, id: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ["tests/fixtures/queue-worker.mjs", mode, path, id], {
+      cwd: process.cwd(),
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stderr = "";
+    child.stderr.on("data", (chunk) => {
+      stderr += String(chunk);
+    });
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`queue worker exited ${code}: ${stderr}`));
+    });
+  });
+}
 
 describe("retain queue", () => {
   it("persists and flushes jobs", async () => {
@@ -142,5 +162,41 @@ describe("retain queue", () => {
     );
     expect(resolveQueuePath("/repo", "/tmp/q.jsonl")).toBe("/tmp/q.jsonl");
     expect(resolveDeadLetterQueuePath("/tmp/q.jsonl")).toBe("/tmp/q.jsonl.dead.jsonl");
+  });
+
+  it("cleans stale lock directories instead of waiting forever", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
+    mkdirSync(`${path}.lock`, { recursive: true });
+    const originalStaleMs = RETAIN_QUEUE_LOCK.staleMs;
+    const originalTimeoutMs = RETAIN_QUEUE_LOCK.timeoutMs;
+    const originalRetryMs = RETAIN_QUEUE_LOCK.retryMs;
+    RETAIN_QUEUE_LOCK.staleMs = 0;
+    RETAIN_QUEUE_LOCK.timeoutMs = 200;
+    RETAIN_QUEUE_LOCK.retryMs = 1;
+    try {
+      await enqueueRetainJob(path, job);
+      expect((await readRetainQueue(path)).map((item) => item.id)).toEqual(["1"]);
+    } finally {
+      RETAIN_QUEUE_LOCK.staleMs = originalStaleMs;
+      RETAIN_QUEUE_LOCK.timeoutMs = originalTimeoutMs;
+      RETAIN_QUEUE_LOCK.retryMs = originalRetryMs;
+    }
+  });
+
+  it("does not lose jobs when multiple processes enqueue concurrently", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
+    await Promise.all(
+      Array.from({ length: 8 }, (_, index) => runWorker("enqueue", path, String(index))),
+    );
+    expect((await readRetainQueue(path)).map((item) => item.id).sort()).toEqual([
+      "0",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+    ]);
   });
 });

@@ -3,7 +3,11 @@ import type { HindsightLikeClient, ResolvedConfig } from "./types.js";
 import { checkHindsight } from "./client.js";
 import { readRetainQueue, flushRetainQueue, resolveQueuePath } from "./queue.js";
 import { formatDebugReport, safeConfig } from "./diagnostics.js";
-import { buildProjectConfigPatch, writeProjectConfig } from "./config-writer.js";
+import {
+  buildProjectConfigPatch,
+  writeProjectConfig,
+  type ProjectConfigPatchInput,
+} from "./config-writer.js";
 import { importPiSession } from "./import-sessions.js";
 import {
   importManifestSummary,
@@ -22,14 +26,7 @@ export interface MemoryOperationsDeps {
   reloadConfig?(cwd: string): void;
 }
 
-export interface ConfigureMemoryArgs {
-  projectBankId?: string;
-  baseUrl?: string;
-  globalBankId?: string;
-  enableGlobalBank?: boolean;
-  enabled?: boolean;
-  queuePath?: string;
-}
+export type ConfigureMemoryArgs = ProjectConfigPatchInput;
 
 function recallTagsForBank(
   cwd: string,
@@ -81,14 +78,7 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
 
     async configure(cwd: string, args: ConfigureMemoryArgs) {
       const projectBankId = args.projectBankId || deps.getProjectBankId();
-      const patch = buildProjectConfigPatch({
-        projectBankId,
-        ...(args.baseUrl ? { baseUrl: args.baseUrl } : {}),
-        ...(args.globalBankId ? { globalBankId: args.globalBankId } : {}),
-        ...(args.enableGlobalBank !== undefined ? { enableGlobalBank: args.enableGlobalBank } : {}),
-        ...(args.enabled !== undefined ? { enabled: args.enabled } : {}),
-        ...(args.queuePath ? { queuePath: args.queuePath } : {}),
-      });
+      const patch = buildProjectConfigPatch({ ...args, projectBankId });
       const result = await writeProjectConfig(cwd, patch);
       deps.reloadConfig?.(cwd);
       return { ...result, projectBankId };

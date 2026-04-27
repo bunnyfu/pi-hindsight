@@ -2,6 +2,11 @@ import type { ResolvedConfig } from "./types.js";
 import { baseTags, findRepoRoot } from "./banking.js";
 import { stableSessionId } from "./session.js";
 import type { ImportManifestEntry } from "./import-manifest.js";
+import {
+  formatHindsightActivity,
+  formatHindsightStatus,
+  type HindsightActivity,
+} from "./status.js";
 
 export interface DebugReportArgs {
   cwd: string;
@@ -13,6 +18,9 @@ export interface DebugReportArgs {
   importCount?: number;
   latestImport?: ImportManifestEntry;
   health?: { ok: boolean; error?: string };
+  activity?: HindsightActivity;
+  memoryCount?: number;
+  queueRemaining?: number;
 }
 
 export function bankSelectionMessage(projectBankId: string, config: ResolvedConfig): string {
@@ -40,6 +48,7 @@ export function formatDebugReport(args: DebugReportArgs): string {
       ? "reachable"
       : `unreachable: ${args.health.error}`
     : "not checked";
+  const activity = args.activity ?? "idle";
   return JSON.stringify(
     {
       enabled: args.config.enabled,
@@ -76,6 +85,15 @@ export function formatDebugReport(args: DebugReportArgs): string {
           : null,
       },
       status: args.config.status,
+      statusPreview:
+        formatHindsightStatus(args.config, {
+          cwd: args.cwd,
+          projectBankId: args.projectBankId,
+          activity,
+          ...(args.memoryCount !== undefined ? { memoryCount: args.memoryCount } : {}),
+          ...(args.queueRemaining !== undefined ? { queueRemaining: args.queueRemaining } : {}),
+        }) ?? null,
+      activity: formatHindsightActivity(activity, args.memoryCount, args.queueRemaining),
       recall: {
         enabled: args.config.recall.enabled,
         budget: args.config.recall.budget,

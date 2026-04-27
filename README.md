@@ -156,7 +156,11 @@ export HINDSIGHT_BASE_URL=http://localhost:8888
 npm run smoke:hindsight
 ```
 
-The smoke test creates a temporary bank, retains a unique marker with `updateMode: "append"`, recalls it, and runs `reflect`.
+The smoke test creates a temporary bank, retains a unique marker with `updateMode: "append"`, recalls it, and runs `reflect`. It uses the configured Hindsight server; it does not start a server. For release verification, run:
+
+```bash
+npm run check:release
+```
 
 ## Safety notes
 

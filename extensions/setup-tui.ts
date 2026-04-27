@@ -1,12 +1,9 @@
 import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 import type { ResolvedConfig } from "./types.js";
-import { buildProjectConfigPatch, writeProjectConfig } from "./config-writer.js";
+import { createMemoryOperations, type MemoryOperationsDeps } from "./memory-operations.js";
+import type { ProjectConfigPatchInput } from "./config-writer.js";
 
-type Deps = {
-  getConfig(): ResolvedConfig;
-  getProjectBankId(): string;
-  reloadConfig?(cwd: string): void;
-};
+type Deps = MemoryOperationsDeps;
 
 const DONE = "Done";
 const CANCEL = "Cancel";
@@ -22,10 +19,9 @@ function parsePositiveInt(value: string | undefined, field: string): number | un
 async function writeAndReload(
   ctx: ExtensionCommandContext,
   deps: Deps,
-  patch: Record<string, unknown>,
+  patch: ProjectConfigPatchInput,
 ): Promise<void> {
-  const result = await writeProjectConfig(ctx.cwd, patch);
-  deps.reloadConfig?.(ctx.cwd);
+  const result = await createMemoryOperations(deps).configure(ctx.cwd, patch);
   ctx.ui.notify(`Wrote ${result.path}`, "info");
 }
 
@@ -82,71 +78,41 @@ export async function runHindsightSetupTui(
     try {
       if (choice === "Set project bank ID") {
         const value = await ctx.ui.input("Project bank ID", projectBankId);
-        if (value)
-          await writeAndReload(ctx, deps, buildProjectConfigPatch({ projectBankId: value.trim() }));
+        if (value) await writeAndReload(ctx, deps, { projectBankId: value.trim() });
       } else if (choice === "Set Hindsight base URL") {
         const value = await ctx.ui.input("Hindsight base URL", config.hindsight.baseUrl);
-        if (value)
-          await writeAndReload(ctx, deps, buildProjectConfigPatch({ baseUrl: value.trim() }));
+        if (value) await writeAndReload(ctx, deps, { baseUrl: value.trim() });
       } else if (choice === "Set timeout (ms)") {
         const value = await ctx.ui.input(
           "Timeout in milliseconds",
           String(config.hindsight.timeoutMs),
         );
         const timeoutMs = parsePositiveInt(value, "timeoutMs");
-        if (timeoutMs !== undefined)
-          await writeAndReload(ctx, deps, buildProjectConfigPatch({ timeoutMs }));
+        if (timeoutMs !== undefined) await writeAndReload(ctx, deps, { timeoutMs });
       } else if (choice === "Disable extension" || choice === "Enable extension") {
-        await writeAndReload(
-          ctx,
-          deps,
-          buildProjectConfigPatch({ enabled: choice === "Enable extension" }),
-        );
+        await writeAndReload(ctx, deps, { enabled: choice === "Enable extension" });
       } else if (choice === "Disable global bank" || choice === "Enable global bank") {
-        await writeAndReload(
-          ctx,
-          deps,
-          buildProjectConfigPatch({ enableGlobalBank: choice === "Enable global bank" }),
-        );
+        await writeAndReload(ctx, deps, { enableGlobalBank: choice === "Enable global bank" });
       } else if (choice === "Set global bank ID") {
         const value = await ctx.ui.input("Global bank ID", config.banks.global.bankId ?? "");
-        if (value)
-          await writeAndReload(ctx, deps, buildProjectConfigPatch({ globalBankId: value.trim() }));
+        if (value) await writeAndReload(ctx, deps, { globalBankId: value.trim() });
       } else if (choice === "Disable recall" || choice === "Enable recall") {
-        await writeAndReload(
-          ctx,
-          deps,
-          buildProjectConfigPatch({ recallEnabled: choice === "Enable recall" }),
-        );
+        await writeAndReload(ctx, deps, { recallEnabled: choice === "Enable recall" });
       } else if (choice === "Set recall budget") {
         const value = await ctx.ui.select("Recall budget", ["low", "mid", "high", CANCEL]);
         if (value && value !== CANCEL)
-          await writeAndReload(
-            ctx,
-            deps,
-            buildProjectConfigPatch({ recallBudget: value as "low" | "mid" | "high" }),
-          );
+          await writeAndReload(ctx, deps, { recallBudget: value as "low" | "mid" | "high" });
       } else if (choice === "Set recall max tokens") {
         const value = await ctx.ui.input("Recall max tokens", String(config.recall.maxTokens));
         const recallMaxTokens = parsePositiveInt(value, "recallMaxTokens");
-        if (recallMaxTokens !== undefined)
-          await writeAndReload(ctx, deps, buildProjectConfigPatch({ recallMaxTokens }));
+        if (recallMaxTokens !== undefined) await writeAndReload(ctx, deps, { recallMaxTokens });
       } else if (choice === "Disable retain" || choice === "Enable retain") {
-        await writeAndReload(
-          ctx,
-          deps,
-          buildProjectConfigPatch({ retainEnabled: choice === "Enable retain" }),
-        );
+        await writeAndReload(ctx, deps, { retainEnabled: choice === "Enable retain" });
       } else if (choice === "Use sync retain flush" || choice === "Use async retain mode") {
-        await writeAndReload(
-          ctx,
-          deps,
-          buildProjectConfigPatch({ retainAsync: choice === "Use async retain mode" }),
-        );
+        await writeAndReload(ctx, deps, { retainAsync: choice === "Use async retain mode" });
       } else if (choice === "Set retain queue path") {
         const value = await ctx.ui.input("Retain queue path", config.retain.queuePath);
-        if (value)
-          await writeAndReload(ctx, deps, buildProjectConfigPatch({ queuePath: value.trim() }));
+        if (value) await writeAndReload(ctx, deps, { queuePath: value.trim() });
       } else if (choice === "Set import branch mode") {
         const value = await ctx.ui.select("Import branch mode", [
           "current-only",
@@ -154,21 +120,12 @@ export async function runHindsightSetupTui(
           CANCEL,
         ]);
         if (value && value !== CANCEL)
-          await writeAndReload(
-            ctx,
-            deps,
-            buildProjectConfigPatch({
-              importIncludeBranches: value as "current-only" | "all-leaves",
-            }),
-          );
+          await writeAndReload(ctx, deps, {
+            importIncludeBranches: value as "current-only" | "all-leaves",
+          });
       } else if (choice === "Set import manifest path") {
         const value = await ctx.ui.input("Import manifest path", config.import.manifestPath);
-        if (value)
-          await writeAndReload(
-            ctx,
-            deps,
-            buildProjectConfigPatch({ importManifestPath: value.trim() }),
-          );
+        if (value) await writeAndReload(ctx, deps, { importManifestPath: value.trim() });
       } else if (choice === "Set status style") {
         const value = await ctx.ui.select("Status style", [
           "off",
@@ -178,13 +135,9 @@ export async function runHindsightSetupTui(
           CANCEL,
         ]);
         if (value && value !== CANCEL)
-          await writeAndReload(
-            ctx,
-            deps,
-            buildProjectConfigPatch({
-              statusStyle: value as "off" | "text" | "emoji" | "nerdfont",
-            }),
-          );
+          await writeAndReload(ctx, deps, {
+            statusStyle: value as "off" | "text" | "emoji" | "nerdfont",
+          });
       } else if (choice === "Set status detail") {
         const value = await ctx.ui.select("Status detail", [
           "minimal",
@@ -194,24 +147,15 @@ export async function runHindsightSetupTui(
           CANCEL,
         ]);
         if (value && value !== CANCEL)
-          await writeAndReload(
-            ctx,
-            deps,
-            buildProjectConfigPatch({
-              statusDetail: value as "minimal" | "project" | "activity" | "verbose",
-            }),
-          );
+          await writeAndReload(ctx, deps, {
+            statusDetail: value as "minimal" | "project" | "activity" | "verbose",
+          });
       } else if (choice === "Set status max length") {
         const value = await ctx.ui.input("Status max length", String(config.status.maxLength));
         const statusMaxLength = parsePositiveInt(value, "statusMaxLength");
-        if (statusMaxLength !== undefined)
-          await writeAndReload(ctx, deps, buildProjectConfigPatch({ statusMaxLength }));
+        if (statusMaxLength !== undefined) await writeAndReload(ctx, deps, { statusMaxLength });
       } else if (choice === "Hide status activity" || choice === "Show status activity") {
-        await writeAndReload(
-          ctx,
-          deps,
-          buildProjectConfigPatch({ statusShowActivity: choice === "Show status activity" }),
-        );
+        await writeAndReload(ctx, deps, { statusShowActivity: choice === "Show status activity" });
       }
     } catch (error) {
       ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
