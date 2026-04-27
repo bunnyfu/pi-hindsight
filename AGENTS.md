@@ -201,11 +201,17 @@ Minimum expected coverage:
 Before merging or considering a task done, run:
 
 ```bash
-npm run typecheck
-npm test
+npm run check
+npm run typecheck:tsc
 ```
 
-If live Hindsight integration behavior changed, also run the smoke test when credentials are available.
+If live Hindsight integration behavior changed, also run the configured-server smoke test when credentials are available:
+
+```bash
+npm run smoke:hindsight
+```
+
+GitHub Actions has a manual `smoke-configured-server` job that uses `HINDSIGHT_BASE_URL` and optional `HINDSIGHT_API_KEY` secrets.
 
 ## Common mistakes to avoid
 

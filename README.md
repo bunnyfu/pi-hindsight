@@ -162,6 +162,16 @@ The smoke test creates a temporary bank, retains a unique marker with `updateMod
 npm run check:release
 ```
 
+GitHub Actions runs normal checks on PRs/pushes. The live Hindsight smoke job is manual (`workflow_dispatch`) and requires repository secrets:
+
+- `HINDSIGHT_BASE_URL` — base URL of the Hindsight server, for example `https://h1.example.com`
+- `HINDSIGHT_API_KEY` — optional, only if the server requires an API key
+
+Optional repository variables:
+
+- `HINDSIGHT_SMOKE_ATTEMPTS` — recall retry attempts, default `20`
+- `PI_HINDSIGHT_SMOKE_BANK_ID` — fixed smoke bank ID; omit to use a timestamped bank
+
 ## Safety notes
 
 The extension redacts common API keys, bearer tokens, GitHub tokens, password-style environment assignments, and credentials embedded in URLs before automatic retain.
