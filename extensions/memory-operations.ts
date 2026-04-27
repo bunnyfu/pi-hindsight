@@ -106,7 +106,7 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
 
     async configure(cwd: string, args: ConfigureMemoryArgs) {
       const projectBankId = args.projectBankId || deps.getProjectBankId();
-      const patch = buildProjectConfigPatch({ ...args, projectBankId });
+      const patch = buildProjectConfigPatch(args);
       const result = await writeProjectConfig(cwd, patch);
       deps.reloadConfig?.(cwd);
       return { ...result, projectBankId };

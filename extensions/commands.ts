@@ -33,8 +33,16 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
     description: "Show Hindsight extension status.",
     handler: async (_args, ctx) => {
       const status = await operations.status(ctx.cwd);
+      const bank = status.config.banks.project.enabled
+        ? status.bankId
+        : (status.config.banks.global.bankId ?? "none");
+      const profile = status.config.banks.project.enabled
+        ? status.config.banks.global.enabled
+          ? "project+global"
+          : "project-only"
+        : "global-only";
       ctx.ui.notify(
-        `Hindsight ${status.config.enabled ? "on" : "off"}; bank ${status.bankId}; queue ${status.queueLength}; imports ${status.imports.count}`,
+        `Hindsight ${status.config.enabled ? "on" : "off"}; profile ${profile}; bank ${bank}; queue ${status.queueLength}; imports ${status.imports.count}`,
         "info",
       );
     },

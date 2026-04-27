@@ -27,10 +27,21 @@ export interface DebugReportArgs {
 }
 
 export function bankSelectionMessage(projectBankId: string, config: ResolvedConfig): string {
+  if (!config.banks.project.enabled) {
+    return config.banks.global.enabled && config.banks.global.bankId
+      ? `Hindsight global-only memory: ${config.banks.global.bankId}`
+      : "Hindsight project bank disabled and no global bank configured.";
+  }
   if (config.banks.project.bankId) {
     return `Hindsight bank configured: ${projectBankId}`;
   }
   return `Hindsight bank auto-selected: ${projectBankId}. Override with PI_HINDSIGHT_PROJECT_BANK_ID or .pi/hindsight.json banks.project.bankId.`;
+}
+
+function memoryProfile(config: ResolvedConfig): "project-only" | "project+global" | "global-only" {
+  if (!config.banks.project.enabled) return "global-only";
+  if (config.banks.global.enabled) return "project+global";
+  return "project-only";
 }
 
 export function safeConfig(config: ResolvedConfig): ResolvedConfig {
@@ -72,6 +83,7 @@ export function formatDebugReport(args: DebugReportArgs): string {
       repoRoot: findRepoRoot(args.cwd),
       sessionFile: args.sessionFile ?? null,
       sessionId,
+      memoryProfile: memoryProfile(args.config),
       projectBankId: args.projectBankId,
       projectBankSelection: args.config.banks.project.bankId
         ? "configured"
@@ -89,6 +101,15 @@ export function formatDebugReport(args: DebugReportArgs): string {
       globalBankId: args.config.banks.global.enabled
         ? (args.config.banks.global.bankId ?? null)
         : null,
+      memoryRoutes: {
+        recall: [
+          ...(args.config.banks.project.enabled ? ["project"] : []),
+          ...(args.config.banks.global.enabled && args.config.banks.global.bankId
+            ? ["global"]
+            : []),
+        ],
+        autoRetain: args.config.banks.project.enabled ? "project" : null,
+      },
       tags,
       queuePath: args.config.retain.queuePath,
       queueLength: args.queueLength,
