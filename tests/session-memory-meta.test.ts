@@ -74,6 +74,54 @@ describe("session memory metadata", () => {
     });
   });
 
+  it("restores recall and retain defaults when switching fail-closed metadata to normal", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-meta-"));
+    const path = sessionMetaPath(cwd, "/tmp/session.jsonl");
+    mkdirSync(join(path, ".."), { recursive: true });
+    writeFileSync(path, "not json");
+
+    await setSessionMemoryMode(cwd, "/tmp/session.jsonl", "normal");
+
+    expect(
+      getEffectiveSessionMemoryMode(await readSessionMemoryMeta(cwd, "/tmp/session.jsonl")),
+    ).toMatchObject({
+      mode: "normal",
+      recall: true,
+      retain: true,
+    });
+  });
+
+  it("restores retain defaults when switching ignored mode to normal", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-meta-"));
+
+    await setSessionMemoryMode(cwd, "/tmp/session.jsonl", "ignored");
+    await setSessionMemoryMode(cwd, "/tmp/session.jsonl", "normal");
+
+    expect(
+      getEffectiveSessionMemoryMode(await readSessionMemoryMeta(cwd, "/tmp/session.jsonl")),
+    ).toMatchObject({
+      mode: "normal",
+      recall: true,
+      retain: true,
+    });
+  });
+
+  it("preserves explicit retain off when switching modes back to normal", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-meta-"));
+
+    await setSessionRetainEnabled(cwd, "/tmp/session.jsonl", false);
+    await setSessionMemoryMode(cwd, "/tmp/session.jsonl", "read-only");
+    await setSessionMemoryMode(cwd, "/tmp/session.jsonl", "normal");
+
+    expect(
+      getEffectiveSessionMemoryMode(await readSessionMemoryMeta(cwd, "/tmp/session.jsonl")),
+    ).toMatchObject({
+      mode: "normal",
+      recall: true,
+      retain: false,
+    });
+  });
+
   it("adds and removes sanitized tags", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-meta-"));
     await addSessionMemoryTag(cwd, undefined, " domain:test ");
