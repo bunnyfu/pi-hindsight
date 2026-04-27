@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
 import type { HindsightLikeClient, RetainJob } from "./types.js";
 
@@ -14,8 +14,40 @@ export const RETAIN_QUEUE_LOCK = {
   staleMs: LOCK_STALE_MS,
 };
 
+export interface QueueLockOwner {
+  pid?: number;
+  acquiredAt?: string;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function isQueueLockOwnerStale(
+  owner: QueueLockOwner | undefined,
+  now = Date.now(),
+  staleMs = RETAIN_QUEUE_LOCK.staleMs,
+): boolean {
+  if (!owner) return true;
+  const acquiredAt = owner.acquiredAt ? Date.parse(owner.acquiredAt) : Number.NaN;
+  return !Number.isFinite(acquiredAt) || now - acquiredAt > staleMs;
+}
+
+async function readQueueLockOwner(lockPath: string): Promise<QueueLockOwner | undefined> {
+  try {
+    return JSON.parse(await readFile(`${lockPath}/owner`, "utf8")) as QueueLockOwner;
+  } catch {
+    return undefined;
+  }
+}
+
+async function isOwnerlessLockDirectoryStale(lockPath: string): Promise<boolean> {
+  try {
+    const info = await stat(lockPath);
+    return Date.now() - info.mtimeMs > RETAIN_QUEUE_LOCK.staleMs;
+  } catch {
+    return true;
+  }
 }
 
 async function acquireFileLock(path: string): Promise<() => Promise<void>> {
@@ -35,9 +67,15 @@ async function acquireFileLock(path: string): Promise<() => Promise<void>> {
       };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      const age = Date.now() - started;
-      if (age > RETAIN_QUEUE_LOCK.staleMs) await rm(lockPath, { recursive: true, force: true });
-      if (age > RETAIN_QUEUE_LOCK.timeoutMs)
+      const owner = await readQueueLockOwner(lockPath);
+      const stale = owner
+        ? isQueueLockOwnerStale(owner)
+        : await isOwnerlessLockDirectoryStale(lockPath);
+      if (stale) {
+        await rm(lockPath, { recursive: true, force: true });
+        continue;
+      }
+      if (Date.now() - started > RETAIN_QUEUE_LOCK.timeoutMs)
         throw new Error(`Timed out waiting for retain queue lock ${lockPath}`);
       await sleep(RETAIN_QUEUE_LOCK.retryMs);
     }

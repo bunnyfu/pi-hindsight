@@ -27,6 +27,8 @@ export interface ResolvedConfig {
     includeToolResults: "meaningful-only" | "all" | "none";
     redactSecrets: boolean;
     queuePath: string;
+    shutdownFlushMaxJobs: number;
+    shutdownFlushTimeoutMs: number;
   };
   import: {
     includeBranches: "current-only" | "all-leaves";

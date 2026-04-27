@@ -107,7 +107,9 @@ Example project config:
   },
   "retain": {
     "queuePath": ".pi/hindsight/retain-queue.jsonl",
-    "updateMode": "append"
+    "updateMode": "append",
+    "shutdownFlushMaxJobs": 10,
+    "shutdownFlushTimeoutMs": 2000
   },
   "import": {
     "manifestPath": ".pi/hindsight/import-manifest.json"
@@ -132,7 +134,9 @@ Automatic recall runs in the `context` hook and injects an ephemeral `<hindsight
 
 Automatic retain runs in the `agent_end` hook. It stores a structured JSON projection of new messages, not a summary. Live sessions use stable `documentId` values and `updateMode: "append"`. A persisted retain cursor under `.pi/hindsight/retain-cursors.json` prevents duplicate appends when Pi provides overlapping transcripts, including after extension restart. Explicit retain tool tags are merged with the base `source:pi`, repo, and session tags so manually retained memories remain visible to default project recall.
 
-Retain jobs are written to a JSONL queue before sending. If Hindsight is down, jobs remain on disk for later flushing. This queue-first behavior applies to both automatic retain and the explicit `hindsight_retain` tool, so manual memories are not lost during Hindsight outages. Queue operations use an in-process mutex plus a lock directory next to the queue file so multiple Pi processes do not rewrite the active queue concurrently. Jobs that exceed the retry limit are moved to a sibling dead-letter file (`<queue>.dead.jsonl`) instead of retrying forever.
+Retain jobs are written to a JSONL queue before sending. If Hindsight is down, jobs remain on disk for later flushing. This queue-first behavior applies to both automatic retain and the explicit `hindsight_retain` tool, so manual memories are not lost during Hindsight outages. Queue operations use an in-process mutex plus a lock directory next to the queue file so multiple Pi processes do not rewrite the active queue concurrently. Stale queue locks are judged from the lock owner's `acquiredAt` timestamp, not from the waiting process age. Jobs that exceed the retry limit are moved to a sibling dead-letter file (`<queue>.dead.jsonl`) instead of retrying forever.
+
+Shutdown queue flushing is intentionally bounded by `retain.shutdownFlushMaxJobs` and `retain.shutdownFlushTimeoutMs`. If jobs remain after shutdown, they stay on disk and are visible through `/hindsight:debug` queue length for later flushing.
 
 At session start, the extension shows the selected bank ID. If no bank ID is configured, it reports the automatically derived bank ID and how to override it.
 
