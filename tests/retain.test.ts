@@ -26,6 +26,24 @@ describe("buildRetainJob", () => {
     expect(JSON.parse(job?.item.content ?? "[]")[0].role).toBe("user");
   });
 
+  it("expands observation scopes into retain jobs", () => {
+    const messages = [
+      { role: "user", content: "remember", timestamp: Date.now() },
+    ] as unknown as AgentEndEvent["messages"];
+    const job = buildRetainJob({
+      config: {
+        ...DEFAULT_CONFIG,
+        observations: { enabled: true, scopes: [["repo:{repoKey}"], ["bank:{projectBankId}"]] },
+      },
+      cwd: "/repo",
+      sessionFile: "/tmp/s.jsonl",
+      bankId: "bank",
+      messages,
+    });
+
+    expect(job?.item.observationScopes).toEqual([[expect.stringMatching(/^repo:/)], ["bank:bank"]]);
+  });
+
   it("excludes noisy and recursive tool results by default but keeps errors", () => {
     const messages = [
       { role: "assistant", content: "Running tools", timestamp: Date.now() },

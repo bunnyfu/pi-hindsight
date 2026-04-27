@@ -85,6 +85,13 @@ describe("Hindsight client adapter integration", () => {
       async: true,
       metadata: { source: "test" },
     });
+    await client.retain("test-bank", "scoped content", {
+      context: "scoped ctx",
+      tags: ["source:pi"],
+      documentId: "pi-session:scoped",
+      updateMode: "append",
+      observationScopes: [["repo:abc"], ["bank:test-bank"]],
+    });
     const recall = await client.recall("test-bank", "query", {
       tags: ["source:pi"],
       tagsMatch: "any_strict",
@@ -98,6 +105,7 @@ describe("Hindsight client adapter integration", () => {
 
     expect(requests.map((request) => `${request.method} ${request.url}`)).toEqual([
       "PUT /v1/default/banks/test-bank",
+      "POST /v1/default/banks/test-bank/memories",
       "POST /v1/default/banks/test-bank/memories",
       "POST /v1/default/banks/test-bank/memories/recall",
       "POST /v1/default/banks/test-bank/reflect",
@@ -117,6 +125,19 @@ describe("Hindsight client adapter integration", () => {
       async: true,
     });
     expect(requests[2]?.body).toMatchObject({
+      items: [
+        {
+          content: "scoped content",
+          context: "scoped ctx",
+          document_id: "pi-session:scoped",
+          update_mode: "append",
+          tags: ["source:pi"],
+          observation_scopes: [["repo:abc"], ["bank:test-bank"]],
+        },
+      ],
+    });
+    expect(JSON.stringify(requests[2]?.body)).not.toContain("observationScopes");
+    expect(requests[3]?.body).toMatchObject({
       query: "query",
       max_tokens: 123,
       budget: "low",

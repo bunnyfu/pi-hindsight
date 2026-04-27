@@ -209,6 +209,7 @@ export async function flushRetainQueue(
           ...(job.item.metadata ? { metadata: job.item.metadata } : {}),
           ...(job.item.async !== undefined ? { async: job.item.async } : {}),
           ...(job.item.tags ? { tags: job.item.tags } : {}),
+          ...(job.item.observationScopes ? { observationScopes: job.item.observationScopes } : {}),
           documentId: job.documentId,
           updateMode: job.updateMode,
         });
