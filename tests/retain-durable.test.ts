@@ -85,6 +85,35 @@ describe("durable explicit retain", () => {
     expect(queued[0]?.item.tags).toEqual(expect.arrayContaining(["source:pi", "decision:test"]));
   });
 
+  it("passes configured observation scopes for explicit retain", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
+    const config: ResolvedConfig = {
+      ...testConfig(),
+      observations: { enabled: true, scopes: [["repo:{repoKey}"], ["bank:{projectBankId}"]] },
+    };
+    const operations = createMemoryOperations({
+      getClient: () =>
+        client(async () => {
+          throw new Error("down");
+        }),
+      getConfig: () => config,
+      getProjectBankId: () => "project-bank",
+    });
+
+    await operations.retainExplicit({
+      cwd,
+      content: "Durable fact",
+      context: "unit test explicit retain",
+      bank: "custom-bank",
+    });
+
+    const queued = await readRetainQueue(resolveQueuePath(cwd, config.retain.queuePath));
+    expect(queued[0]?.item.observationScopes).toEqual([
+      [expect.stringMatching(/^repo:/)],
+      ["bank:custom-bank"],
+    ]);
+  });
+
   it("does not burn retries on existing backlog during a continuous outage", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
     const config = testConfig();

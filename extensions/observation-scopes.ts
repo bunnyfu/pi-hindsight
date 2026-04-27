@@ -17,6 +17,7 @@ export function observationScopePlaceholders(
 ): Record<string, string> {
   return {
     cwdHash: cwdHash(identity.cwd),
+    bankId: identity.projectBankId,
     projectBankId: identity.projectBankId,
     repoKey: identity.repoKey,
     sessionId: identity.sessionId,

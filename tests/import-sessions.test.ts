@@ -106,6 +106,7 @@ describe("Pi session import", () => {
       updateMode: "replace",
       documentId: result.documentId,
       async: true,
+      observationScopes: [[expect.stringMatching(/^harness:/)], [expect.stringMatching(/^repo:/)]],
       tags: expect.arrayContaining([
         "source:pi",
         "import:historical",

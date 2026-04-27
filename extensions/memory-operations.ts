@@ -16,7 +16,8 @@ import {
 } from "./import-manifest.js";
 import { recallScopeTags } from "./banking.js";
 import { stableSessionId } from "./session.js";
-import { explicitRetainTags } from "./memory-identity.js";
+import { createMemoryIdentity, explicitRetainTags } from "./memory-identity.js";
+import { expandObservationScopes } from "./observation-scopes.js";
 import { retainDurably } from "./retain-durable.js";
 import { readLastRecallSnapshot, resolveLastRecallPath } from "./recall-visibility.js";
 import {
@@ -85,6 +86,13 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
         ...meta.tags,
       ]);
       const capabilities = deps.getCapabilities?.();
+      const identity = createMemoryIdentity(args.cwd, config, args.sessionFile);
+      const observationScopes = config.observations.enabled
+        ? expandObservationScopes(config.observations.scopes, {
+            ...identity,
+            projectBankId: bankId,
+          })
+        : [];
       const result = await retainDurably({
         cwd: args.cwd,
         config,
@@ -100,6 +108,7 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
           ...(args.sessionFile ? { pi_session_file: args.sessionFile } : {}),
         },
         source: "tool",
+        ...(observationScopes.length ? { observationScopes } : {}),
         ...(capabilities ? { capabilities } : {}),
       });
       return { bankId, tags, ...result, queued: result.enqueued };
