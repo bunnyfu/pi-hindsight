@@ -12,6 +12,13 @@ type Deps = MemoryOperationsDeps;
 const DONE = "Done";
 const CANCEL = "Cancel";
 
+const LOCAL_EMBED_GUIDANCE = [
+  "Local hindsight-embed guidance:",
+  "uvx hindsight-embed@latest profile create pi --port 8888",
+  "uvx hindsight-embed@latest -p pi bank create <bank-id>",
+  "uvx hindsight-embed@latest -p pi ui start",
+].join("\n");
+
 function parsePositiveInt(value: string | undefined, field: string): number | undefined {
   if (value === undefined || value.trim() === "") return undefined;
   const parsed = Number(value.trim());
@@ -65,6 +72,7 @@ export async function runHindsightSetupTui(
     const projectBankId = deps.getProjectBankId();
     const choice = await ctx.ui.select("Hindsight setup", [
       ...statusLines(config, projectBankId).map((line) => `· ${line}`),
+      "Choose deployment profile",
       "Set project bank ID",
       "Set Hindsight base URL",
       "Set timeout (ms)",
@@ -95,7 +103,34 @@ export async function runHindsightSetupTui(
     if (choice.startsWith("· ")) continue;
 
     try {
-      if (choice === "Set project bank ID") {
+      if (choice === "Choose deployment profile") {
+        const value = await ctx.ui.select("Deployment profile", [
+          "Hindsight Cloud",
+          "Existing local/external API",
+          "Local hindsight-embed guidance",
+          CANCEL,
+        ]);
+        if (value === "Hindsight Cloud") {
+          const baseUrl = await ctx.ui.input("Hindsight Cloud base URL", config.hindsight.baseUrl);
+          if (baseUrl) await writeAndReload(ctx, deps, { baseUrl: baseUrl.trim() });
+          ctx.ui.notify(
+            "Cloud profile selected. Store API keys outside project config; SecretRef setup is a separate roadmap item.",
+            "info",
+          );
+        } else if (value === "Existing local/external API") {
+          const baseUrl = await ctx.ui.input("Hindsight API base URL", config.hindsight.baseUrl);
+          if (baseUrl) await writeAndReload(ctx, deps, { baseUrl: baseUrl.trim() });
+        } else if (value === "Local hindsight-embed guidance") {
+          ctx.ui.notify(LOCAL_EMBED_GUIDANCE, "info");
+          const useDefault = await ctx.ui.select("Set base URL to http://localhost:8888?", [
+            "Yes",
+            "No",
+            CANCEL,
+          ]);
+          if (useDefault === "Yes")
+            await writeAndReload(ctx, deps, { baseUrl: "http://localhost:8888" });
+        }
+      } else if (choice === "Set project bank ID") {
         const value = await ctx.ui.input("Project bank ID", projectBankId);
         if (value) await writeAndReload(ctx, deps, { projectBankId: value.trim() });
       } else if (choice === "Set Hindsight base URL") {
