@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { enqueueRetainJob, readRetainQueue, resolveQueuePath } from "../extensions/queue.js";
@@ -101,6 +101,110 @@ describe("extension hooks", () => {
     expect(retainedContent).toContain("Decision still stands.");
     expect(retainedContent).not.toContain("<hindsight-memory>");
     expect(retainedContent).not.toContain("repo-specific remembered fact");
+  });
+
+  it("writes opt-in last recall snapshot to sidecar", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ recall: { storeLastRecall: true } }),
+    );
+    const handlers: Record<string, Array<(event: any, ctx: any) => Promise<any>>> = {};
+    const pi = {
+      on: vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+        handlers[name] = [...(handlers[name] ?? []), handler];
+      }),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    await handlers.session_start?.[0]?.({}, ctx);
+    await handlers.context?.[0]?.(
+      { messages: [{ role: "user", content: "What did we decide?", timestamp: 1 }] },
+      ctx,
+    );
+
+    const snapshotPath = join(cwd, ".pi", "hindsight", "last-recall.json");
+    expect(existsSync(snapshotPath)).toBe(true);
+    const snapshot = JSON.parse(readFileSync(snapshotPath, "utf8")) as Record<string, any>;
+    expect(snapshot.query).toContain("What did we decide?");
+    expect(snapshot.rendered).toContain("<hindsight-memory>");
+    expect(snapshot.blocks[0].results[0].text).toBe("repo-specific remembered fact");
+  });
+
+  it("still injects recall when optional snapshot write fails", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ recall: { storeLastRecall: true, lastRecallPath: "." } }),
+    );
+    const handlers: Record<string, Array<(event: any, ctx: any) => Promise<any>>> = {};
+    const pi = {
+      on: vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+        handlers[name] = [...(handlers[name] ?? []), handler];
+      }),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    await handlers.session_start?.[0]?.({}, ctx);
+    const result = await handlers.context?.[0]?.(
+      { messages: [{ role: "user", content: "What did we decide?", timestamp: 1 }] },
+      ctx,
+    );
+
+    expect(result?.messages[0].content).toContain("<hindsight-memory>");
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining("Hindsight last recall snapshot write failed"),
+      "warning",
+    );
+  });
+
+  it("does not write last recall snapshot by default", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    const handlers: Record<string, Array<(event: any, ctx: any) => Promise<any>>> = {};
+    const pi = {
+      on: vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+        handlers[name] = [...(handlers[name] ?? []), handler];
+      }),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    await handlers.session_start?.[0]?.({}, ctx);
+    await handlers.context?.[0]?.(
+      { messages: [{ role: "user", content: "What did we decide?", timestamp: 1 }] },
+      ctx,
+    );
+
+    expect(existsSync(join(cwd, ".pi", "hindsight", "last-recall.json"))).toBe(false);
   });
 
   it("uses repo scope for project recall and source scope for global recall", async () => {

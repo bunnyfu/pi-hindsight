@@ -7,6 +7,7 @@ skills-lock.json
 .pi/hindsight/import-manifest.json
 .pi/hindsight/retain-cursors.json
 .pi/hindsight/session-meta/
+.pi/hindsight/last-recall.json
 coverage/
 dist/
 tmp/

@@ -176,6 +176,36 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
     },
   });
 
+  pi.registerCommand("hindsight:last-recall", {
+    description: "Show the last opt-in persisted recall snapshot.",
+    handler: async (_args, ctx) => {
+      try {
+        const result = await operations.lastRecall(ctx.cwd);
+        if (!result.snapshot) {
+          ctx.ui.notify(
+            `No Hindsight recall snapshot at ${result.path}. Enable recall.storeLastRecall to write one.`,
+            "warning",
+          );
+          return;
+        }
+        if (!Array.isArray(result.snapshot.blocks)) throw new Error("invalid snapshot shape");
+        const memoryCount = result.snapshot.blocks.reduce(
+          (count, block) => count + block.memoryCount,
+          0,
+        );
+        ctx.ui.notify(
+          `Hindsight last recall ${result.snapshot.createdAt}; memories=${memoryCount}; query=${result.snapshot.query}`,
+          "info",
+        );
+      } catch (error) {
+        ctx.ui.notify(
+          `Hindsight last recall snapshot unreadable: ${(error as Error).message}`,
+          "warning",
+        );
+      }
+    },
+  });
+
   pi.registerCommand("hindsight:flush", {
     description: "Flush queued retain jobs.",
     handler: async (_args, ctx) => {

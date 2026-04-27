@@ -20,6 +20,7 @@ import {
 } from "./retain-cursor.js";
 import type { HindsightCapabilities, HindsightLikeClient, ResolvedConfig } from "./types.js";
 import { getEffectiveSessionMemoryMode, readSessionMemoryMeta } from "./session-memory-meta.js";
+import { writeLastRecallSnapshot } from "./recall-visibility.js";
 
 export type RuntimeCtx = {
   cwd: string;
@@ -237,6 +238,21 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
               : "Hindsight recalled no matching memory",
             "info",
           );
+        }
+        if (config.recall.storeLastRecall) {
+          try {
+            await writeLastRecallSnapshot(runtime.cwd, config.recall.lastRecallPath, {
+              query: blocks[0]?.query ?? "",
+              rendered,
+              blocks,
+            });
+          } catch (error) {
+            notify(
+              runtime,
+              `Hindsight last recall snapshot write failed: ${(error as Error).message}`,
+              "warning",
+            );
+          }
         }
         if (!rendered) return undefined;
         const recallMessage = {

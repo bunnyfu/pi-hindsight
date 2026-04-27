@@ -64,6 +64,8 @@ describe("resolveConfig", () => {
           maxQueryChars: 0,
           queryPreamble: 42,
           includeDateInQuery: "yes",
+          storeLastRecall: "yes",
+          lastRecallPath: "",
           topK: -1,
           timeoutMs: 0,
           injectionPosition: "middle",
@@ -98,6 +100,8 @@ describe("resolveConfig", () => {
     expect(config.recall.maxQueryChars).toBe(800);
     expect(config.recall.queryPreamble).toBe("Pi coding task memory lookup.");
     expect(config.recall.includeDateInQuery).toBe(false);
+    expect(config.recall.storeLastRecall).toBe(false);
+    expect(config.recall.lastRecallPath).toBe(".pi/hindsight/last-recall.json");
     expect(config.recall.topK).toBe(8);
     expect(config.recall.timeoutMs).toBe(10_000);
     expect(config.recall.injectionPosition).toBe("append");
