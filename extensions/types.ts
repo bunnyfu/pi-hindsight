@@ -11,8 +11,13 @@ export interface ResolvedConfig {
   enabled: boolean;
   hindsight: { baseUrl: string; apiKey?: string; timeoutMs: number };
   banks: {
-    project: { enabled: boolean; bankId?: string; derive: "repo" | "cwd" | "manual" };
-    global: { enabled: boolean; bankId?: string };
+    project: {
+      enabled: boolean;
+      bankId?: string;
+      derive: "repo" | "cwd" | "manual";
+      mission?: string;
+    };
+    global: { enabled: boolean; bankId?: string; mission?: string };
   };
   recall: {
     enabled: boolean;
@@ -143,6 +148,16 @@ export interface HindsightLikeClient {
       tagsMatch?: TagsMatch;
     },
   ): Promise<unknown>;
-  createBank?(bankId: string, options?: Record<string, unknown>): Promise<unknown>;
+  createBank?(
+    bankId: string,
+    options?: {
+      name?: string;
+      reflectMission?: string;
+      retainMission?: string;
+      retainExtractionMode?: string;
+      enableObservations?: boolean;
+      observationsMission?: string;
+    },
+  ): Promise<unknown>;
   getBankProfile?(bankId: string): Promise<unknown>;
 }

@@ -48,6 +48,7 @@ describe("diagnostics", () => {
       appendUpdateMode: "not checked",
       appendFallback: "error",
     });
+    expect(report.bankMissions).toEqual({ projectConfigured: false, globalConfigured: false });
     expect(report.overrideProjectBankId).toContain("PI_HINDSIGHT_PROJECT_BANK_ID");
     expect(report.tags).toEqual(expect.arrayContaining(["source:pi"]));
   });

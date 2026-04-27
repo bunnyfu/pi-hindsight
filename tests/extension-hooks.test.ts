@@ -15,6 +15,7 @@ const mocked = vi.hoisted(() => ({
     createBank: vi.fn(async (..._args: unknown[]) => undefined),
     getBankProfile: vi.fn(async (..._args: unknown[]) => ({})),
   },
+  ensureGlobalBank: vi.fn(async () => undefined),
   ensureProjectBank: vi.fn(async () => undefined),
   checkHindsight: vi.fn(async () => ({ ok: true })),
 }));
@@ -25,6 +26,7 @@ vi.mock("../extensions/client.js", () => ({
 }));
 
 vi.mock("../extensions/bank-operations.js", () => ({
+  ensureGlobalBank: mocked.ensureGlobalBank,
   ensureProjectBank: mocked.ensureProjectBank,
 }));
 
@@ -147,6 +149,11 @@ describe("extension hooks", () => {
       tags: ["source:pi"],
       tagsMatch: "any_strict",
     });
+    expect(mocked.ensureGlobalBank).toHaveBeenCalledWith(
+      mocked.client,
+      "global-bank",
+      expect.objectContaining({ enabled: true, bankId: "global-bank" }),
+    );
   });
 
   it("honors append recall injection position", async () => {
@@ -180,6 +187,81 @@ describe("extension hooks", () => {
     expect(contextResult.messages[0]).toEqual(original[0]);
     expect(contextResult.messages[1].role).toBe("system");
     expect(contextResult.messages[1].content).toContain("<hindsight-memory>");
+  });
+
+  it("ensures global bank even when project bank is disabled", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({
+        banks: { project: { enabled: false }, global: { enabled: true, bankId: "global-bank" } },
+        retain: { enabled: false },
+      }),
+    );
+    const handlers: Record<string, Array<(event: any, ctx: any) => Promise<any>>> = {};
+    const pi = {
+      on: vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+        handlers[name] = [...(handlers[name] ?? []), handler];
+      }),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    await handlers.session_start?.[0]?.({}, ctx);
+
+    expect(mocked.ensureProjectBank).not.toHaveBeenCalled();
+    expect(mocked.ensureGlobalBank).toHaveBeenCalledWith(
+      mocked.client,
+      "global-bank",
+      expect.objectContaining({ enabled: true, bankId: "global-bank" }),
+    );
+  });
+
+  it("probes append capability even if global bank ensure fails", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ banks: { global: { enabled: true, bankId: "global-bank" } } }),
+    );
+    mocked.ensureGlobalBank.mockRejectedValueOnce(new Error("global down"));
+    const handlers: Record<string, Array<(event: any, ctx: any) => Promise<any>>> = {};
+    const pi = {
+      on: vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+        handlers[name] = [...(handlers[name] ?? []), handler];
+      }),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    await handlers.session_start?.[0]?.({}, ctx);
+
+    expect(mocked.client.retain).toHaveBeenCalledWith(
+      expect.stringMatching(/^pi-project-/),
+      "Pi Hindsight append capability probe. Safe to ignore.",
+      expect.objectContaining({ updateMode: "append" }),
+    );
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining("Hindsight global bank ensure failed: global down"),
+      "warning",
+    );
   });
 
   it("explicit retain keeps base tags when extra tags are provided", async () => {

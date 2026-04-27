@@ -3,7 +3,7 @@ import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { resolveConfig } from "./config.js";
 import { deriveProjectBankId } from "./banking.js";
 import { createHindsightClient } from "./client.js";
-import { ensureProjectBank } from "./bank-operations.js";
+import { ensureGlobalBank, ensureProjectBank } from "./bank-operations.js";
 import { recallForContext } from "./recall.js";
 import { enqueueRetainFromAgentEnd } from "./retain.js";
 import { detectAppendCapability } from "./capabilities.js";
@@ -158,14 +158,36 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       if (!config.enabled) return;
       if (config.banks.project.enabled) {
         try {
-          await ensureProjectBank(client, projectBankId);
-          if (config.retain.enabled)
-            capabilities = await detectAppendCapability(client, projectBankId);
+          await ensureProjectBank(client, projectBankId, config.banks.project);
         } catch (error) {
           setMemoryStatus(runtime, "recall-failed");
           notify(
             runtime,
-            `Hindsight bank ensure/capability check failed: ${error instanceof Error ? error.message : String(error)}`,
+            `Hindsight project bank ensure failed: ${error instanceof Error ? error.message : String(error)}`,
+            "warning",
+          );
+        }
+      }
+      if (config.banks.global.enabled && config.banks.global.bankId) {
+        try {
+          await ensureGlobalBank(client, config.banks.global.bankId, config.banks.global);
+        } catch (error) {
+          setMemoryStatus(runtime, "recall-failed");
+          notify(
+            runtime,
+            `Hindsight global bank ensure failed: ${error instanceof Error ? error.message : String(error)}`,
+            "warning",
+          );
+        }
+      }
+      if (config.retain.enabled) {
+        try {
+          capabilities = await detectAppendCapability(client, projectBankId);
+        } catch (error) {
+          setMemoryStatus(runtime, "recall-failed");
+          notify(
+            runtime,
+            `Hindsight capability check failed: ${error instanceof Error ? error.message : String(error)}`,
             "warning",
           );
         }

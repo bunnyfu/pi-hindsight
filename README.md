@@ -98,8 +98,15 @@ Example project config:
 ```json
 {
   "banks": {
-    "project": { "bankId": "pi-project-my-repo", "derive": "manual" },
-    "global": { "enabled": false }
+    "project": {
+      "bankId": "pi-project-my-repo",
+      "derive": "manual",
+      "mission": "Memory for this Pi coding project. Extract architecture decisions, bugs, fixes, constraints, durable preferences, and project continuity."
+    },
+    "global": {
+      "enabled": false,
+      "mission": "Cross-project memory for durable user preferences, recurring workflows, coding habits, and stable assistant behavior."
+    }
   },
   "recall": {
     "budget": "low",
@@ -145,7 +152,7 @@ Retain jobs are written to a JSONL queue before sending. If Hindsight is down, j
 
 Shutdown queue flushing is intentionally bounded by `retain.shutdownFlushMaxJobs` and `retain.shutdownFlushTimeoutMs`. The timeout is a soft bound checked between queued jobs so shutdown does not leave a background flush holding the queue lock. If jobs remain after shutdown, they stay on disk and are visible through `/hindsight:debug` queue length for later flushing.
 
-At session start, the extension shows the selected bank ID. If no bank ID is configured, it reports the automatically derived bank ID and how to override it.
+At session start, the extension shows the selected bank ID. If no bank ID is configured, it reports the automatically derived bank ID and how to override it. Project and global banks can define `mission` text; configured missions are sent to Hindsight as both `reflectMission` and `retainMission` during bank ensure so extraction and reflection stay aligned with the bank purpose. If no mission is configured, Pi-specific default missions are used.
 
 The footer status is configurable with two independent knobs:
 
