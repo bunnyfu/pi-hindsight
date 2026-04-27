@@ -159,6 +159,8 @@ export function formatDebugReport(args: DebugReportArgs): string {
         contextTurns: args.config.recall.contextTurns,
         roles: args.config.recall.roles,
         maxQueryChars: args.config.recall.maxQueryChars,
+        queryPreamble: args.config.recall.queryPreamble ?? null,
+        includeDateInQuery: args.config.recall.includeDateInQuery,
         topK: args.config.recall.topK,
         timeoutMs: args.config.recall.timeoutMs,
         injectionPosition: args.config.recall.injectionPosition,

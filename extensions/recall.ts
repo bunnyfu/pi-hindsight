@@ -35,11 +35,22 @@ export interface RecallQueryPolicy {
   roles: RecallRole[];
   contextTurns: number;
   maxQueryChars: number;
+  preamble?: string;
+  includeDate?: boolean;
+  now?: Date;
+}
+
+function messageRole(message: AgentMessage): string {
+  return (message as unknown as { role?: string }).role ?? "unknown";
 }
 
 function messageContent(message: AgentMessage): string {
   const content = projectMessage(message).content;
   return typeof content === "string" ? content : JSON.stringify(content ?? "");
+}
+
+function formatQueryMessage(message: AgentMessage): string {
+  return `${messageRole(message)}: ${messageContent(message)}`;
 }
 
 function isInjectedHindsightMemory(message: AgentMessage): boolean {
@@ -61,14 +72,17 @@ export function composeRecallQuery(
       : policyOrRecentTurns;
   const allowedRoles = new Set<string>(policy.roles);
   const selected = messages
-    .filter((message) => allowedRoles.has((message as unknown as { role?: string }).role ?? ""))
+    .filter((message) => allowedRoles.has(messageRole(message)))
     .filter((message) => !isInjectedHindsightMemory(message))
     .slice(-Math.max(1, policy.contextTurns));
-  const query = selected
-    .map((message) => messageContent(message))
-    .join("\n\n")
-    .trim();
-  return query ? truncateRecallQuery(query, policy.maxQueryChars) : "current Pi coding task";
+  const lines = [
+    ...(policy.preamble?.trim() ? [policy.preamble.trim()] : []),
+    ...(policy.includeDate
+      ? [`Current date: ${(policy.now ?? new Date()).toISOString().slice(0, 10)}`]
+      : []),
+    ...(selected.length ? selected.map(formatQueryMessage) : ["current Pi coding task"]),
+  ];
+  return truncateRecallQuery(lines.join("\n\n").trim(), policy.maxQueryChars);
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
@@ -116,6 +130,8 @@ export async function recallForContext(args: {
     roles: args.config.recall.roles,
     contextTurns: args.config.recall.contextTurns,
     maxQueryChars: args.config.recall.maxQueryChars,
+    preamble: args.config.recall.queryPreamble,
+    includeDate: args.config.recall.includeDateInQuery,
   });
   const blocks: RecallBlock[] = [];
   for (const scope of args.scopes) {

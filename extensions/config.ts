@@ -18,6 +18,8 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     contextTurns: 2,
     roles: ["user", "assistant"],
     maxQueryChars: 800,
+    queryPreamble: "Pi coding task memory lookup.",
+    includeDateInQuery: false,
     topK: 8,
     timeoutMs: 10_000,
     injectionMode: "context",
@@ -250,6 +252,14 @@ export function normalizeConfig(config: ResolvedConfig, rawConfig?: unknown): Re
         DEFAULT_CONFIG.recall.roles,
       ),
       maxQueryChars: positiveInt(config.recall?.maxQueryChars, DEFAULT_CONFIG.recall.maxQueryChars),
+      queryPreamble:
+        typeof config.recall?.queryPreamble === "string"
+          ? config.recall.queryPreamble
+          : DEFAULT_CONFIG.recall.queryPreamble,
+      includeDateInQuery: bool(
+        config.recall?.includeDateInQuery,
+        DEFAULT_CONFIG.recall.includeDateInQuery,
+      ),
       topK: positiveInt(config.recall?.topK, DEFAULT_CONFIG.recall.topK),
       timeoutMs: positiveInt(config.recall?.timeoutMs, DEFAULT_CONFIG.recall.timeoutMs),
       injectionMode: "context",

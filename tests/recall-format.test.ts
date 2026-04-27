@@ -19,7 +19,7 @@ describe("recall formatting", () => {
       },
       { role: "user", content: "second", timestamp: 3 },
     ] as unknown as AgentMessage[];
-    expect(composeRecallQuery(messages, 1)).toBe("second");
+    expect(composeRecallQuery(messages, 1)).toBe("user: second");
   });
 
   it("respects roles, context turns, max query chars, and ignores injected memory", () => {
@@ -50,7 +50,24 @@ describe("recall formatting", () => {
         contextTurns: 1,
         maxQueryChars: 200,
       }),
-    ).toBe("Please explain literal <hindsight-memory> tags");
+    ).toBe("user: Please explain literal <hindsight-memory> tags");
+  });
+
+  it("adds deterministic preamble and optional date", () => {
+    const messages = [
+      { role: "user", content: "ship it", timestamp: 1 },
+    ] as unknown as AgentMessage[];
+
+    expect(
+      composeRecallQuery(messages, {
+        roles: ["user"],
+        contextTurns: 1,
+        maxQueryChars: 200,
+        preamble: "Find relevant project memory.",
+        includeDate: true,
+        now: new Date("2026-04-27T12:00:00.000Z"),
+      }),
+    ).toBe("Find relevant project memory.\n\nCurrent date: 2026-04-27\n\nuser: ship it");
   });
 
   it("renders memory block", () => {
