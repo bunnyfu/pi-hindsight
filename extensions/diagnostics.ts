@@ -62,6 +62,10 @@ export function formatDebugReport(args: DebugReportArgs): string {
       projectBankSelection: args.config.banks.project.bankId
         ? "configured"
         : args.config.banks.project.derive,
+      bankMissions: {
+        projectConfigured: Boolean(args.config.banks.project.mission),
+        globalConfigured: Boolean(args.config.banks.global.mission),
+      },
       overrideProjectBankId:
         "Set PI_HINDSIGHT_PROJECT_BANK_ID or .pi/hindsight.json banks.project.bankId",
       globalBankId: args.config.banks.global.enabled

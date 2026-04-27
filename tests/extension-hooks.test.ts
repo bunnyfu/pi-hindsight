@@ -15,6 +15,7 @@ const mocked = vi.hoisted(() => ({
     createBank: vi.fn(async (..._args: unknown[]) => undefined),
     getBankProfile: vi.fn(async (..._args: unknown[]) => ({})),
   },
+  ensureGlobalBank: vi.fn(async () => undefined),
   ensureProjectBank: vi.fn(async () => undefined),
   checkHindsight: vi.fn(async () => ({ ok: true })),
 }));
@@ -25,6 +26,7 @@ vi.mock("../extensions/client.js", () => ({
 }));
 
 vi.mock("../extensions/bank-operations.js", () => ({
+  ensureGlobalBank: mocked.ensureGlobalBank,
   ensureProjectBank: mocked.ensureProjectBank,
 }));
 
@@ -147,6 +149,11 @@ describe("extension hooks", () => {
       tags: ["source:pi"],
       tagsMatch: "any_strict",
     });
+    expect(mocked.ensureGlobalBank).toHaveBeenCalledWith(
+      mocked.client,
+      "global-bank",
+      expect.objectContaining({ enabled: true, bankId: "global-bank" }),
+    );
   });
 
   it("honors append recall injection position", async () => {

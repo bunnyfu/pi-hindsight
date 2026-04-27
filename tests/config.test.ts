@@ -14,7 +14,10 @@ describe("resolveConfig", () => {
     mkdirSync(join(cwd, ".pi"));
     writeFileSync(
       join(cwd, ".pi", "hindsight.json"),
-      JSON.stringify({ recall: { maxTokens: 123 }, banks: { project: { derive: "cwd" } } }),
+      JSON.stringify({
+        recall: { maxTokens: 123 },
+        banks: { project: { derive: "cwd", mission: "Project mission" } },
+      }),
     );
     const config = resolveConfig(cwd, {
       HINDSIGHT_BASE_URL: "http://h",
@@ -24,6 +27,7 @@ describe("resolveConfig", () => {
     expect(config.hindsight.baseUrl).toBe("http://h");
     expect(config.banks.project.bankId).toBe("manual-bank");
     expect(config.banks.project.derive).toBe("manual");
+    expect(config.banks.project.mission).toBe("Project mission");
   });
 
   it("reads boolean overrides from injected env", () => {

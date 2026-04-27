@@ -135,10 +135,16 @@ export function normalizeConfig(config: ResolvedConfig): ResolvedConfig {
           ["repo", "cwd", "manual"],
           DEFAULT_CONFIG.banks.project.derive,
         ),
+        ...(typeof config.banks?.project?.mission === "string"
+          ? { mission: config.banks.project.mission }
+          : {}),
       },
       global: {
         enabled: bool(config.banks?.global?.enabled, DEFAULT_CONFIG.banks.global.enabled),
         ...(globalBankId ? { bankId: globalBankId } : {}),
+        ...(typeof config.banks?.global?.mission === "string"
+          ? { mission: config.banks.global.mission }
+          : {}),
       },
     },
     recall: {

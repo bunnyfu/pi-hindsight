@@ -3,7 +3,7 @@ import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { resolveConfig } from "./config.js";
 import { deriveProjectBankId } from "./banking.js";
 import { createHindsightClient } from "./client.js";
-import { ensureProjectBank } from "./bank-operations.js";
+import { ensureGlobalBank, ensureProjectBank } from "./bank-operations.js";
 import { recallForContext } from "./recall.js";
 import { enqueueRetainFromAgentEnd } from "./retain.js";
 import { detectAppendCapability } from "./capabilities.js";
@@ -158,7 +158,9 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       if (!config.enabled) return;
       if (config.banks.project.enabled) {
         try {
-          await ensureProjectBank(client, projectBankId);
+          await ensureProjectBank(client, projectBankId, config.banks.project);
+          if (config.banks.global.enabled && config.banks.global.bankId)
+            await ensureGlobalBank(client, config.banks.global.bankId, config.banks.global);
           if (config.retain.enabled)
             capabilities = await detectAppendCapability(client, projectBankId);
         } catch (error) {
