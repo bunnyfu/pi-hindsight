@@ -39,6 +39,20 @@ describe("recall formatting", () => {
     ).toBe("long suffix");
   });
 
+  it("keeps legitimate user mentions of the hindsight-memory token", () => {
+    const messages = [
+      { role: "user", content: "Please explain literal <hindsight-memory> tags", timestamp: 1 },
+    ] as unknown as AgentMessage[];
+
+    expect(
+      composeRecallQuery(messages, {
+        roles: ["user"],
+        contextTurns: 1,
+        maxQueryChars: 200,
+      }),
+    ).toBe("Please explain literal <hindsight-memory> tags");
+  });
+
   it("renders memory block", () => {
     const rendered = renderRecallBlocks([
       {

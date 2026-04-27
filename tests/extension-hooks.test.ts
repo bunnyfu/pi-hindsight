@@ -178,6 +178,7 @@ describe("extension hooks", () => {
     const contextResult = await handlers.context?.[0]?.({ messages: original }, ctx);
 
     expect(contextResult.messages[0]).toEqual(original[0]);
+    expect(contextResult.messages[1].role).toBe("system");
     expect(contextResult.messages[1].content).toContain("<hindsight-memory>");
   });
 

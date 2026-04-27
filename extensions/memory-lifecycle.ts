@@ -202,7 +202,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
         }
         if (!rendered) return undefined;
         const recallMessage = {
-          role: "user",
+          role: config.recall.injectionPosition === "append" ? "system" : "user",
           content: rendered,
           timestamp: Date.now(),
         } as AgentMessage;

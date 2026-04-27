@@ -43,7 +43,7 @@ function messageContent(message: AgentMessage): string {
 }
 
 function isInjectedHindsightMemory(message: AgentMessage): boolean {
-  return messageContent(message).includes("<hindsight-memory>");
+  return messageContent(message).trim().startsWith("<hindsight-memory>");
 }
 
 export function truncateRecallQuery(query: string, maxChars: number): string {
