@@ -80,13 +80,18 @@ Inside Pi, open the interactive configuration TUI:
 
 The setup TUI lets you edit the memory profile, project bank ID, Hindsight base URL, timeout, global bank, recall budget, token budget, retain settings, queue path, import branch mode, statusline display, and Pi window notifications. It writes `.pi/hindsight.json` and reloads the extension config after each change. Active MVP import config is limited to branch mode, replace-vs-append behavior, and manifest path.
 
-Memory profiles make global memory explicit:
+Memory profiles make global memory explicit. Choose the narrowest route that fits the repo:
 
-- `project-only` keeps recall and automatic retain scoped to the repo-derived project bank. This remains safest for sensitive repos.
-- `project+global` recalls from both the project bank and a configured global bank. Automatic retain still writes project content to the project bank by default.
-- `global-only` disables the project bank and recalls only from the global bank. Automatic retain is disabled because there is no project bank retain route yet; use `hindsight_retain` with the global bank ID when you intentionally want global memory.
+- `project-only` keeps recall and automatic retain scoped to the selected project bank. Use this for sensitive repos, work projects, client code, or any repository where deletion/export/debugging should stay isolated.
+- `project+global` recalls from both the project bank and a configured global bank. Use this for most personal coding: project facts remain in the project bank, while durable preferences and cross-project habits can be recalled from the global bank. Automatic retain still writes project transcript deltas to the project bank by default.
+- `global-only` disables the project bank and recalls only from the global bank. Use this only when broad shared global recall is acceptable and you intentionally run a one-bank workflow. Automatic retain is disabled because there is no project bank retain route; use `hindsight_retain` with the global bank ID when you intentionally want global memory.
 
 When a profile enables global memory without an existing bank ID, setup writes `pi-global` as the global bank ID. Override it with `PI_HINDSIGHT_GLOBAL_BANK_ID`, `.pi/hindsight.json`, or the setup TUI if you prefer a different shared bank.
+
+Profile routing is inspectable:
+
+- `/hindsight:status` shows the active profile, primary/project bank, queue length, and import count.
+- `/hindsight:debug` includes `memoryProfile` and `memoryRoutes`, where `memoryRoutes.recall` lists configured automatic recall routes and `memoryRoutes.autoRetain` shows the configured automatic retain route or `null` when automatic retain has no route.
 
 For a quick default config, run:
 
