@@ -247,9 +247,11 @@ describe("extension hooks", () => {
     expect(contextResult.messages.at(-1).content).toBe("What do I know?");
     expect(mocked.client.recall).toHaveBeenCalledTimes(2);
     expect(mocked.client.recall.mock.calls[0]?.[0]).toMatch(/^pi-project-/);
-    expect(mocked.client.recall.mock.calls[0]?.[1]).toBe(
-      "Pi coding task memory lookup.\n\nuser: What do I know?",
+    expect(mocked.client.recall.mock.calls[0]?.[1]).toContain(
+      "Project memory lookup for current repo architecture",
     );
+    expect(mocked.client.recall.mock.calls[0]?.[1]).toContain("scope:project");
+    expect(mocked.client.recall.mock.calls[0]?.[1]).toContain("user: What do I know?");
     expect(mocked.client.recall.mock.calls[0]?.[2]).toMatchObject({
       maxTokens: 800,
       types: ["world", "experience", "observation"],
@@ -257,6 +259,11 @@ describe("extension hooks", () => {
       tagsMatch: "any_strict",
     });
     expect(mocked.client.recall.mock.calls[1]?.[0]).toBe("global-bank");
+    expect(mocked.client.recall.mock.calls[1]?.[1]).toContain(
+      "Global memory lookup for durable user preferences",
+    );
+    expect(mocked.client.recall.mock.calls[1]?.[1]).toContain("scope:global");
+    expect(mocked.client.recall.mock.calls[1]?.[1]).toContain("user: What do I know?");
     expect(mocked.client.recall.mock.calls[1]?.[2]).toMatchObject({
       tags: ["source:pi"],
       tagsMatch: "any_strict",

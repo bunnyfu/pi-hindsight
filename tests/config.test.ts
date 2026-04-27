@@ -41,12 +41,23 @@ describe("resolveConfig", () => {
     mkdirSync(join(cwd, ".pi"));
     writeFileSync(
       join(cwd, ".pi", "hindsight.json"),
-      JSON.stringify({ recall: { queryPreamble: "Find memory.", includeDateInQuery: true } }),
+      JSON.stringify({
+        recall: {
+          queryPreamble: "Find memory.",
+          projectQueryPreamble: "Find project memory.",
+          globalQueryPreamble: "Find global memory.",
+          includeDateInQuery: true,
+          includeRepoHintsInQuery: false,
+        },
+      }),
     );
 
     const config = resolveConfig(cwd);
     expect(config.recall.queryPreamble).toBe("Find memory.");
+    expect(config.recall.projectQueryPreamble).toBe("Find project memory.");
+    expect(config.recall.globalQueryPreamble).toBe("Find global memory.");
     expect(config.recall.includeDateInQuery).toBe(true);
+    expect(config.recall.includeRepoHintsInQuery).toBe(false);
   });
 
   it("normalizes invalid config values back to defaults", () => {
@@ -63,7 +74,10 @@ describe("resolveConfig", () => {
           roles: ["user", "alien"],
           maxQueryChars: 0,
           queryPreamble: 42,
+          projectQueryPreamble: 42,
+          globalQueryPreamble: 42,
           includeDateInQuery: "yes",
+          includeRepoHintsInQuery: "yes",
           storeLastRecall: "yes",
           lastRecallPath: "",
           topK: -1,
@@ -99,7 +113,14 @@ describe("resolveConfig", () => {
     expect(config.recall.roles).toEqual(["user", "assistant"]);
     expect(config.recall.maxQueryChars).toBe(800);
     expect(config.recall.queryPreamble).toBe("Pi coding task memory lookup.");
+    expect(config.recall.projectQueryPreamble).toBe(
+      "Project memory lookup for current repo architecture, tasks, bugs, decisions, and constraints.",
+    );
+    expect(config.recall.globalQueryPreamble).toBe(
+      "Global memory lookup for durable user preferences, recurring workflows, coding habits, and cross-project context.",
+    );
     expect(config.recall.includeDateInQuery).toBe(false);
+    expect(config.recall.includeRepoHintsInQuery).toBe(true);
     expect(config.recall.storeLastRecall).toBe(false);
     expect(config.recall.lastRecallPath).toBe(".pi/hindsight/last-recall.json");
     expect(config.recall.topK).toBe(8);

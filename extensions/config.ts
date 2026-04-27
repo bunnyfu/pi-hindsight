@@ -19,7 +19,12 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     roles: ["user", "assistant"],
     maxQueryChars: 800,
     queryPreamble: "Pi coding task memory lookup.",
+    projectQueryPreamble:
+      "Project memory lookup for current repo architecture, tasks, bugs, decisions, and constraints.",
+    globalQueryPreamble:
+      "Global memory lookup for durable user preferences, recurring workflows, coding habits, and cross-project context.",
     includeDateInQuery: false,
+    includeRepoHintsInQuery: true,
     storeLastRecall: false,
     lastRecallPath: ".pi/hindsight/last-recall.json",
     topK: 8,
@@ -258,9 +263,21 @@ export function normalizeConfig(config: ResolvedConfig, rawConfig?: unknown): Re
         typeof config.recall?.queryPreamble === "string"
           ? config.recall.queryPreamble
           : DEFAULT_CONFIG.recall.queryPreamble,
+      projectQueryPreamble:
+        typeof config.recall?.projectQueryPreamble === "string"
+          ? config.recall.projectQueryPreamble
+          : DEFAULT_CONFIG.recall.projectQueryPreamble,
+      globalQueryPreamble:
+        typeof config.recall?.globalQueryPreamble === "string"
+          ? config.recall.globalQueryPreamble
+          : DEFAULT_CONFIG.recall.globalQueryPreamble,
       includeDateInQuery: bool(
         config.recall?.includeDateInQuery,
         DEFAULT_CONFIG.recall.includeDateInQuery,
+      ),
+      includeRepoHintsInQuery: bool(
+        config.recall?.includeRepoHintsInQuery,
+        DEFAULT_CONFIG.recall.includeRepoHintsInQuery,
       ),
       storeLastRecall: bool(config.recall?.storeLastRecall, DEFAULT_CONFIG.recall.storeLastRecall),
       lastRecallPath:
