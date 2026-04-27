@@ -3,6 +3,8 @@ import { importDocumentId } from "./session.js";
 import { baseTags } from "./banking.js";
 import { redactSecrets } from "./sanitize.js";
 import { hashImportContent, type ImportManifestEntry } from "./import-manifest.js";
+import { createMemoryIdentity } from "./memory-identity.js";
+import { expandObservationScopes } from "./observation-scopes.js";
 import type { ImportBranch } from "./import-branches.js";
 import type { ParsedSession } from "./import-parser.js";
 
@@ -54,6 +56,14 @@ export async function retainImportBranch(args: ImportRetainArgs): Promise<Import
     `document:${documentId}`,
   ];
   if (args.leaves.length > 1) tags.push("forked:true");
+  const identity = createMemoryIdentity(args.cwd, args.config, args.sessionFile);
+  const observationScopes = args.config.observations.enabled
+    ? expandObservationScopes(args.config.observations.scopes, {
+        ...identity,
+        sessionId: args.sessionId,
+        projectBankId: args.bankId,
+      })
+    : [];
   await args.client.retain(args.bankId, content, {
     context: `Historical Pi session import from ${args.sessionFile}, branch ${leafId}`,
     documentId,
@@ -69,6 +79,7 @@ export async function retainImportBranch(args: ImportRetainArgs): Promise<Import
       include_branches: args.config.import.includeBranches,
       ...(args.parsed.sessionTimestamp ? { session_timestamp: args.parsed.sessionTimestamp } : {}),
     },
+    ...(observationScopes.length ? { observationScopes } : {}),
   });
   return {
     document: { documentId, leafId, messageCount: branchMessages.length, contentHash },

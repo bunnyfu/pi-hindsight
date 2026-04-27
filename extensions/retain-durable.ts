@@ -30,6 +30,7 @@ export interface RetainDurablyArgs {
   metadata?: Record<string, string>;
   source: DurableRetainSource;
   timestamp?: string;
+  observationScopes?: string[][];
   capabilities?: HindsightCapabilities;
 }
 
@@ -73,6 +74,7 @@ export function buildDurableRetainJob(args: Omit<RetainDurablyArgs, "client">): 
         retainSource: args.source,
         ...args.metadata,
       },
+      ...(args.observationScopes?.length ? { observationScopes: args.observationScopes } : {}),
     },
     retries: 0,
   };

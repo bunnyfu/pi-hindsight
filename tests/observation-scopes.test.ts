@@ -18,7 +18,7 @@ describe("observation scopes", () => {
         [
           ["harness:pi"],
           ["repo:{repoKey}"],
-          ["bank:{projectBankId}", "session:{sessionId}", "cwd:{cwdHash}"],
+          ["bank:{projectBankId}", "target:{bankId}", "session:{sessionId}", "cwd:{cwdHash}"],
         ],
         identity,
       ),
@@ -27,6 +27,7 @@ describe("observation scopes", () => {
       ["repo:abc123"],
       [
         "bank:pi-project-abc123",
+        "target:pi-project-abc123",
         "session:session-1",
         `cwd:${observationScopePlaceholders(identity).cwdHash}`,
       ],
