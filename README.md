@@ -113,14 +113,14 @@ Example project config:
     }
   },
   "recall": {
-    "budget": "low",
+    "budget": "mid",
     "maxTokens": 800,
     "roles": ["user", "assistant"],
     "contextTurns": 2,
     "maxQueryChars": 800,
     "topK": 8,
     "timeoutMs": 10000,
-    "injectionPosition": "prepend"
+    "injectionPosition": "append"
   },
   "observations": {
     "enabled": true,
@@ -176,7 +176,7 @@ Example project config:
 
 ## Memory behavior
 
-Automatic recall runs in the `context` hook and injects an ephemeral `<hindsight-memory>` message into the provider context. Project bank recall is scoped by the current repo tag. If a global bank is enabled, global recall uses an explicit non-repo `source:pi` scope so cross-project memories can be found without requiring the current repo tag. Recall query composition is bounded by `recall.roles`, `recall.contextTurns`, and `recall.maxQueryChars`; slow recalls are bounded by `recall.timeoutMs`. `recall.topK` limits injected results per bank. The injected memory block is not written to the Pi transcript by this extension.
+Automatic recall runs in the `context` hook and injects an ephemeral `<hindsight-memory>` message into the provider context. Project bank recall is scoped by the current repo tag. If a global bank is enabled, global recall uses an explicit non-repo `source:pi` scope so cross-project memories can be found without requiring the current repo tag. Recall query composition is bounded by `recall.roles`, `recall.contextTurns`, and `recall.maxQueryChars`; slow recalls are bounded by `recall.timeoutMs`. `recall.topK` limits injected results per bank. The default recall budget is `mid`, and the default injection position is `append`: recall is inserted near the end of provider context, before the current user message when present, so fresh memory does not change the beginning of the provider prompt and break prompt caching. `prepend` remains configurable for users who explicitly prefer memory before the transcript, but it can reduce prompt-cache hits because every recalled block changes the prompt prefix. The injected memory block is not written to the Pi transcript by this extension.
 
 Automatic retain runs in the `agent_end` hook. It stores a structured JSON projection of new messages, not a summary. The retain projection is controlled by `retain.content`, `retain.toolFilter`, and `retain.strip`; defaults keep user/assistant text, assistant tool calls, and tool result errors while excluding recursive Hindsight tool output and noisy read/search results. The legacy `includeToolResults` option remains as a compatibility shorthand for tool result content. Live sessions use stable `documentId` values and `updateMode: "append"`. On startup, the extension probes append support with a deterministic `pi-hindsight-capability:append:<bank>` document tagged `test:capability` and `feature:append-probe`. If append is known unsupported, `retain.appendFallback: "error"` refuses retain clearly; `"per-turn-documents"` uses deterministic per-delta document IDs with `updateMode: "replace"` to avoid overwriting earlier turns. A persisted retain cursor under `.pi/hindsight/retain-cursors.json` prevents duplicate appends when Pi provides overlapping transcripts, including after extension restart. Explicit retain tool tags are merged with the base `source:pi`, repo, and session tags so manually retained memories remain visible to default project recall. Per-session governance is stored outside provider-visible messages under `.pi/hindsight/session-meta/`. `/hindsight:mode normal|read-only|ignored` controls whether a session recalls and/or retains memory, `/hindsight:retain on|off` toggles retain for the session, and `/hindsight:tag add|remove <tag>` merges manual tags into automatic retain jobs.
 

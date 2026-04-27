@@ -73,7 +73,7 @@ describe("resolveConfig", () => {
     );
 
     const config = resolveConfig(cwd);
-    expect(config.recall.budget).toBe("low");
+    expect(config.recall.budget).toBe("mid");
     expect(config.recall.maxTokens).toBe(800);
     expect(config.recall.types).toEqual(["world", "experience", "observation"]);
     expect(config.observations.enabled).toBe(true);
@@ -83,7 +83,7 @@ describe("resolveConfig", () => {
     expect(config.recall.maxQueryChars).toBe(800);
     expect(config.recall.topK).toBe(8);
     expect(config.recall.timeoutMs).toBe(10_000);
-    expect(config.recall.injectionPosition).toBe("prepend");
+    expect(config.recall.injectionPosition).toBe("append");
     expect(config.retain.appendFallback).toBe("error");
     expect(config.retain.includeToolResults).toBe("meaningful-only");
     expect(config.retain.content.toolResult).toEqual(["error"]);

@@ -40,7 +40,7 @@ describe("extension hooks", () => {
     mocked.client.retain.mockImplementation(async (..._args: unknown[]) => undefined);
   });
 
-  it("prepends recalled memory in context and keeps that block out of retained transcript content", async () => {
+  it("appends recalled memory before current user by default and keeps that block out of retained transcript content", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
     mkdirSync(join(cwd, ".git"));
     mkdirSync(join(cwd, ".pi"));
@@ -70,19 +70,22 @@ describe("extension hooks", () => {
     await handlers.session_start?.[0]?.({}, ctx);
     mocked.client.retain.mockClear();
     const originalMessages = [
+      { role: "assistant", content: "Earlier context", timestamp: Date.now() - 1 },
       { role: "user", content: "What did we decide?", timestamp: Date.now() },
     ];
     const contextResult = await handlers.context?.[0]?.({ messages: originalMessages }, ctx);
 
-    expect(contextResult.messages[0].content).toContain("<hindsight-memory>");
-    expect(contextResult.messages[0].content).toContain("repo-specific remembered fact");
-    expect(contextResult.messages.slice(1)).toEqual(originalMessages);
+    expect(contextResult.messages[0]).toEqual(originalMessages[0]);
+    expect(contextResult.messages[1].role).toBe("user");
+    expect(contextResult.messages[1].content).toContain("<hindsight-memory>");
+    expect(contextResult.messages[1].content).toContain("repo-specific remembered fact");
+    expect(contextResult.messages.at(-1)).toEqual(originalMessages[1]);
 
     await handlers.agent_end?.[0]?.(
       {
         messages: [
-          contextResult.messages[0],
           ...originalMessages,
+          contextResult.messages[1],
           { role: "assistant", content: "Decision still stands.", timestamp: Date.now() },
         ],
       },
@@ -135,7 +138,9 @@ describe("extension hooks", () => {
       ctx,
     );
 
+    expect(contextResult.messages[0].role).toBe("user");
     expect(contextResult.messages[0].content).toContain("global-bank memory");
+    expect(contextResult.messages.at(-1).content).toBe("What do I know?");
     expect(mocked.client.recall).toHaveBeenCalledTimes(2);
     expect(mocked.client.recall.mock.calls[0]?.[0]).toMatch(/^pi-project-/);
     expect(mocked.client.recall.mock.calls[0]?.[1]).toBe("What do I know?");
@@ -157,7 +162,40 @@ describe("extension hooks", () => {
     );
   });
 
-  it("honors append recall injection position", async () => {
+  it("honors explicit prepend recall injection position with user role", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ recall: { injectionPosition: "prepend" } }),
+    );
+    const handlers: Record<string, Array<(event: any, ctx: any) => Promise<any>>> = {};
+    const pi = {
+      on: vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+        handlers[name] = [...(handlers[name] ?? []), handler];
+      }),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    await handlers.session_start?.[0]?.({}, ctx);
+    const original = [{ role: "user", content: "q", timestamp: 1 }];
+    const contextResult = await handlers.context?.[0]?.({ messages: original }, ctx);
+
+    expect(contextResult.messages[0].role).toBe("user");
+    expect(contextResult.messages[0].content).toContain("<hindsight-memory>");
+    expect(contextResult.messages[1]).toEqual(original[0]);
+  });
+
+  it("honors explicit append recall injection position", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
     mkdirSync(join(cwd, ".git"));
     mkdirSync(join(cwd, ".pi"));
@@ -185,9 +223,44 @@ describe("extension hooks", () => {
     const original = [{ role: "user", content: "q", timestamp: 1 }];
     const contextResult = await handlers.context?.[0]?.({ messages: original }, ctx);
 
-    expect(contextResult.messages[0]).toEqual(original[0]);
-    expect(contextResult.messages[1].role).toBe("system");
-    expect(contextResult.messages[1].content).toContain("<hindsight-memory>");
+    expect(contextResult.messages[0].role).toBe("user");
+    expect(contextResult.messages[0].content).toContain("<hindsight-memory>");
+    expect(contextResult.messages.at(-1)).toEqual(original[0]);
+  });
+
+  it("does not append synthetic recall when transcript does not end with user", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    const handlers: Record<string, Array<(event: any, ctx: any) => Promise<any>>> = {};
+    const pi = {
+      on: vi.fn((name: string, handler: (event: any, ctx: any) => Promise<any>) => {
+        handlers[name] = [...(handlers[name] ?? []), handler];
+      }),
+      registerTool: vi.fn(),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    await handlers.session_start?.[0]?.({}, ctx);
+    const contextResult = await handlers.context?.[0]?.(
+      {
+        messages: [
+          { role: "user", content: "Use tools", timestamp: 1 },
+          { role: "assistant", content: "Calling tool", timestamp: 2 },
+          { role: "toolResult", content: "tool output", timestamp: 3 },
+        ],
+      },
+      ctx,
+    );
+
+    expect(contextResult).toBeUndefined();
   });
 
   it("ensures global bank even when project bank is disabled", async () => {
@@ -333,7 +406,9 @@ describe("extension hooks", () => {
       { messages: [{ role: "user", content: "q", timestamp: 1 }] },
       ctx,
     );
+    expect(recall.messages[0].role).toBe("user");
     expect(recall.messages[0].content).toContain("<hindsight-memory>");
+    expect(recall.messages.at(-1).content).toBe("q");
     await handlers.agent_end?.[0]?.(
       { messages: [{ role: "user", content: "remember", timestamp: 1 }] },
       ctx,
