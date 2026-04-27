@@ -31,6 +31,8 @@ export interface ResolvedConfig {
     contextTurns: number;
     roles: RecallRole[];
     maxQueryChars: number;
+    queryPreamble: string;
+    includeDateInQuery: boolean;
     topK: number;
     timeoutMs: number;
     injectionMode: "context";

@@ -36,6 +36,19 @@ describe("resolveConfig", () => {
     expect(resolveConfig(cwd, { PI_HINDSIGHT_ENABLED: "true" }).enabled).toBe(true);
   });
 
+  it("accepts recall query builder overrides", () => {
+    const cwd = tmp();
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ recall: { queryPreamble: "Find memory.", includeDateInQuery: true } }),
+    );
+
+    const config = resolveConfig(cwd);
+    expect(config.recall.queryPreamble).toBe("Find memory.");
+    expect(config.recall.includeDateInQuery).toBe(true);
+  });
+
   it("normalizes invalid config values back to defaults", () => {
     const cwd = tmp();
     mkdirSync(join(cwd, ".pi"));
@@ -49,6 +62,8 @@ describe("resolveConfig", () => {
           contextTurns: 0,
           roles: ["user", "alien"],
           maxQueryChars: 0,
+          queryPreamble: 42,
+          includeDateInQuery: "yes",
           topK: -1,
           timeoutMs: 0,
           injectionPosition: "middle",
@@ -81,6 +96,8 @@ describe("resolveConfig", () => {
     expect(config.recall.contextTurns).toBe(2);
     expect(config.recall.roles).toEqual(["user", "assistant"]);
     expect(config.recall.maxQueryChars).toBe(800);
+    expect(config.recall.queryPreamble).toBe("Pi coding task memory lookup.");
+    expect(config.recall.includeDateInQuery).toBe(false);
     expect(config.recall.topK).toBe(8);
     expect(config.recall.timeoutMs).toBe(10_000);
     expect(config.recall.injectionPosition).toBe("append");

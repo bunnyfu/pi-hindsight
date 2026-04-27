@@ -143,7 +143,9 @@ describe("extension hooks", () => {
     expect(contextResult.messages.at(-1).content).toBe("What do I know?");
     expect(mocked.client.recall).toHaveBeenCalledTimes(2);
     expect(mocked.client.recall.mock.calls[0]?.[0]).toMatch(/^pi-project-/);
-    expect(mocked.client.recall.mock.calls[0]?.[1]).toBe("What do I know?");
+    expect(mocked.client.recall.mock.calls[0]?.[1]).toBe(
+      "Pi coding task memory lookup.\n\nuser: What do I know?",
+    );
     expect(mocked.client.recall.mock.calls[0]?.[2]).toMatchObject({
       maxTokens: 800,
       types: ["world", "experience", "observation"],
