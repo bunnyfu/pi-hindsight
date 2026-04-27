@@ -19,6 +19,7 @@ import {
   readRetainFingerprints,
 } from "./retain-cursor.js";
 import type { HindsightCapabilities, HindsightLikeClient, ResolvedConfig } from "./types.js";
+import { getEffectiveSessionMemoryMode, readSessionMemoryMeta } from "./session-memory-meta.js";
 
 export type RuntimeCtx = {
   cwd: string;
@@ -207,6 +208,10 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       if (!config.enabled || !config.recall.enabled) return undefined;
       const runtime = snapshotRuntime(ctx);
       if (!runtime) return undefined;
+      const sessionMemory = getEffectiveSessionMemoryMode(
+        await readSessionMemoryMeta(runtime.cwd, runtime.sessionFile),
+      );
+      if (!sessionMemory.recall) return undefined;
       const scopes = selectMemoryScopes(runtime.cwd, config);
       if (scopes.length === 0) return undefined;
       try {
@@ -254,6 +259,13 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
         return { queued: false, sent: 0, remaining: 0 };
       const runtime = snapshotRuntime(ctx);
       if (!runtime) return { queued: false, sent: 0, remaining: 0 };
+      const sessionMemory = getEffectiveSessionMemoryMode(
+        await readSessionMemoryMeta(runtime.cwd, runtime.sessionFile),
+      );
+      if (!sessionMemory.retain) {
+        await markRetainedMessages(runtime, event.messages);
+        return { queued: false, sent: 0, remaining: 0 };
+      }
       const messages = await newRetainMessages(runtime, event.messages);
       const messageCount = retainableMessageCount(messages);
       if (!messageCount) return { queued: false, sent: 0, remaining: 0 };
@@ -267,6 +279,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
           client,
           bankId: projectBankId,
           ...(capabilities ? { capabilities } : {}),
+          extraTags: sessionMemory.tags,
         });
         if (result.queued) await markRetainedMessages(runtime, messages);
         setMemoryStatus(

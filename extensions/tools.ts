@@ -17,7 +17,13 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
       ),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
-      const { bankId, result } = await operations.recall(ctx.cwd, params.query, params.bank);
+      const sessionFile = ctx.sessionManager.getSessionFile?.();
+      const { bankId, result } = await operations.recall(
+        ctx.cwd,
+        params.query,
+        params.bank,
+        sessionFile,
+      );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         details: { bankId },

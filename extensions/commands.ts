@@ -2,6 +2,29 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import type { MemoryOperationsDeps } from "./memory-operations.js";
 import { createMemoryOperations } from "./memory-operations.js";
 import { runHindsightSetupTui } from "./setup-tui.js";
+import type { SessionMemoryMode } from "./session-memory-meta.js";
+
+function firstArg(args: unknown): string | undefined {
+  if (Array.isArray(args)) return typeof args[0] === "string" ? args[0] : undefined;
+  if (typeof args === "string") return args.split(/\s+/).filter(Boolean)[0];
+  return undefined;
+}
+
+function secondArg(args: unknown): string | undefined {
+  if (Array.isArray(args)) return typeof args[1] === "string" ? args[1] : undefined;
+  if (typeof args === "string") return args.split(/\s+/).filter(Boolean)[1];
+  return undefined;
+}
+
+function sessionFile(ctx: {
+  sessionManager?: { getSessionFile?: () => string | undefined };
+}): string | undefined {
+  return ctx.sessionManager?.getSessionFile?.();
+}
+
+function isSessionMode(value: string | undefined): value is SessionMemoryMode {
+  return value === "normal" || value === "read-only" || value === "ignored";
+}
 
 export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
   const operations = createMemoryOperations(deps);
@@ -82,6 +105,66 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
         `Imported ${result.messageCount} messages as ${result.documentId}; manifest ${result.manifestPath}`,
         "info",
       );
+    },
+  });
+
+  pi.registerCommand("hindsight:session", {
+    description: "Show current Hindsight session memory mode and tags.",
+    handler: async (_args, ctx) => {
+      const result = await operations.session(ctx.cwd, sessionFile(ctx));
+      ctx.ui.notify(
+        `Hindsight session mode=${result.meta.mode}; recall=${result.effective.recall}; retain=${result.effective.retain}; tags=${result.meta.tags.join(",") || "none"}`,
+        "info",
+      );
+    },
+  });
+
+  pi.registerCommand("hindsight:mode", {
+    description: "Set session memory mode: normal, read-only, or ignored.",
+    handler: async (args, ctx) => {
+      const mode = firstArg(args);
+      if (!isSessionMode(mode)) {
+        ctx.ui.notify("Usage: /hindsight:mode normal|read-only|ignored", "warning");
+        return;
+      }
+      const result = await operations.setSessionMode(ctx.cwd, sessionFile(ctx), mode);
+      ctx.ui.notify(
+        `Hindsight session mode=${result.meta.mode}; recall=${result.effective.recall}; retain=${result.effective.retain}`,
+        "info",
+      );
+    },
+  });
+
+  pi.registerCommand("hindsight:retain", {
+    description: "Enable or disable retain for this session.",
+    handler: async (args, ctx) => {
+      const value = firstArg(args);
+      if (value !== "on" && value !== "off") {
+        ctx.ui.notify("Usage: /hindsight:retain on|off", "warning");
+        return;
+      }
+      const result = await operations.setSessionRetain(ctx.cwd, sessionFile(ctx), value === "on");
+      ctx.ui.notify(
+        `Hindsight session retain requested=${value}; effective=${result.effective.retain ? "on" : "off"}; mode=${result.meta.mode}`,
+        "info",
+      );
+    },
+  });
+
+  pi.registerCommand("hindsight:tag", {
+    description: "Add or remove a Hindsight tag for this session.",
+    handler: async (args, ctx) => {
+      const action = firstArg(args);
+      const tag = secondArg(args);
+      if ((action !== "add" && action !== "remove") || !tag) {
+        ctx.ui.notify("Usage: /hindsight:tag add|remove <tag>", "warning");
+        return;
+      }
+      const result =
+        action === "add"
+          ? await operations.addSessionTag(ctx.cwd, sessionFile(ctx), tag)
+          : await operations.removeSessionTag(ctx.cwd, sessionFile(ctx), tag);
+      ctx.ui.notify(`Hindsight session tags=${result.meta.tags.join(",") || "none"}`, "info");
     },
   });
 

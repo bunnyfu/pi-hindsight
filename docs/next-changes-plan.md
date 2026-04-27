@@ -1865,3 +1865,162 @@ A PR is done only when:
 Implement PR 1 first: durable explicit retain.
 
 It is the highest-value small fix because it closes a real memory-loss gap without requiring new Hindsight API discovery. After that, fix queue lock stale detection before adding broader memory-quality features.
+
+---
+
+# Maintainer Feedback Addendum: Global Recall, Budgets, Prompt Cache, and Hindsight-Native Controls
+
+## Source and stance
+
+Feedback from `noctuid/pi-hindsight` is credible implementation input because that extension exercises the same Pi/Hindsight integration surface and already ships several knobs we were planning to add. It should influence defaults and sequencing, but not override this repository's core design goals: durable queue-first retention, official Hindsight client alignment, automatic bank setup, conservative transcript safety, and focused Pi module boundaries.
+
+Local context inspected: `noctuid/pi-hindsight` in `~/.clone-repo-context/agent/sandbox/pi-hindsight`, especially `src/config.ts`, `src/index.ts`, `src/retention.ts`, `src/prepare.ts`, `src/client.ts`, and queue/retention tests.
+
+## Accepted changes
+
+### 1. Make global memory a first-class default option, not an afterthought
+
+The criticism is valid: project-only recall as the practical default prevents cross-project observations from helping. Current code supports a global bank, but the roadmap frames global recall as explicitly non-repo scoped and optional. That is safe, but too passive.
+
+Decision:
+
+- Keep project bank creation as the default because it matches official integration expectations and avoids one giant accidental memory bank.
+- Add setup profiles that make global memory easy and recommended:
+  - `project-only`: safest default for sensitive repos.
+  - `project+global`: recommended balanced default for most users.
+  - `global-only`: useful for personal assistants, scripts, and repo-agnostic workflows.
+- In `project+global`, recall should query both project and global banks, with clear labels in injected context.
+- Retain should keep project-scoped conversation content in the project bank by default. Global retention should be explicit through routing/profile configuration, not silently duplicate every repo transcript into global memory.
+- Observation consolidation should be able to use global scopes where configured.
+
+Roadmap impact:
+
+- Pull global-bank UX forward from PR 13 into the next configuration/defaults PR.
+- Add docs explaining privacy tradeoffs and when global recall should be enabled.
+
+### 2. Change default recall budget from `low` to `mid`
+
+The current `low` default was chosen from caution, not measured evidence. The maintainer reports `mid` is fast and practical. Their extension defaults `autoRecallBudget` to `mid`. Hindsight recall is expected to be milliseconds-scale, unlike reflect.
+
+Decision:
+
+- Change `DEFAULT_CONFIG.recall.budget` from `low` to `mid`.
+- Keep `maxTokens`, `topK`, `timeoutMs`, and query truncation conservative.
+- Keep setup/config support for `low` for users who want minimum latency.
+
+Roadmap impact:
+
+- Add to the next defaults PR before more recall-query work, because it is user-visible behavior and affects docs/tests.
+
+### 3. Stop prepending by default; protect prompt caching
+
+This is the strongest actionable criticism. Prepending fresh recall before existing context changes the early prompt prefix every turn and can damage provider prompt caching. Current default `recall.injectionPosition = "prepend"` should change.
+
+Decision:
+
+- Change default recall injection position to `append`.
+- Prefer appending as a system context block at the end of existing context, before the new user turn if Pi serialization allows that safely.
+- Keep explicit position configurability only if tests prove both modes serialize safely and docs warn that prepend hurts caching.
+- If possible in Pi hooks, remove or de-emphasize `prepend` from setup UI.
+
+Roadmap impact:
+
+- Add a prompt-cache safety PR before deeper recall-query changes.
+- Tests must assert appended recall does not become final user content and does not get retained.
+
+### 4. Make observation scopes customizable on retain, without inventing unsupported fields
+
+The feedback is directionally right. `noctuid/pi-hindsight` stores `observationScopes`/`observation_scopes` in queue entries and passes them through retention paths. This repository currently expands scopes for config/diagnostics and maps `observations.enabled` to bank settings, but avoids adding unsupported request fields. That caution remains correct until official client/API support is confirmed.
+
+Decision:
+
+- Add a client capability/adaptor layer for retain observation scopes only after verifying official Hindsight API/client support.
+- If supported, capture expanded observation scopes at queue time so queued jobs preserve the context active when the message was retained.
+- Support placeholder expansion for at least `{cwd}`, `{repo}`, `{session}`, `{branch}`, `{bank}`, and user-defined literals.
+- Scope policy belongs in config and retained job payloads, not metadata filtering.
+
+Roadmap impact:
+
+- Replace the vague current PR 9 "session pattern rules" with a concrete memory-quality PR: customizable observation scopes on retain plus placeholder tests, gated by capability detection.
+
+### 5. Keep and extend rich retain projection controls
+
+This is already partially done in PR 7. The other extension confirms this matters: thinking inclusion, specific tool-call/result filtering, and field stripping all need config. Our current design now has `retain.content`, `retain.toolFilter`, and `retain.strip`, which is aligned.
+
+Decision:
+
+- Keep current controls.
+- Add follow-up tests for thinking inclusion/exclusion and named tool-call/result removal if not already covered enough.
+- Do not broaden this into a generic message-rewrite engine.
+
+### 6. Keep PR 8 session tags and retain on/off; add session start timestamp later
+
+PR 8 now covers per-session tags and retain mode. The maintainer also noted timestamp should be session start time. That is valid for stable chronological retention and Hindsight ordering.
+
+Decision:
+
+- Keep PR 8 as-is if review is clean.
+- Add a later focused PR to persist session start timestamp and use it consistently for session-level retain/import metadata where Hindsight expects timestamps.
+
+### 7. Consider per-session queue files, but do not switch immediately
+
+The other extension queues on `message_end` into per-session queue files, avoiding dedup and improving crash resistance. This is a strong design point, but switching now would be a larger architectural migration. Our current queue has been hardened with locks, durable explicit retain, and cursoring.
+
+Decision:
+
+- Do not replace queue architecture in the current PR sequence.
+- Add a design spike/PR after import workflow work to evaluate message-end queueing and per-session queue shards.
+- If adopted, migrate incrementally: keep current queue reader compatible, write new per-session queue files for new auto-retain jobs, and provide a queue migration/flush path.
+
+### 8. Recall query construction needs its own improvement PR
+
+Both implementations likely under-optimize recall query construction. Current roadmap has controls but not better query synthesis.
+
+Decision:
+
+- Add a dedicated recall-query PR after prompt-cache/default fixes.
+- Improve query formation using recent user intent, bounded assistant context, session title/path/branch, and optional preamble/date injection.
+- Do not use reflect for automatic recall query generation.
+- Keep query construction deterministic and testable.
+
+### 9. Optional recall visibility is useful, but must remain non-provider-visible
+
+The maintainer supports opt-in persisted recall display. This repo currently defers persisted recall messages because recalled blocks must not be persisted into transcript history or retained back into memory. Visibility is still valuable for debugging.
+
+Decision:
+
+- Keep automatic recall ephemeral by default.
+- Add an opt-in recall debug/display feature that stores last recall in a sidecar/debug panel or custom hidden message filtered from provider context and retention.
+- Do not persist recall into normal conversation history unless Pi guarantees it can be excluded from provider serialization and retain.
+
+## Rejected or deferred changes
+
+- Do not make a single global bank the only default. It is useful, but unsafe for unrelated repos and sensitive work.
+- Do not pass undocumented `observation_scopes` fields through the official client until API support is verified.
+- Do not remove project bank support. Automatic bank creation and project bank derivation remain a differentiator and align with official integration expectations.
+- Do not immediately migrate to environment-variable-only configuration. Env vars are useful for scripts, but project config is easier to inspect, commit intentionally, and support through setup UI. Add env overrides where they improve automation.
+
+## Revised near-term PR order
+
+1. PR 8: Session memory metadata, modes, and tags. Keep current PR focused; do not mix default changes into it unless Codex requests related fixes.
+2. PR 9: Recall defaults and prompt-cache safety.
+   - default budget `mid`
+   - default injection position `append`
+   - docs/tests for prompt-cache rationale
+   - setup UI updated to discourage prepend
+3. PR 10: Global memory profiles and setup defaults.
+   - `project-only`, `project+global`, `global-only`
+   - clear privacy docs
+   - diagnostics show active recall/retain routes
+4. PR 11: Customizable retain observation scopes with capability guard.
+   - queue-time placeholder expansion
+   - supported API/client path only
+   - no undocumented retain fields without proof
+5. PR 12: Recall query construction improvements.
+   - deterministic query builder
+   - optional preamble/date injection
+   - tests for truncation and role handling
+6. PR 13: Optional recall visibility/debug display.
+   - sidecar or custom filtered message
+   - never retained and never provider-visible by default
+7. PR 14+: Resume existing import dry-run, checkpointing, setup profiles, SecretRef, smoke/doctor work.

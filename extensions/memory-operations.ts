@@ -18,6 +18,15 @@ import { recallScopeTags } from "./banking.js";
 import { stableSessionId } from "./session.js";
 import { explicitRetainTags } from "./memory-identity.js";
 import { retainDurably } from "./retain-durable.js";
+import {
+  addSessionMemoryTag,
+  getEffectiveSessionMemoryMode,
+  readSessionMemoryMeta,
+  removeSessionMemoryTag,
+  setSessionMemoryMode,
+  setSessionRetainEnabled,
+  type SessionMemoryMode,
+} from "./session-memory-meta.js";
 
 export interface MemoryOperationsDeps {
   getClient(): HindsightLikeClient;
@@ -42,7 +51,10 @@ function recallTagsForBank(
 
 export function createMemoryOperations(deps: MemoryOperationsDeps) {
   return {
-    async recall(cwd: string, query: string, bank?: string) {
+    async recall(cwd: string, query: string, bank?: string, sessionFile?: string) {
+      const meta = await readSessionMemoryMeta(cwd, sessionFile);
+      if (!getEffectiveSessionMemoryMode(meta).recall)
+        throw new Error("Hindsight recall is disabled for this session");
       const config = deps.getConfig();
       const bankId = bank || deps.getProjectBankId();
       const result = await deps.getClient().recall(bankId, query, {
@@ -62,9 +74,15 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
       bank?: string;
       tags?: string[];
     }) {
+      const meta = await readSessionMemoryMeta(args.cwd, args.sessionFile);
+      if (!getEffectiveSessionMemoryMode(meta).retain)
+        throw new Error("Hindsight retain is disabled for this session");
       const config = deps.getConfig();
       const bankId = args.bank || deps.getProjectBankId();
-      const tags = explicitRetainTags(args.cwd, args.sessionFile, args.tags);
+      const tags = explicitRetainTags(args.cwd, args.sessionFile, [
+        ...(args.tags ?? []),
+        ...meta.tags,
+      ]);
       const capabilities = deps.getCapabilities?.();
       const result = await retainDurably({
         cwd: args.cwd,
@@ -188,6 +206,31 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
       );
       deps.reloadConfig?.(cwd);
       return { ...result, projectBankId: deps.getProjectBankId() };
+    },
+
+    async session(cwd: string, sessionFile?: string) {
+      const meta = await readSessionMemoryMeta(cwd, sessionFile);
+      return { meta, effective: getEffectiveSessionMemoryMode(meta) };
+    },
+
+    async setSessionMode(cwd: string, sessionFile: string | undefined, mode: SessionMemoryMode) {
+      const meta = await setSessionMemoryMode(cwd, sessionFile, mode);
+      return { meta, effective: getEffectiveSessionMemoryMode(meta) };
+    },
+
+    async setSessionRetain(cwd: string, sessionFile: string | undefined, enabled: boolean) {
+      const meta = await setSessionRetainEnabled(cwd, sessionFile, enabled);
+      return { meta, effective: getEffectiveSessionMemoryMode(meta) };
+    },
+
+    async addSessionTag(cwd: string, sessionFile: string | undefined, tag: string) {
+      const meta = await addSessionMemoryTag(cwd, sessionFile, tag);
+      return { meta, effective: getEffectiveSessionMemoryMode(meta) };
+    },
+
+    async removeSessionTag(cwd: string, sessionFile: string | undefined, tag: string) {
+      const meta = await removeSessionMemoryTag(cwd, sessionFile, tag);
+      return { meta, effective: getEffectiveSessionMemoryMode(meta) };
     },
 
     async flush(cwd: string) {
