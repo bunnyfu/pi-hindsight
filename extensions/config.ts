@@ -71,6 +71,8 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     includeBranches: "current-only",
     replaceExistingImportedDocs: true,
     manifestPath: ".pi/hindsight/import-manifest.json",
+    checkpointPath: ".pi/hindsight/import-checkpoint.json",
+    resume: true,
   },
   status: {
     style: "text",
@@ -345,6 +347,11 @@ export function normalizeConfig(config: ResolvedConfig, rawConfig?: unknown): Re
         DEFAULT_CONFIG.import.replaceExistingImportedDocs,
       ),
       manifestPath: stringValue(config.import?.manifestPath, DEFAULT_CONFIG.import.manifestPath),
+      checkpointPath: stringValue(
+        config.import?.checkpointPath,
+        DEFAULT_CONFIG.import.checkpointPath,
+      ),
+      resume: bool(config.import?.resume, DEFAULT_CONFIG.import.resume),
     },
     status: {
       style: enumValue(

@@ -30,6 +30,8 @@ export interface ImportDocumentPreview {
   updateMode: "append" | "replace";
   bankId: string;
   wouldWrite: boolean;
+  status: "pending" | "completed" | "failed" | "skipped";
+  error?: string;
 }
 
 export interface ImportRetainResult {
@@ -87,6 +89,7 @@ function buildImportBranch(args: Omit<ImportRetainArgs, "client">): ImportBranch
     updateMode,
     bankId: args.bankId,
     wouldWrite: true,
+    status: "pending" as const,
   };
   const manifestEntry: ImportManifestEntry = {
     documentId,
