@@ -37,8 +37,16 @@ export function importRunId(args: {
   bankId: string;
   sessionId: string;
   includeBranches: "current-only" | "all-leaves";
+  updateMode: UpdateMode;
 }): string {
-  return ["pi-import", args.bankId, args.sessionId, args.includeBranches, args.sourceFile]
+  return [
+    "pi-import",
+    args.bankId,
+    args.sessionId,
+    args.includeBranches,
+    args.updateMode,
+    args.sourceFile,
+  ]
     .join(":")
     .replace(/\s+/g, "_");
 }

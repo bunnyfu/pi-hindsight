@@ -360,6 +360,58 @@ describe("Pi session import", () => {
     ]);
   });
 
+  it("starts a fresh checkpoint run when update mode changes", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-"));
+    mkdirSync(join(dir, ".git"));
+    const sessionFile = join(dir, "session.jsonl");
+    writeFileSync(
+      sessionFile,
+      [
+        JSON.stringify({ type: "session", id: "session-mode", cwd: dir }),
+        JSON.stringify({
+          type: "message",
+          id: "root",
+          parentId: null,
+          message: { role: "user", content: "root" },
+        }),
+        JSON.stringify({
+          type: "message",
+          id: "leaf",
+          parentId: "root",
+          message: { role: "assistant", content: "leaf" },
+        }),
+      ].join("\n"),
+    );
+
+    await importPiSession({
+      sessionFile,
+      bankId: "bank",
+      config: {
+        ...DEFAULT_CONFIG,
+        import: { ...DEFAULT_CONFIG.import, replaceExistingImportedDocs: false },
+      },
+      client: { retain: async () => undefined, recall: async () => [], reflect: async () => ({}) },
+    });
+
+    const calls: unknown[][] = [];
+    const result = await importPiSession({
+      sessionFile,
+      bankId: "bank",
+      config: DEFAULT_CONFIG,
+      client: {
+        retain: async (...args: unknown[]) => {
+          calls.push(args);
+        },
+        recall: async () => [],
+        reflect: async () => ({}),
+      },
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(result.documents[0]).toMatchObject({ status: "completed", updateMode: "replace" });
+    expect(result.runId).toContain(":replace:");
+  });
+
   it("selects import branches without retaining or writing manifests", () => {
     const parsed = parseImportSessionJsonl(
       [

@@ -69,6 +69,7 @@ export async function importPiSession(args: {
     bankId: args.bankId,
     sessionId,
     includeBranches,
+    updateMode,
   });
 
   const importConfig = { ...args.config, import: { ...args.config.import, includeBranches } };
