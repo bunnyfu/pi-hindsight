@@ -49,6 +49,9 @@ describe("diagnostics", () => {
       appendFallback: "error",
     });
     expect(report.bankMissions).toEqual({ projectConfigured: false, globalConfigured: false });
+    const retain = report.retain as Record<string, any>;
+    expect(retain.content.toolResult).toEqual(["error"]);
+    expect(retain.toolFilter.toolResult.exclude).toContain("hindsight_recall");
     expect(report.observations).toEqual({
       enabled: true,
       scopes: [["harness:pi"], [expect.stringMatching(/^repo:/)]],

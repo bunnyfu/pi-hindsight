@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
+import { DEFAULT_CONFIG, resolveConfig } from "../extensions/config.js";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { buildRetainJob } from "../extensions/retain.js";
 import type { AgentEndEvent } from "@mariozechner/pi-coding-agent";
 
@@ -21,5 +24,155 @@ describe("buildRetainJob", () => {
     expect(job?.item.async).toBe(true);
     expect(job?.item.content).not.toContain("API_KEY=secret");
     expect(JSON.parse(job?.item.content ?? "[]")[0].role).toBe("user");
+  });
+
+  it("excludes noisy and recursive tool results by default but keeps errors", () => {
+    const messages = [
+      { role: "assistant", content: "Running tools", timestamp: Date.now() },
+      {
+        role: "toolResult",
+        toolName: "read",
+        isError: false,
+        content: "huge file",
+        timestamp: Date.now(),
+      },
+      {
+        role: "toolResult",
+        toolName: "hindsight_recall",
+        isError: false,
+        content: "memory",
+        timestamp: Date.now(),
+      },
+      {
+        role: "toolResult",
+        toolName: "bash",
+        isError: true,
+        content: "failed",
+        timestamp: Date.now(),
+      },
+    ] as unknown as AgentEndEvent["messages"];
+    const job = buildRetainJob({ config: DEFAULT_CONFIG, cwd: "/repo", bankId: "bank", messages });
+    const retained = JSON.parse(job?.item.content ?? "[]") as Array<Record<string, unknown>>;
+
+    expect(retained.map((message) => message.content).join("\n")).toContain("failed");
+    expect(retained.map((message) => message.content).join("\n")).not.toContain("huge file");
+    expect(retained.map((message) => message.content).join("\n")).not.toContain("memory");
+  });
+
+  it("maps legacy includeToolResults all to full tool result content", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ retain: { includeToolResults: "all" } }),
+    );
+    const legacyConfig = resolveConfig(cwd);
+    const messages = [
+      {
+        role: "toolResult",
+        toolName: "bash",
+        isError: false,
+        content: "full output",
+        timestamp: Date.now(),
+      },
+    ] as unknown as AgentEndEvent["messages"];
+    const job = buildRetainJob({ config: legacyConfig, cwd: "/repo", bankId: "bank", messages });
+    expect(job?.item.content).toContain("full output");
+  });
+
+  it("maps legacy includeToolResults none to no tool result content", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ retain: { includeToolResults: "none" } }),
+    );
+    const config = resolveConfig(cwd);
+    const messages = [
+      {
+        role: "toolResult",
+        toolName: "bash",
+        isError: true,
+        content: "error output",
+        timestamp: Date.now(),
+      },
+    ] as unknown as AgentEndEvent["messages"];
+    const job = buildRetainJob({ config, cwd: "/repo", bankId: "bank", messages });
+    expect(job).toBeUndefined();
+  });
+
+  it("honors assistant text, toolCall, and thinking selectors", () => {
+    const baseMessage = {
+      role: "assistant",
+      content: [
+        { type: "text", text: "assistant text" },
+        { type: "thinking", thinking: "private thought" },
+        { type: "toolCall", name: "bash", arguments: { command: "echo hi" } },
+      ],
+      timestamp: Date.now(),
+    } as unknown as AgentEndEvent["messages"][number];
+
+    const toolOnly = buildRetainJob({
+      config: {
+        ...DEFAULT_CONFIG,
+        retain: {
+          ...DEFAULT_CONFIG.retain,
+          content: { ...DEFAULT_CONFIG.retain.content, assistant: ["toolCall"] },
+        },
+      },
+      cwd: "/repo",
+      bankId: "bank",
+      messages: [baseMessage] as AgentEndEvent["messages"],
+    });
+    expect(toolOnly?.item.content).toContain("[toolCall bash]");
+    expect(toolOnly?.item.content).not.toContain("assistant text");
+
+    const thinkingOnly = buildRetainJob({
+      config: {
+        ...DEFAULT_CONFIG,
+        retain: {
+          ...DEFAULT_CONFIG.retain,
+          content: { ...DEFAULT_CONFIG.retain.content, assistant: ["thinking"] },
+        },
+      },
+      cwd: "/repo",
+      bankId: "bank",
+      messages: [baseMessage] as AgentEndEvent["messages"],
+    });
+    expect(thinkingOnly?.item.content).toContain("private thought");
+    expect(thinkingOnly?.item.content).not.toContain("assistant text");
+    expect(thinkingOnly?.item.content).not.toContain("[toolCall bash]");
+  });
+
+  it("filters excluded assistant tool calls without dropping assistant text", () => {
+    const messages = [
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "keep this" },
+          { type: "toolCall", name: "hindsight_recall", arguments: { query: "x" } },
+          { type: "toolCall", name: "bash", arguments: { command: "echo ok" } },
+        ],
+        timestamp: Date.now(),
+      },
+    ] as unknown as AgentEndEvent["messages"];
+    const job = buildRetainJob({ config: DEFAULT_CONFIG, cwd: "/repo", bankId: "bank", messages });
+    expect(job?.item.content).toContain("keep this");
+    expect(job?.item.content).toContain("[toolCall bash]");
+    expect(job?.item.content).not.toContain("hindsight_recall");
+  });
+
+  it("strips configured fields", () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      retain: { ...DEFAULT_CONFIG.retain, strip: { message: ["model"], topLevel: ["content"] } },
+    };
+    const messages = [
+      { role: "assistant", model: "m", content: "answer", timestamp: Date.now() },
+    ] as unknown as AgentEndEvent["messages"];
+    const job = buildRetainJob({ config, cwd: "/repo", bankId: "bank", messages });
+    const retained = JSON.parse(job?.item.content ?? "[]") as Array<Record<string, unknown>>;
+    expect(retained[0]).not.toHaveProperty("model");
+    expect(retained[0]).not.toHaveProperty("content");
   });
 });

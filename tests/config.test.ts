@@ -85,6 +85,9 @@ describe("resolveConfig", () => {
     expect(config.recall.injectionPosition).toBe("prepend");
     expect(config.retain.appendFallback).toBe("error");
     expect(config.retain.includeToolResults).toBe("meaningful-only");
+    expect(config.retain.content.toolResult).toEqual(["error"]);
+    expect(config.retain.toolFilter.toolResult.exclude).toContain("hindsight_recall");
+    expect(config.retain.strip.message).toContain("usage");
     expect(config.retain.queuePath).toBe(".pi/hindsight/retain-queue.jsonl");
     expect(config.retain.shutdownFlushMaxJobs).toBe(10);
     expect(config.retain.shutdownFlushTimeoutMs).toBe(2_000);

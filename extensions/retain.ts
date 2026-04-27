@@ -21,7 +21,7 @@ export function buildRetainJob(args: {
   messages: AgentEndEvent["messages"];
   capabilities?: HindsightCapabilities;
 }): RetainJob | undefined {
-  const projected = projectMessages(args.messages, args.config.retain.includeToolResults);
+  const projected = projectMessages(args.messages, args.config);
   if (projected.length === 0) return undefined;
   const content = args.config.retain.redactSecrets
     ? redactSecrets(JSON.stringify(projected, null, 2))

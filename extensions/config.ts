@@ -34,6 +34,27 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     updateMode: "append",
     appendFallback: "error",
     includeToolResults: "meaningful-only",
+    content: {
+      user: ["text"],
+      assistant: ["text", "toolCall"],
+      toolResult: ["error"],
+    },
+    toolFilter: {
+      toolCall: { exclude: ["hindsight_retain", "hindsight_recall", "hindsight_reflect"] },
+      toolResult: {
+        exclude: [
+          "hindsight_retain",
+          "hindsight_recall",
+          "hindsight_reflect",
+          "read",
+          "grep",
+          "find",
+          "find_files",
+          "ls",
+        ],
+      },
+    },
+    strip: { message: ["usage", "cost", "responseId"], topLevel: ["id", "parentId"] },
     redactSecrets: true,
     queuePath: ".pi/hindsight/retain-queue.jsonl",
     shutdownFlushMaxJobs: 10,
@@ -123,7 +144,43 @@ function enumArray<T extends string>(value: unknown, allowed: readonly T[], fall
     : fallback;
 }
 
-export function normalizeConfig(config: ResolvedConfig): ResolvedConfig {
+function optionalStringArray(value: unknown): string[] | undefined {
+  return Array.isArray(value) && value.every((item) => typeof item === "string")
+    ? value
+    : undefined;
+}
+
+function toolNameFilter(
+  value: unknown,
+  fallback: { include?: string[]; exclude?: string[] },
+): { include?: string[]; exclude?: string[] } {
+  if (!isRecord(value)) return fallback;
+  const include = optionalStringArray(value.include);
+  const exclude = optionalStringArray(value.exclude);
+  return {
+    ...(include ? { include } : {}),
+    ...(exclude ? { exclude } : {}),
+  };
+}
+
+function includeToolResultsToContent(
+  value: "meaningful-only" | "all" | "none",
+): Array<"error" | "summary" | "content"> {
+  if (value === "none") return [];
+  if (value === "all") return ["error", "summary", "content"];
+  return ["error"];
+}
+
+function hasConfiguredToolResultContent(rawConfig: unknown): boolean {
+  return (
+    isRecord(rawConfig) &&
+    isRecord(rawConfig.retain) &&
+    isRecord(rawConfig.retain.content) &&
+    "toolResult" in rawConfig.retain.content
+  );
+}
+
+export function normalizeConfig(config: ResolvedConfig, rawConfig?: unknown): ResolvedConfig {
   const apiKey = optionalString(config.hindsight?.apiKey, DEFAULT_CONFIG.hindsight.apiKey);
   const projectBankId = optionalString(
     config.banks?.project?.bankId,
@@ -219,6 +276,41 @@ export function normalizeConfig(config: ResolvedConfig): ResolvedConfig {
         ["meaningful-only", "all", "none"],
         DEFAULT_CONFIG.retain.includeToolResults,
       ),
+      content: {
+        user: enumArray(config.retain?.content?.user, ["text"], DEFAULT_CONFIG.retain.content.user),
+        assistant: enumArray(
+          config.retain?.content?.assistant,
+          ["text", "toolCall", "thinking"],
+          DEFAULT_CONFIG.retain.content.assistant,
+        ),
+        toolResult: enumArray(
+          hasConfiguredToolResultContent(rawConfig)
+            ? config.retain?.content?.toolResult
+            : undefined,
+          ["error", "summary", "content"],
+          includeToolResultsToContent(
+            enumValue(
+              config.retain?.includeToolResults,
+              ["meaningful-only", "all", "none"],
+              DEFAULT_CONFIG.retain.includeToolResults,
+            ),
+          ),
+        ),
+      },
+      toolFilter: {
+        toolCall: toolNameFilter(
+          config.retain?.toolFilter?.toolCall,
+          DEFAULT_CONFIG.retain.toolFilter.toolCall,
+        ),
+        toolResult: toolNameFilter(
+          config.retain?.toolFilter?.toolResult,
+          DEFAULT_CONFIG.retain.toolFilter.toolResult,
+        ),
+      },
+      strip: {
+        message: stringArray(config.retain?.strip?.message, DEFAULT_CONFIG.retain.strip.message),
+        topLevel: stringArray(config.retain?.strip?.topLevel, DEFAULT_CONFIG.retain.strip.topLevel),
+      },
       redactSecrets: bool(config.retain?.redactSecrets, DEFAULT_CONFIG.retain.redactSecrets),
       queuePath: stringValue(config.retain?.queuePath, DEFAULT_CONFIG.retain.queuePath),
       shutdownFlushMaxJobs: positiveInt(
@@ -265,28 +357,44 @@ export function normalizeConfig(config: ResolvedConfig): ResolvedConfig {
 }
 
 export function resolveConfig(cwd: string, env: NodeJS.ProcessEnv = process.env): ResolvedConfig {
+  let rawConfig: Record<string, unknown> = {};
   let config = DEFAULT_CONFIG;
   const home = env.HOME;
-  if (home) config = merge(config, readJson(join(home, ".pi", "agent", "hindsight.json")));
-  config = merge(config, readJson(join(cwd, ".pi", "hindsight.json")));
+  const homeConfig = home ? readJson(join(home, ".pi", "agent", "hindsight.json")) : undefined;
+  rawConfig = merge(rawConfig, homeConfig);
+  config = merge(config, homeConfig);
+  const projectConfig = readJson(join(cwd, ".pi", "hindsight.json"));
+  rawConfig = merge(rawConfig, projectConfig);
+  config = merge(config, projectConfig);
 
   const enabled = envBool(env, "PI_HINDSIGHT_ENABLED");
-  if (enabled !== undefined) config = merge(config, { enabled });
-  if (env.HINDSIGHT_BASE_URL)
+  if (enabled !== undefined) {
+    rawConfig = merge(rawConfig, { enabled });
+    config = merge(config, { enabled });
+  }
+  if (env.HINDSIGHT_BASE_URL) {
+    rawConfig = merge(rawConfig, { hindsight: { baseUrl: env.HINDSIGHT_BASE_URL } });
     config = merge(config, { hindsight: { baseUrl: env.HINDSIGHT_BASE_URL } });
-  if (env.HINDSIGHT_API_KEY)
+  }
+  if (env.HINDSIGHT_API_KEY) {
+    rawConfig = merge(rawConfig, { hindsight: { apiKey: env.HINDSIGHT_API_KEY } });
     config = merge(config, { hindsight: { apiKey: env.HINDSIGHT_API_KEY } });
+  }
   if (env.PI_HINDSIGHT_PROJECT_BANK_ID) {
-    config = merge(config, {
+    const patch = {
       banks: { project: { bankId: env.PI_HINDSIGHT_PROJECT_BANK_ID, derive: "manual" } },
-    });
+    };
+    rawConfig = merge(rawConfig, patch);
+    config = merge(config, patch);
   }
   if (env.PI_HINDSIGHT_GLOBAL_BANK_ID) {
-    config = merge(config, {
+    const patch = {
       banks: { global: { enabled: true, bankId: env.PI_HINDSIGHT_GLOBAL_BANK_ID } },
-    });
+    };
+    rawConfig = merge(rawConfig, patch);
+    config = merge(config, patch);
   }
-  return normalizeConfig(config);
+  return normalizeConfig(config, rawConfig);
 }
 
 export { DEFAULT_CONFIG };
