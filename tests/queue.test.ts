@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { existsSync, mkdirSync, mkdtempSync, utimesSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -72,6 +79,18 @@ describe("retain queue", () => {
     expect(await readRetainQueue(path)).toHaveLength(0);
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject(["b", "raw", { async: true }]);
+  });
+
+  it("appends jobs even when earlier queue lines are malformed", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
+    writeFileSync(path, "{not json}\n", "utf8");
+
+    await enqueueRetainJob(path, job);
+
+    const lines = readFileSync(path, "utf8").trim().split("\n");
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain('"id":"1"');
+    await expect(readRetainQueue(path)).rejects.toThrow();
   });
 
   it("forwards queued observation scopes to retain", async () => {

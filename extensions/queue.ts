@@ -215,12 +215,21 @@ export interface EnqueueRetainJobResult {
   currentLength: number;
 }
 
+async function countQueuedLines(path: string): Promise<number> {
+  try {
+    return (await readFile(path, "utf8")).split("\n").filter(Boolean).length;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return 0;
+    throw error;
+  }
+}
+
 export async function enqueueRetainJobWithStats(
   path: string,
   job: RetainJob,
 ): Promise<EnqueueRetainJobResult> {
   return withQueueLock(path, async () => {
-    const previousLength = (await readRetainQueue(path)).length;
+    const previousLength = await countQueuedLines(path);
     await mkdir(dirname(path), { recursive: true });
     await appendFile(path, `${JSON.stringify(job)}\n`, "utf8");
     return { previousLength, currentLength: previousLength + 1 };
