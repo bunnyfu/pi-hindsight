@@ -235,16 +235,19 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
         }
         if (!rendered) return undefined;
         const recallMessage = {
-          role: config.recall.injectionPosition === "append" ? "system" : "user",
+          role: "user",
           content: rendered,
           timestamp: Date.now(),
         } as AgentMessage;
-        return {
-          messages:
-            config.recall.injectionPosition === "append"
-              ? [...event.messages, recallMessage]
-              : [recallMessage, ...event.messages],
-        };
+        if (config.recall.injectionPosition === "append") {
+          const last = event.messages[event.messages.length - 1];
+          const lastRole = (last as unknown as { role?: string } | undefined)?.role;
+          if (last && lastRole === "user") {
+            return { messages: [...event.messages.slice(0, -1), recallMessage, last] };
+          }
+          return { messages: [...event.messages, recallMessage] };
+        }
+        return { messages: [recallMessage, ...event.messages] };
       } catch {
         setMemoryStatus(runtime, "recall-failed");
         return undefined;

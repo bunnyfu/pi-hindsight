@@ -554,7 +554,7 @@ Add config:
     "maxQueryChars": 800,
     "topK": 8,
     "timeoutMs": 10000,
-    "injectionPosition": "prepend"
+    "injectionPosition": "append"
   }
 }
 ```
@@ -1914,7 +1914,7 @@ Roadmap impact:
 
 ### 3. Stop prepending by default; protect prompt caching
 
-This is the strongest actionable criticism. Prepending fresh recall before existing context changes the early prompt prefix every turn and can damage provider prompt caching. Current default `recall.injectionPosition = "prepend"` should change.
+This is the strongest actionable criticism. Prepending fresh recall before existing context changes the early prompt prefix every turn and can damage provider prompt caching. The previous default `recall.injectionPosition = "prepend"` should change to `append`.
 
 Decision:
 

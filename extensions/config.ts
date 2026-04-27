@@ -11,7 +11,7 @@ const DEFAULT_CONFIG: ResolvedConfig = {
   },
   recall: {
     enabled: true,
-    budget: "low",
+    budget: "mid",
     maxTokens: 800,
     types: ["world", "experience", "observation"],
     recentTurnsForQuery: 2,
@@ -21,7 +21,7 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     topK: 8,
     timeoutMs: 10_000,
     injectionMode: "context",
-    injectionPosition: "prepend",
+    injectionPosition: "append",
     includeFactsInDebug: false,
   },
   observations: {
