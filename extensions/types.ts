@@ -74,6 +74,8 @@ export interface ResolvedConfig {
     includeBranches: "current-only" | "all-leaves";
     replaceExistingImportedDocs: boolean;
     manifestPath: string;
+    checkpointPath: string;
+    resume: boolean;
   };
   status: {
     style: StatusStyle;

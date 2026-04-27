@@ -4,6 +4,14 @@ import type { HindsightLikeClient, ResolvedConfig } from "./types.js";
 import { importDocumentId, stableSessionId } from "./session.js";
 import { parseImportSessionJsonl, parsePiSessionJsonl } from "./import-parser.js";
 import { leafIds, selectImportBranches } from "./import-branches.js";
+import {
+  createImportCheckpoint,
+  importRunId,
+  readImportCheckpoint,
+  resolveImportCheckpointPath,
+  writeImportCheckpoint,
+  type ImportCheckpoint,
+} from "./import-checkpoint.js";
 import { resolveImportManifestPath, upsertImportManifestEntries } from "./import-manifest.js";
 import { previewImportBranch, retainImportBranch } from "./import-retain.js";
 
@@ -22,6 +30,8 @@ export interface ImportSessionDocumentResult {
   updateMode: "append" | "replace";
   bankId: string;
   wouldWrite: boolean;
+  status: "pending" | "completed" | "failed" | "skipped";
+  error?: string;
 }
 
 export interface ImportSessionResult {
@@ -31,6 +41,8 @@ export interface ImportSessionResult {
   retained: boolean;
   dryRun: boolean;
   manifestPath: string;
+  checkpointPath: string;
+  runId: string;
   documents: ImportSessionDocumentResult[];
 }
 
@@ -50,31 +62,123 @@ export async function importPiSession(args: {
   const includeBranches = args.includeBranches ?? args.config.import.includeBranches;
   const branches = selectImportBranches(parsed, includeBranches);
   const manifestPath = resolveImportManifestPath(cwd, args.config.import.manifestPath);
+  const checkpointPath = resolveImportCheckpointPath(cwd, args.config.import.checkpointPath);
+  const updateMode = args.config.import.replaceExistingImportedDocs ? "replace" : "append";
+  const runId = importRunId({
+    sourceFile: args.sessionFile,
+    bankId: args.bankId,
+    sessionId,
+    includeBranches,
+  });
 
   const importConfig = { ...args.config, import: { ...args.config.import, includeBranches } };
-  const results = await Promise.all(
-    branches.map((branch) => {
-      const common = {
-        sessionFile: args.sessionFile,
-        bankId: args.bankId,
-        config: importConfig,
-        parsed,
-        cwd,
-        sessionId,
-        leaves,
-        branch,
+  const now = new Date().toISOString();
+  const existingCheckpoint = args.config.import.resume
+    ? await readImportCheckpoint(checkpointPath)
+    : undefined;
+  let checkpoint: ImportCheckpoint =
+    existingCheckpoint?.runId === runId
+      ? existingCheckpoint
+      : createImportCheckpoint({
+          runId,
+          sourceFile: args.sessionFile,
+          bankId: args.bankId,
+          sessionId,
+          cwd,
+          includeBranches,
+          updateMode,
+          now,
+        });
+  checkpoint = { ...checkpoint, updatedAt: now };
+
+  const results = [];
+  for (const branch of branches) {
+    const common = {
+      sessionFile: args.sessionFile,
+      bankId: args.bankId,
+      config: importConfig,
+      parsed,
+      cwd,
+      sessionId,
+      leaves,
+      branch,
+    };
+    const preview = previewImportBranch(common);
+    const previous = checkpoint.documents[preview.document.documentId];
+    const canSkip =
+      !args.dryRun &&
+      args.config.import.resume &&
+      previous?.status === "completed" &&
+      previous.contentHash === preview.document.contentHash;
+    if (args.dryRun || canSkip) {
+      results.push({
+        ...preview,
+        document: {
+          ...preview.document,
+          wouldWrite: false,
+          status: canSkip ? ("skipped" as const) : preview.document.status,
+        },
+      });
+      continue;
+    }
+
+    checkpoint.documents[preview.document.documentId] = {
+      documentId: preview.document.documentId,
+      leafId: preview.document.leafId,
+      contentHash: preview.document.contentHash,
+      messageCount: preview.document.messageCount,
+      status: "pending",
+      updatedAt: new Date().toISOString(),
+    };
+    await writeImportCheckpoint(checkpointPath, checkpoint);
+
+    try {
+      const retained = await retainImportBranch({ ...common, client: args.client });
+      const completedAt = new Date().toISOString();
+      checkpoint.documents[retained.document.documentId] = {
+        documentId: retained.document.documentId,
+        leafId: retained.document.leafId,
+        contentHash: retained.document.contentHash,
+        messageCount: retained.document.messageCount,
+        status: "completed",
+        updatedAt: completedAt,
       };
-      return args.dryRun
-        ? Promise.resolve(previewImportBranch(common))
-        : retainImportBranch({ ...common, client: args.client });
-    }),
-  );
+      checkpoint.updatedAt = completedAt;
+      await writeImportCheckpoint(checkpointPath, checkpoint);
+      results.push({
+        ...retained,
+        document: { ...retained.document, status: "completed" as const },
+      });
+    } catch (error) {
+      const failedAt = new Date().toISOString();
+      const message = error instanceof Error ? error.message : String(error);
+      checkpoint.documents[preview.document.documentId] = {
+        documentId: preview.document.documentId,
+        leafId: preview.document.leafId,
+        contentHash: preview.document.contentHash,
+        messageCount: preview.document.messageCount,
+        status: "failed",
+        updatedAt: failedAt,
+        error: message,
+      };
+      checkpoint.updatedAt = failedAt;
+      await writeImportCheckpoint(checkpointPath, checkpoint);
+      results.push({
+        ...preview,
+        document: { ...preview.document, status: "failed" as const, error: message },
+      });
+      throw error;
+    }
+  }
 
   const documents = results.map((result) => result.document);
-  if (!args.dryRun) {
+  const completedResults = results.filter(
+    (result) => result.document.status === "completed" || result.document.status === "skipped",
+  );
+  if (!args.dryRun && completedResults.length > 0) {
     await upsertImportManifestEntries(
       manifestPath,
-      results.map((result) => result.manifestEntry),
+      completedResults.map((result) => result.manifestEntry),
     );
   }
 
@@ -88,6 +192,7 @@ export async function importPiSession(args: {
     updateMode: args.config.import.replaceExistingImportedDocs ? "replace" : "append",
     bankId: args.bankId,
     wouldWrite: !args.dryRun,
+    status: "pending" as const,
   };
   return {
     sessionFile: args.sessionFile,
@@ -96,6 +201,8 @@ export async function importPiSession(args: {
     retained: !args.dryRun,
     dryRun: Boolean(args.dryRun),
     manifestPath,
+    checkpointPath,
+    runId,
     documents,
   };
 }

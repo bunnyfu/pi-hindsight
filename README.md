@@ -40,7 +40,7 @@ This is an early MVP scaffold. It includes:
   - `/hindsight:tag`
 - tests for config, bank derivation, stable document IDs, sanitization, recall formatting, retain payloads, diagnostics, client request shapes, extension hook placement, historical import, import manifests, and queue replay
 
-Historical import supports importing the current Pi session or an explicit JSONL path via tool. Imports write deterministic document IDs and update an import manifest so `/hindsight:debug` can show imported document count and latest import provenance. Use `/hindsight:import --dry-run` or `hindsight_import` with `dryRun: true` to preview documents, message counts, content sizes, tags, update mode, and target bank without writing Hindsight memory or mutating the manifest. Add `--all-leaves` or `allLeaves: true` to preview/import every branch leaf instead of only the current branch.
+Historical import supports importing the current Pi session or an explicit JSONL path via tool. Imports write deterministic document IDs and update an import manifest so `/hindsight:debug` can show imported document count and latest import provenance. Use `/hindsight:import --dry-run` or `hindsight_import` with `dryRun: true` to preview documents, message counts, content sizes, tags, update mode, and target bank without writing Hindsight memory or mutating the manifest. Add `--all-leaves` or `allLeaves: true` to preview/import every branch leaf instead of only the current branch. Imports maintain `.pi/hindsight/import-checkpoint.json` by default and resume completed documents without re-retaining them when `import.resume` is enabled.
 
 ## Install for local development
 
@@ -78,7 +78,7 @@ Inside Pi, open the interactive configuration TUI:
 /hindsight:setup
 ```
 
-The setup TUI lets you edit the memory profile, project bank ID, Hindsight base URL, timeout, global bank, recall budget, token budget, retain settings, queue path, import branch mode, statusline display, and Pi window notifications. It writes `.pi/hindsight.json` and reloads the extension config after each change. Active MVP import config is limited to branch mode, replace-vs-append behavior, and manifest path.
+The setup TUI lets you edit the memory profile, project bank ID, Hindsight base URL, timeout, global bank, recall budget, token budget, retain settings, queue path, import branch mode, statusline display, and Pi window notifications. It writes `.pi/hindsight.json` and reloads the extension config after each change. Active import config covers branch mode, replace-vs-append behavior, manifest path, checkpoint path, and resume behavior.
 
 Memory profiles make global memory explicit. Choose the narrowest route that fits the repo:
 

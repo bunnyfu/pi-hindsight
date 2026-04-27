@@ -148,6 +148,8 @@ describe("resolveConfig", () => {
     expect(config.retain.shutdownFlushMaxJobs).toBe(10);
     expect(config.retain.shutdownFlushTimeoutMs).toBe(2_000);
     expect(config.import.includeBranches).toBe("current-only");
+    expect(config.import.checkpointPath).toBe(".pi/hindsight/import-checkpoint.json");
+    expect(config.import.resume).toBe(true);
     expect(config).not.toHaveProperty("import.includeCompactionSummaries");
     expect(config).not.toHaveProperty("import.includeBranchSummaries");
     expect(config.status.style).toBe("text");

@@ -9,6 +9,7 @@ import {
   parsePiSessionJsonl,
   selectImportBranches,
 } from "../extensions/import-sessions.js";
+import { readImportCheckpoint } from "../extensions/import-checkpoint.js";
 import { readImportManifest } from "../extensions/import-manifest.js";
 
 describe("Pi session import", () => {
@@ -244,6 +245,8 @@ describe("Pi session import", () => {
     expect(result.retained).toBe(false);
     expect(result.dryRun).toBe(true);
     expect(result.messageCount).toBe(4);
+    expect(result.checkpointPath).toBe(join(dir, ".pi/hindsight/import-checkpoint.json"));
+    await expect(readImportCheckpoint(result.checkpointPath)).resolves.toBeUndefined();
     expect(result.documents).toEqual([
       expect.objectContaining({
         documentId: "pi-import:session-preview:leaf:a",
@@ -267,6 +270,94 @@ describe("Pi session import", () => {
       version: 1,
       imports: {},
     });
+  });
+
+  it("resumes completed checkpoint documents without duplicate retain", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-"));
+    mkdirSync(join(dir, ".git"));
+    const sessionFile = join(dir, "session.jsonl");
+    writeFileSync(
+      sessionFile,
+      [
+        JSON.stringify({ type: "session", id: "session-resume", cwd: dir }),
+        JSON.stringify({
+          type: "message",
+          id: "root",
+          parentId: null,
+          message: { role: "user", content: "root" },
+        }),
+        JSON.stringify({
+          type: "message",
+          id: "a",
+          parentId: "root",
+          message: { role: "assistant", content: "a" },
+        }),
+        JSON.stringify({
+          type: "message",
+          id: "b",
+          parentId: "root",
+          message: { role: "assistant", content: "b" },
+        }),
+      ].join("\n"),
+    );
+    const firstCalls: unknown[][] = [];
+    await expect(
+      importPiSession({
+        sessionFile,
+        bankId: "bank",
+        config: DEFAULT_CONFIG,
+        includeBranches: "all-leaves",
+        client: {
+          retain: async (...args: unknown[]) => {
+            firstCalls.push(args);
+            if (firstCalls.length === 2) throw new Error("interrupted");
+          },
+          recall: async () => [],
+          reflect: async () => ({}),
+        },
+      }),
+    ).rejects.toThrow(/interrupted/);
+
+    const checkpoint = await readImportCheckpoint(
+      join(dir, ".pi/hindsight/import-checkpoint.json"),
+    );
+    expect(checkpoint?.documents["pi-import:session-resume:leaf:a"]?.status).toBe("completed");
+    expect(checkpoint?.documents["pi-import:session-resume:leaf:b"]?.status).toBe("failed");
+
+    const secondCalls: unknown[][] = [];
+    const result = await importPiSession({
+      sessionFile,
+      bankId: "bank",
+      config: DEFAULT_CONFIG,
+      includeBranches: "all-leaves",
+      client: {
+        retain: async (...args: unknown[]) => {
+          secondCalls.push(args);
+        },
+        recall: async () => [],
+        reflect: async () => ({}),
+      },
+    });
+
+    expect(secondCalls).toHaveLength(1);
+    const retainedOptions = secondCalls[0]?.[2] as { documentId: string };
+    expect(retainedOptions.documentId).toBe("pi-import:session-resume:leaf:b");
+    expect(result.documents.map((document) => [document.leafId, document.status])).toEqual([
+      ["a", "skipped"],
+      ["b", "completed"],
+    ]);
+    const resumedCheckpoint = await readImportCheckpoint(result.checkpointPath);
+    expect(resumedCheckpoint?.documents["pi-import:session-resume:leaf:a"]?.status).toBe(
+      "completed",
+    );
+    expect(resumedCheckpoint?.documents["pi-import:session-resume:leaf:b"]?.status).toBe(
+      "completed",
+    );
+    const manifest = await readImportManifest(result.manifestPath);
+    expect(Object.keys(manifest.imports).sort()).toEqual([
+      "pi-import:session-resume:leaf:a",
+      "pi-import:session-resume:leaf:b",
+    ]);
   });
 
   it("selects import branches without retaining or writing manifests", () => {
