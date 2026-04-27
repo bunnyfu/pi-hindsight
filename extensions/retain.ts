@@ -11,7 +11,7 @@ import { projectMessages } from "./messages.js";
 import { redactSecrets } from "./sanitize.js";
 import { contextLabel, liveDocumentId, stableSessionId } from "./session.js";
 import { enqueueRetainJob, flushRetainQueue, resolveQueuePath } from "./queue.js";
-import { resolveRetainDocumentTarget } from "./capabilities.js";
+import { appendFallbackTarget, resolveRetainDocumentTarget } from "./capabilities.js";
 import { createMemoryIdentity } from "./memory-identity.js";
 import { expandObservationScopes } from "./observation-scopes.js";
 
@@ -38,12 +38,18 @@ export function buildRetainJob(args: {
       })
     : [];
   const baseDocumentId = liveDocumentId(args.sessionFile, args.cwd);
+  const fallbackParts = [content, args.cwd, args.sessionFile, sessionId];
   const target = resolveRetainDocumentTarget({
     config: args.config,
     ...(args.capabilities ? { capabilities: args.capabilities } : {}),
     documentId: baseDocumentId,
     updateMode: args.config.retain.updateMode,
-    fallbackParts: [content, args.cwd, args.sessionFile, sessionId],
+    fallbackParts,
+  });
+  const fallback = appendFallbackTarget({
+    config: args.config,
+    documentId: baseDocumentId,
+    fallbackParts,
   });
   return {
     id: randomUUID(),
@@ -51,6 +57,7 @@ export function buildRetainJob(args: {
     createdAt: new Date().toISOString(),
     documentId: target.documentId,
     updateMode: target.updateMode,
+    ...(fallback && target.updateMode === "append" ? { appendFallback: fallback } : {}),
     item: {
       content,
       context: contextLabel(args.cwd, args.sessionFile),

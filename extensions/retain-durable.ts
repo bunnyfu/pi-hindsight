@@ -13,7 +13,7 @@ import {
   resolveQueuePath,
 } from "./queue.js";
 import { redactSecrets } from "./sanitize.js";
-import { resolveRetainDocumentTarget } from "./capabilities.js";
+import { appendFallbackTarget, resolveRetainDocumentTarget } from "./capabilities.js";
 
 export type DurableRetainSource = "auto" | "tool" | "command" | "import";
 
@@ -42,12 +42,18 @@ export interface RetainDurablyResult {
 
 export function buildDurableRetainJob(args: Omit<RetainDurablyArgs, "client">): RetainJob {
   const content = args.config.retain.redactSecrets ? redactSecrets(args.content) : args.content;
+  const fallbackParts = [content, args.context, args.tags, args.metadata];
   const target = resolveRetainDocumentTarget({
     config: args.config,
     ...(args.capabilities ? { capabilities: args.capabilities } : {}),
     documentId: args.documentId,
     updateMode: args.updateMode,
-    fallbackParts: [content, args.context, args.tags, args.metadata],
+    fallbackParts,
+  });
+  const fallback = appendFallbackTarget({
+    config: args.config,
+    documentId: args.documentId,
+    fallbackParts,
   });
   return {
     id: randomUUID(),
@@ -55,6 +61,7 @@ export function buildDurableRetainJob(args: Omit<RetainDurablyArgs, "client">): 
     createdAt: new Date().toISOString(),
     documentId: target.documentId,
     updateMode: target.updateMode,
+    ...(fallback && target.updateMode === "append" ? { appendFallback: fallback } : {}),
     item: {
       content,
       context: args.context,

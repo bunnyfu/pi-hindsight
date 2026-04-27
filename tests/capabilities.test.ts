@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "../extensions/config.js";
 import {
   detectAppendCapability,
+  isAppendUnsupportedError,
   perDeltaDocumentId,
   resolveRetainDocumentTarget,
 } from "../extensions/capabilities.js";
@@ -59,6 +60,21 @@ describe("append capabilities", () => {
 
     expect(capabilities.appendUpdateMode).toBe(false);
     expect(capabilities.error).toContain("append unsupported");
+  });
+
+  it("detects append validation errors from old servers", async () => {
+    const error = new Error(
+      `retain failed: [{"loc":["body","items",0,"update_mode"],"msg":"Input should be 'replace'","input":"append"}]`,
+    );
+    expect(isAppendUnsupportedError(error)).toBe(true);
+
+    const capabilities = await detectAppendCapability(
+      client(async () => {
+        throw error;
+      }),
+      "bank",
+    );
+    expect(capabilities.appendUpdateMode).toBe(false);
   });
 
   it("does not mark generic probe failures as unsupported", async () => {

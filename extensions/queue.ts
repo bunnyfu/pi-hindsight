@@ -25,6 +25,18 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isAppendUnsupportedError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const mentionsAppendMode = /append|update[_ ]?mode/i.test(message);
+  const explicitUnsupported =
+    /unsupported|invalid|unknown|unrecognized|not allowed|not permitted/i.test(message);
+  const validationUnsupported =
+    /update[_ ]?mode/i.test(message) &&
+    /append/i.test(message) &&
+    /input should be|expected|literal_error|permitted|allowed/i.test(message);
+  return mentionsAppendMode && (explicitUnsupported || validationUnsupported);
+}
+
 async function writeQueueHeartbeat(lockPath: string, token: string): Promise<void> {
   const heartbeatPath = `${lockPath}/heartbeat-${token}`;
   const tmpPath = `${heartbeatPath}.${process.pid}.tmp`;
@@ -314,7 +326,7 @@ export async function flushRetainQueue(
         break;
       }
       try {
-        await client.retain(job.bankId, job.item.content, {
+        const options = {
           context: job.item.context,
           ...(job.item.timestamp ? { timestamp: job.item.timestamp } : {}),
           ...(job.item.metadata ? { metadata: job.item.metadata } : {}),
@@ -323,7 +335,17 @@ export async function flushRetainQueue(
           ...(job.item.observationScopes ? { observationScopes: job.item.observationScopes } : {}),
           documentId: job.documentId,
           updateMode: job.updateMode,
-        });
+        };
+        try {
+          await client.retain(job.bankId, job.item.content, options);
+        } catch (error) {
+          if (!job.appendFallback || !isAppendUnsupportedError(error)) throw error;
+          await client.retain(job.bankId, job.item.content, {
+            ...options,
+            documentId: job.appendFallback.documentId,
+            updateMode: job.appendFallback.updateMode,
+          });
+        }
         sent += 1;
       } catch (error) {
         const retries = job.retries + 1;

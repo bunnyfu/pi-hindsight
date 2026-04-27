@@ -119,6 +119,10 @@ export interface RetainJob {
   createdAt: string;
   documentId: string;
   updateMode: UpdateMode;
+  appendFallback?: {
+    documentId: string;
+    updateMode: "replace";
+  };
   item: {
     content: string;
     context: string;
