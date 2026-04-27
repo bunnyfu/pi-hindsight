@@ -170,7 +170,12 @@ export async function setSessionMemoryMode(
   const meta = await readSessionMemoryMeta(cwd, sessionFile);
   const updates: Partial<HindsightSessionMeta> = { mode };
   if (mode === "normal" || mode === "read-only") updates.recallMode = "normal";
-  if (mode === "normal") {
+  const looksFailClosed =
+    meta.mode === "ignored" &&
+    meta.recallMode === "off" &&
+    meta.retainMode === "off" &&
+    !meta.retained;
+  if (mode === "normal" && looksFailClosed) {
     updates.retained = true;
     updates.retainMode = "normal";
   }

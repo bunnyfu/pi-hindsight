@@ -106,6 +106,22 @@ describe("session memory metadata", () => {
     });
   });
 
+  it("preserves explicit retain off when switching modes back to normal", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-meta-"));
+
+    await setSessionRetainEnabled(cwd, "/tmp/session.jsonl", false);
+    await setSessionMemoryMode(cwd, "/tmp/session.jsonl", "read-only");
+    await setSessionMemoryMode(cwd, "/tmp/session.jsonl", "normal");
+
+    expect(
+      getEffectiveSessionMemoryMode(await readSessionMemoryMeta(cwd, "/tmp/session.jsonl")),
+    ).toMatchObject({
+      mode: "normal",
+      recall: true,
+      retain: false,
+    });
+  });
+
   it("adds and removes sanitized tags", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-meta-"));
     await addSessionMemoryTag(cwd, undefined, " domain:test ");
