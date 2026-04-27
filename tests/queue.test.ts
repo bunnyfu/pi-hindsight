@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -114,6 +114,30 @@ describe("retain queue", () => {
     expect(dead[0]?.retries).toBe(1);
     expect(dead[0]?.lastError).toContain("moved to dead-letter queue");
     expect(dead[0]?.deadLetteredAt).toBeDefined();
+  });
+
+  it("keeps exhausted jobs active when dead-letter append fails", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
+    await enqueueRetainJob(path, job);
+    mkdirSync(resolveDeadLetterQueuePath(path));
+
+    await expect(
+      flushRetainQueue(
+        path,
+        {
+          retain: async () => {
+            throw new Error("down");
+          },
+          recall: async () => [],
+          reflect: async () => ({}),
+        },
+        { maxRetries: 1 },
+      ),
+    ).rejects.toThrow();
+
+    const remaining = await readRetainQueue(path);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]?.id).toBe("1");
   });
 
   it("can bound shutdown flushing to avoid blocking session switches", async () => {
@@ -244,11 +268,14 @@ describe("retain queue", () => {
 
   it("cleans stale lock directories instead of waiting forever", async () => {
     const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
-    mkdirSync(`${path}.lock`, { recursive: true });
+    const lockPath = `${path}.lock`;
+    mkdirSync(lockPath, { recursive: true });
+    const oldTime = new Date(Date.now() - 10_000);
+    utimesSync(lockPath, oldTime, oldTime);
     const originalStaleMs = RETAIN_QUEUE_LOCK.staleMs;
     const originalTimeoutMs = RETAIN_QUEUE_LOCK.timeoutMs;
     const originalRetryMs = RETAIN_QUEUE_LOCK.retryMs;
-    RETAIN_QUEUE_LOCK.staleMs = 0;
+    RETAIN_QUEUE_LOCK.staleMs = 1;
     RETAIN_QUEUE_LOCK.timeoutMs = 200;
     RETAIN_QUEUE_LOCK.retryMs = 1;
     try {

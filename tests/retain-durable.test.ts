@@ -4,7 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../extensions/config.js";
 import { createMemoryOperations } from "../extensions/memory-operations.js";
-import { flushRetainQueue, readRetainQueue, resolveQueuePath } from "../extensions/queue.js";
+import {
+  flushRetainQueue,
+  readDeadLetterQueue,
+  readRetainQueue,
+  resolveQueuePath,
+} from "../extensions/queue.js";
 import type { HindsightLikeClient, ResolvedConfig } from "../extensions/types.js";
 import {
   setSessionMemoryMode,
@@ -78,6 +83,64 @@ describe("durable explicit retain", () => {
     expect(queued[0]?.item.content).toContain("Durable fact");
     expect(queued[0]?.item.content).not.toContain("super-secret");
     expect(queued[0]?.item.tags).toEqual(expect.arrayContaining(["source:pi", "decision:test"]));
+  });
+
+  it("does not burn retries on existing backlog during a continuous outage", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
+    const config = testConfig();
+    const operations = createMemoryOperations({
+      getClient: () =>
+        client(async () => {
+          throw new Error("down");
+        }),
+      getConfig: () => config,
+      getProjectBankId: () => "project-bank",
+    });
+
+    for (let index = 0; index < 7; index += 1) {
+      await operations.retainExplicit({
+        cwd,
+        content: `Decision ${index}`,
+        context: "unit test explicit retain",
+      });
+    }
+
+    const queuePath = resolveQueuePath(cwd, config.retain.queuePath);
+    const queued = await readRetainQueue(queuePath);
+    expect(queued).toHaveLength(7);
+    expect(queued[0]?.retries).toBe(1);
+    expect(queued.slice(1).every((queuedJob) => queuedJob.retries === 0)).toBe(true);
+    expect(await readDeadLetterQueue(queuePath)).toHaveLength(0);
+  });
+
+  it("does not burn retries when explicit retains race during an outage", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
+    const config = testConfig();
+    const operations = createMemoryOperations({
+      getClient: () =>
+        client(async () => {
+          throw new Error("down");
+        }),
+      getConfig: () => config,
+      getProjectBankId: () => "project-bank",
+    });
+
+    await Promise.all(
+      Array.from({ length: 7 }, (_, index) =>
+        operations.retainExplicit({
+          cwd,
+          content: `Decision ${index}`,
+          context: "unit test explicit retain",
+        }),
+      ),
+    );
+
+    const queuePath = resolveQueuePath(cwd, config.retain.queuePath);
+    const queued = await readRetainQueue(queuePath);
+    expect(queued).toHaveLength(7);
+    expect(queued.filter((queuedJob) => queuedJob.retries === 1)).toHaveLength(1);
+    expect(queued.filter((queuedJob) => queuedJob.retries === 0)).toHaveLength(6);
+    expect(await readDeadLetterQueue(queuePath)).toHaveLength(0);
   });
 
   it("flushes queued explicit retain later", async () => {

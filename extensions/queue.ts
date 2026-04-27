@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { appendFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
 import type { HindsightLikeClient, RetainJob } from "./types.js";
@@ -17,24 +18,36 @@ export const RETAIN_QUEUE_LOCK = {
 export interface QueueLockOwner {
   pid?: number;
   acquiredAt?: string;
+  token?: string;
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function writeQueueLockOwner(lockPath: string): Promise<void> {
-  await writeFile(
-    `${lockPath}/owner`,
-    JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString() }),
-    "utf8",
-  );
+async function writeQueueHeartbeat(lockPath: string, token: string): Promise<void> {
+  const heartbeatPath = `${lockPath}/heartbeat-${token}`;
+  const tmpPath = `${heartbeatPath}.${process.pid}.tmp`;
+  await writeFile(tmpPath, new Date().toISOString(), "utf8");
+  await rename(tmpPath, heartbeatPath);
 }
 
-function startQueueLockHeartbeat(lockPath: string): NodeJS.Timeout {
+async function writeQueueLockOwner(lockPath: string, token: string): Promise<void> {
+  const ownerPath = `${lockPath}/owner`;
+  const tmpPath = `${ownerPath}.${process.pid}.${token}.tmp`;
+  await writeFile(
+    tmpPath,
+    JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString(), token }),
+    "utf8",
+  );
+  await rename(tmpPath, ownerPath);
+  await writeQueueHeartbeat(lockPath, token);
+}
+
+function startQueueLockHeartbeat(lockPath: string, token: string): NodeJS.Timeout {
   const heartbeatMs = Math.max(1, Math.min(5_000, Math.floor(RETAIN_QUEUE_LOCK.staleMs / 2)));
   const heartbeat = setInterval(() => {
-    void writeQueueLockOwner(lockPath).catch(() => undefined);
+    void writeQueueHeartbeat(lockPath, token).catch(() => undefined);
   }, heartbeatMs);
   heartbeat.unref?.();
   return heartbeat;
@@ -67,35 +80,99 @@ async function isOwnerlessLockDirectoryStale(lockPath: string): Promise<boolean>
   }
 }
 
+async function isQueueLockStale(lockPath: string, owner: QueueLockOwner): Promise<boolean> {
+  if (!owner.token) return isQueueLockOwnerStale(owner);
+  try {
+    const heartbeat = await stat(`${lockPath}/heartbeat-${owner.token}`);
+    return Date.now() - heartbeat.mtimeMs > RETAIN_QUEUE_LOCK.staleMs;
+  } catch {
+    return isQueueLockOwnerStale(owner);
+  }
+}
+
+async function removeLockIfOwned(lockPath: string, token: string): Promise<void> {
+  const owner = await readQueueLockOwner(lockPath);
+  if (owner?.token === token) await rm(lockPath, { recursive: true, force: true });
+}
+
+function staleClaimPath(lockPath: string): string {
+  return `${lockPath}.stale-claim`;
+}
+
+async function isStaleCleanupClaimActive(lockPath: string): Promise<boolean> {
+  const claimPath = staleClaimPath(lockPath);
+  try {
+    const info = await stat(claimPath);
+    if (Date.now() - info.mtimeMs <= RETAIN_QUEUE_LOCK.staleMs) return true;
+    await rm(claimPath, { recursive: true, force: true });
+    return false;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+async function withStaleCleanupClaim<T>(
+  lockPath: string,
+  fn: () => Promise<T>,
+): Promise<T | undefined> {
+  const claimPath = staleClaimPath(lockPath);
+  try {
+    await mkdir(claimPath, { recursive: false });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") return undefined;
+    throw error;
+  }
+  try {
+    return await fn();
+  } finally {
+    await rm(claimPath, { recursive: true, force: true });
+  }
+}
+
+async function removeLockIfStillStale(lockPath: string): Promise<boolean> {
+  return (
+    (await withStaleCleanupClaim(lockPath, async () => {
+      const owner = await readQueueLockOwner(lockPath);
+      const stale = owner
+        ? await isQueueLockStale(lockPath, owner)
+        : await isOwnerlessLockDirectoryStale(lockPath);
+      if (!stale) return false;
+      await rm(lockPath, { recursive: true, force: true });
+      return true;
+    })) ?? false
+  );
+}
+
 async function acquireFileLock(path: string): Promise<() => Promise<void>> {
   const lockPath = `${path}.lock`;
   const started = Date.now();
   await mkdir(dirname(path), { recursive: true });
   while (true) {
+    if (await isStaleCleanupClaimActive(lockPath)) {
+      if (Date.now() - started > RETAIN_QUEUE_LOCK.timeoutMs)
+        throw new Error(`Timed out waiting for retain queue lock ${lockPath}`);
+      await sleep(RETAIN_QUEUE_LOCK.retryMs);
+      continue;
+    }
+    const token = randomUUID();
     try {
       await mkdir(lockPath, { recursive: false });
       try {
-        await writeQueueLockOwner(lockPath);
+        await writeQueueLockOwner(lockPath, token);
       } catch (error) {
         await rm(lockPath, { recursive: true, force: true });
         if (["ENOENT", "EINVAL"].includes((error as NodeJS.ErrnoException).code ?? "")) continue;
         throw error;
       }
-      const heartbeat = startQueueLockHeartbeat(lockPath);
+      const heartbeat = startQueueLockHeartbeat(lockPath, token);
       return async () => {
         clearInterval(heartbeat);
-        await rm(lockPath, { recursive: true, force: true });
+        await removeLockIfOwned(lockPath, token);
       };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      const owner = await readQueueLockOwner(lockPath);
-      const stale = owner
-        ? isQueueLockOwnerStale(owner)
-        : await isOwnerlessLockDirectoryStale(lockPath);
-      if (stale) {
-        await rm(lockPath, { recursive: true, force: true });
-        continue;
-      }
+      if (await removeLockIfStillStale(lockPath)) continue;
       if (Date.now() - started > RETAIN_QUEUE_LOCK.timeoutMs)
         throw new Error(`Timed out waiting for retain queue lock ${lockPath}`);
       await sleep(RETAIN_QUEUE_LOCK.retryMs);
@@ -133,11 +210,25 @@ export function resolveDeadLetterQueuePath(path: string): string {
   return `${path}.dead.jsonl`;
 }
 
-export async function enqueueRetainJob(path: string, job: RetainJob): Promise<void> {
-  await withQueueLock(path, async () => {
+export interface EnqueueRetainJobResult {
+  previousLength: number;
+  currentLength: number;
+}
+
+export async function enqueueRetainJobWithStats(
+  path: string,
+  job: RetainJob,
+): Promise<EnqueueRetainJobResult> {
+  return withQueueLock(path, async () => {
+    const previousLength = (await readRetainQueue(path)).length;
     await mkdir(dirname(path), { recursive: true });
     await appendFile(path, `${JSON.stringify(job)}\n`, "utf8");
+    return { previousLength, currentLength: previousLength + 1 };
   });
+}
+
+export async function enqueueRetainJob(path: string, job: RetainJob): Promise<void> {
+  await enqueueRetainJobWithStats(path, job);
 }
 
 export async function readRetainQueue(path: string): Promise<RetainJob[]> {
@@ -166,6 +257,17 @@ export async function writeRetainQueue(path: string, jobs: RetainJob[]): Promise
     "utf8",
   );
   await rename(tmp, path);
+}
+
+async function appendDeadLetterJobs(path: string, jobs: RetainJob[]): Promise<void> {
+  if (jobs.length === 0) return;
+  const deadLetterPath = resolveDeadLetterQueuePath(path);
+  await mkdir(dirname(deadLetterPath), { recursive: true });
+  await appendFile(
+    deadLetterPath,
+    jobs.map((job) => JSON.stringify(job)).join("\n") + "\n",
+    "utf8",
+  );
 }
 
 export type FlushRetainQueueOptions = {
@@ -236,10 +338,8 @@ export async function flushRetainQueue(
         }
       }
     }
+    await appendDeadLetterJobs(path, deadLetteredJobs);
     await writeRetainQueue(path, remaining);
-    for (const deadLetteredJob of deadLetteredJobs) {
-      await enqueueRetainJob(resolveDeadLetterQueuePath(path), deadLetteredJob);
-    }
     return { sent, remaining: remaining.length, deadLettered: deadLetteredJobs.length };
   });
 }

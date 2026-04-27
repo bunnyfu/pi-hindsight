@@ -6,7 +6,12 @@ import type {
   RetainJob,
   UpdateMode,
 } from "./types.js";
-import { enqueueRetainJob, flushRetainQueue, resolveQueuePath } from "./queue.js";
+import {
+  enqueueRetainJobWithStats,
+  flushRetainQueue,
+  readRetainQueue,
+  resolveQueuePath,
+} from "./queue.js";
 import { redactSecrets } from "./sanitize.js";
 import { resolveRetainDocumentTarget } from "./capabilities.js";
 
@@ -68,7 +73,11 @@ export function buildDurableRetainJob(args: Omit<RetainDurablyArgs, "client">): 
 
 export async function retainDurably(args: RetainDurablyArgs): Promise<RetainDurablyResult> {
   const queuePath = resolveQueuePath(args.cwd, args.config.retain.queuePath);
-  await enqueueRetainJob(queuePath, buildDurableRetainJob(args));
-  const result = await flushRetainQueue(queuePath, args.client);
+  const enqueueResult = await enqueueRetainJobWithStats(queuePath, buildDurableRetainJob(args));
+  if (enqueueResult.previousLength > 0) {
+    const remaining = (await readRetainQueue(queuePath)).length;
+    return { enqueued: true, sent: 0, remaining, deadLettered: 0 };
+  }
+  const result = await flushRetainQueue(queuePath, args.client, { maxJobs: 1 });
   return { enqueued: true, ...result };
 }

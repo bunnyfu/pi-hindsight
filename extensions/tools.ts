@@ -55,10 +55,13 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
         ...(params.bank ? { bank: params.bank } : {}),
         ...(params.tags ? { tags: params.tags } : {}),
       });
+      const deadLetterStatus = result.deadLettered
+        ? ` ${result.deadLettered} job${result.deadLettered === 1 ? "" : "s"} moved to dead-letter queue; run /hindsight:debug to inspect.`
+        : "";
       const status =
         result.remaining > 0
-          ? `Queued for ${result.bankId}; ${result.remaining} job${result.remaining === 1 ? "" : "s"} pending.`
-          : `Retained in ${result.bankId}.`;
+          ? `Queued for ${result.bankId}; ${result.remaining} job${result.remaining === 1 ? "" : "s"} pending.${deadLetterStatus}`
+          : `Retained in ${result.bankId}.${deadLetterStatus}`;
       return {
         content: [{ type: "text", text: status }],
         details: result,
