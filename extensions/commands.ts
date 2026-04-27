@@ -21,9 +21,14 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
     description: "Check Hindsight connectivity and queue.",
     handler: async (_args, ctx) => {
       const doctor = await operations.doctor(ctx.cwd);
+      const append = doctor.capabilities
+        ? doctor.capabilities.appendUpdateMode
+          ? "append supported"
+          : "append unsupported"
+        : "append not checked";
       ctx.ui.notify(
-        `Hindsight ${doctor.health.ok ? "reachable" : `unreachable: ${doctor.health.error}`}; queue ${doctor.queueLength}; imports ${doctor.imports.count}`,
-        doctor.health.ok ? "info" : "warning",
+        `Hindsight ${doctor.health.ok ? "reachable" : `unreachable: ${doctor.health.error}`}; ${append}; queue ${doctor.queueLength}; imports ${doctor.imports.count}`,
+        doctor.health.ok && doctor.capabilities?.appendUpdateMode !== false ? "info" : "warning",
       );
     },
   });

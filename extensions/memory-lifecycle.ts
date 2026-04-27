@@ -6,6 +6,7 @@ import { createHindsightClient } from "./client.js";
 import { ensureProjectBank } from "./bank-operations.js";
 import { recallForContext } from "./recall.js";
 import { enqueueRetainFromAgentEnd } from "./retain.js";
+import { detectAppendCapability } from "./capabilities.js";
 import { flushRetainQueue, resolveQueuePath } from "./queue.js";
 import { getSessionFile, stableSessionId } from "./session.js";
 import { bankSelectionMessage } from "./diagnostics.js";
@@ -17,7 +18,7 @@ import {
   messageFingerprint,
   readRetainFingerprints,
 } from "./retain-cursor.js";
-import type { HindsightLikeClient, ResolvedConfig } from "./types.js";
+import type { HindsightCapabilities, HindsightLikeClient, ResolvedConfig } from "./types.js";
 
 export type RuntimeCtx = {
   cwd: string;
@@ -41,6 +42,7 @@ export interface MemoryLifecycleDeps {
   getClient(): HindsightLikeClient;
   getConfig(): ResolvedConfig;
   getProjectBankId(): string;
+  getCapabilities(): HindsightCapabilities | undefined;
   reloadConfig(cwd: string): void;
 }
 
@@ -70,12 +72,14 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
   let config: ResolvedConfig = resolveConfig(initialCwd);
   let client: HindsightLikeClient = createHindsightClient(config);
   let projectBankId = deriveProjectBankId(initialCwd, config);
+  let capabilities: HindsightCapabilities | undefined;
   const retainedBySession = new Map<string, Set<string>>();
 
   const reloadConfig = (cwd: string) => {
     config = resolveConfig(cwd);
     client = createHindsightClient(config);
     projectBankId = deriveProjectBankId(cwd, config);
+    capabilities = undefined;
   };
 
   const setMemoryStatus = (
@@ -140,6 +144,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
     getClient: () => client,
     getConfig: () => config,
     getProjectBankId: () => projectBankId,
+    getCapabilities: () => capabilities,
     reloadConfig,
   };
 
@@ -152,14 +157,20 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       reloadConfig(runtime.cwd);
       if (!config.enabled) return;
       if (config.banks.project.enabled)
-        void ensureProjectBank(client, projectBankId).catch((error) => {
-          setMemoryStatus(runtime, "recall-failed");
-          notify(
-            runtime,
-            `Hindsight bank ensure failed: ${error instanceof Error ? error.message : String(error)}`,
-            "warning",
-          );
-        });
+        void (async () => {
+          try {
+            await ensureProjectBank(client, projectBankId);
+            if (config.retain.enabled)
+              capabilities = await detectAppendCapability(client, projectBankId);
+          } catch (error) {
+            setMemoryStatus(runtime, "recall-failed");
+            notify(
+              runtime,
+              `Hindsight bank ensure/capability check failed: ${error instanceof Error ? error.message : String(error)}`,
+              "warning",
+            );
+          }
+        })();
       setMemoryStatus(runtime, "idle");
       if (config.notifications.startup)
         notify(runtime, bankSelectionMessage(projectBankId, config), "info");
@@ -223,6 +234,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
           config,
           client,
           bankId: projectBankId,
+          ...(capabilities ? { capabilities } : {}),
         });
         if (result.queued) await markRetainedMessages(runtime, messages);
         setMemoryStatus(

@@ -65,6 +65,7 @@ describe("extension hooks", () => {
     hindsightExtension(pi as any);
 
     await handlers.session_start?.[0]?.({}, ctx);
+    mocked.client.retain.mockClear();
     const originalMessages = [
       { role: "user", content: "What did we decide?", timestamp: Date.now() },
     ];
@@ -85,8 +86,10 @@ describe("extension hooks", () => {
       ctx,
     );
 
-    expect(mocked.client.retain).toHaveBeenCalledTimes(1);
-    const retainCalls = mocked.client.retain.mock.calls as unknown[][];
+    const retainCalls = (mocked.client.retain.mock.calls as unknown[][]).filter(
+      (call) => call[1] !== "Pi Hindsight append capability probe. Safe to ignore.",
+    );
+    expect(retainCalls).toHaveLength(1);
     const retainedContent = retainCalls[0]?.[1] as string;
     expect(retainedContent).toContain("What did we decide?");
     expect(retainedContent).toContain("Decision still stands.");
@@ -247,11 +250,15 @@ describe("extension hooks", () => {
     const { default: hindsightExtension } = await import("../extensions/index.js");
     hindsightExtension(pi as any);
     await handlers.session_start?.[0]?.({}, ctx);
+    mocked.client.retain.mockClear();
     await handlers.agent_end?.[0]?.({ messages: [u1, a1] }, ctx);
     await handlers.agent_end?.[0]?.({ messages: [u1, a1, u2, a2] }, ctx);
 
-    expect(mocked.client.retain).toHaveBeenCalledTimes(2);
-    const secondContent = mocked.client.retain.mock.calls[1]?.[1] as string;
+    const retainCalls = (mocked.client.retain.mock.calls as unknown[][]).filter(
+      (call) => call[1] !== "Pi Hindsight append capability probe. Safe to ignore.",
+    );
+    expect(retainCalls).toHaveLength(2);
+    const secondContent = retainCalls[1]?.[1] as string;
     expect(secondContent).toContain("u2");
     expect(secondContent).toContain("a2");
     expect(secondContent).not.toContain("u1");
@@ -281,14 +288,18 @@ describe("extension hooks", () => {
 
     const first = createMemoryLifecycle(cwd);
     await first.initialize(ctx);
+    mocked.client.retain.mockClear();
     await first.retain({ messages: [u1, a1] } as any, ctx);
 
     const second = createMemoryLifecycle(cwd);
     await second.initialize(ctx);
     await second.retain({ messages: [u1, a1, u2, a2] } as any, ctx);
 
-    expect(mocked.client.retain).toHaveBeenCalledTimes(2);
-    const secondContent = mocked.client.retain.mock.calls[1]?.[1] as string;
+    const retainCalls = (mocked.client.retain.mock.calls as unknown[][]).filter(
+      (call) => call[1] !== "Pi Hindsight append capability probe. Safe to ignore.",
+    );
+    expect(retainCalls).toHaveLength(2);
+    const secondContent = retainCalls[1]?.[1] as string;
     expect(secondContent).toContain("u2");
     expect(secondContent).toContain("a2");
     expect(secondContent).not.toContain("u1");

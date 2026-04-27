@@ -1,5 +1,5 @@
 import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
-import type { HindsightLikeClient, ResolvedConfig } from "./types.js";
+import type { HindsightCapabilities, HindsightLikeClient, ResolvedConfig } from "./types.js";
 import { checkHindsight } from "./client.js";
 import { readRetainQueue, flushRetainQueue, resolveQueuePath } from "./queue.js";
 import { formatDebugReport, safeConfig } from "./diagnostics.js";
@@ -23,6 +23,7 @@ export interface MemoryOperationsDeps {
   getClient(): HindsightLikeClient;
   getConfig(): ResolvedConfig;
   getProjectBankId(): string;
+  getCapabilities?(): HindsightCapabilities | undefined;
   reloadConfig?(cwd: string): void;
 }
 
@@ -64,6 +65,7 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
       const config = deps.getConfig();
       const bankId = args.bank || deps.getProjectBankId();
       const tags = explicitRetainTags(args.cwd, args.sessionFile, args.tags);
+      const capabilities = deps.getCapabilities?.();
       const result = await retainDurably({
         cwd: args.cwd,
         config,
@@ -79,6 +81,7 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
           ...(args.sessionFile ? { pi_session_file: args.sessionFile } : {}),
         },
         source: "tool",
+        ...(capabilities ? { capabilities } : {}),
       });
       return { bankId, tags, ...result, queued: result.enqueued };
     },
@@ -135,7 +138,12 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
         readRetainQueue(resolveQueuePath(cwd, config.retain.queuePath)),
         readImportManifest(resolveImportManifestPath(cwd, config.import.manifestPath)),
       ]);
-      return { health, queueLength: queue.length, imports: importManifestSummary(manifest) };
+      return {
+        health,
+        ...(deps.getCapabilities?.() ? { capabilities: deps.getCapabilities() } : {}),
+        queueLength: queue.length,
+        imports: importManifestSummary(manifest),
+      };
     },
 
     config() {
@@ -152,6 +160,7 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
       const manifest = await readImportManifest(manifestPath);
       const imports = importManifestSummary(manifest);
       const sessionFile = ctx.sessionManager.getSessionFile?.();
+      const capabilities = deps.getCapabilities?.();
       return {
         health,
         report: formatDebugReport({
@@ -164,6 +173,7 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
           importCount: imports.count,
           ...(imports.latest ? { latestImport: imports.latest } : {}),
           health,
+          ...(capabilities ? { capabilities } : {}),
         }),
       };
     },
