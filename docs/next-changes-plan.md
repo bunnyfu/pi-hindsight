@@ -2144,16 +2144,29 @@ Roadmap impact:
 - Insert Recall Query V2 before larger import/setup polish if current PR sequence allows.
 - Update maintainer notes after implemented so `noctuid` can compare approaches.
 
-## Updated later PR backlog
+## Updated implementation status
 
-1. Finish PR 14: opt-in recall visibility sidecar.
-2. Recall Query V2: bank-aware deterministic query shaping.
-3. Retain transport cleanup / upstream issue:
-   - open Hindsight issue for single retain observation scopes
-   - optionally standardize adapter on `retainBatch()` for all retain writes
-4. Profile docs refinement:
-   - explain project-only vs project+global vs global-only
-   - emphasize one-bank workflows via tags/scopes are supported through global-only
-5. Optional transcript recall visibility spike:
-   - only if Pi serialization and retain filtering can be proven safe
-   - must include scan/prune cleanup command before release
+Completed in follow-up PRs:
+
+1. Opt-in recall visibility sidecar.
+2. Recall Query V2 with bank-aware deterministic query shaping.
+3. Retain transport cleanup: adapter now uses `retainBatch()` for retain writes.
+4. Profile documentation refinement for `project-only`, `project+global`, and `global-only`.
+5. Queue durability, append fallback replay, recall failure hardening, observation-scope retain alignment, and unreleased legacy cleanup after retrospective review of early PRs.
+6. Import UX improvements:
+   - dry-run previews
+   - all-leaves override
+   - checkpoint/resume
+   - project-scoped session import commands
+7. Setup deployment guidance and API key SecretRef support.
+8. Doctor/smoke diagnostics polish.
+
+In progress:
+
+- Recall cleanup command for scanning/pruning accidentally persisted `<hindsight-memory>` transcript blocks.
+
+Remaining candidates:
+
+1. Optional upstream Hindsight issue for single `retain()` observation-scope support.
+2. Optional transcript-persisted recall visibility only if Pi serialization/retain filtering is proven safe. Keep sidecar-only default indefinitely unless this is proven.
+3. Release readiness polish: changelog/version prep, package metadata review, and live configured-server smoke run when credentials are available.
