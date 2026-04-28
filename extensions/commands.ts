@@ -78,9 +78,16 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
           ? "append supported"
           : "append unsupported"
         : "append not checked";
+      const observation = doctor.observations.error
+        ? `; observations invalid: ${doctor.observations.error}`
+        : "";
       ctx.ui.notify(
-        `Hindsight ${doctor.health.ok ? "reachable" : `unreachable: ${doctor.health.error}`}; ${append}; queue ${doctor.queueLength}; imports ${doctor.imports.count}`,
-        doctor.health.ok && doctor.capabilities?.appendUpdateMode !== false ? "info" : "warning",
+        `Hindsight ${doctor.health.ok ? "reachable" : `unreachable: ${doctor.health.error}`}; ${append}; queue ${doctor.queueLength}; imports ${doctor.imports.count}${observation}`,
+        doctor.health.ok &&
+          doctor.capabilities?.appendUpdateMode !== false &&
+          !doctor.observations.error
+          ? "info"
+          : "warning",
       );
     },
   });

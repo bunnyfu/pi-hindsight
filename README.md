@@ -233,7 +233,7 @@ Use the debug command inside Pi to inspect what the extension believes:
 /hindsight:debug
 ```
 
-The report includes the project bank ID, whether it was configured or derived, current tags, queue path, queue length, import manifest summary, Hindsight reachability, and redacted effective config.
+The report includes the project bank ID, whether it was configured or derived, current tags, queue path, queue length, import manifest summary, Hindsight reachability, observation-scope expansion or errors with remediation hints, and redacted effective config. `/hindsight:doctor` also warns when observation-scope placeholders are invalid.
 
 Run the local smoke test against a real Hindsight server:
 
@@ -243,7 +243,7 @@ export HINDSIGHT_BASE_URL=http://localhost:8888
 npm run smoke:hindsight
 ```
 
-The smoke test creates a temporary bank, retains a unique marker with `updateMode: "append"`, recalls it, and runs `reflect`. It uses the configured Hindsight server; it does not start a server. For release verification, run:
+The smoke test creates a temporary bank, retains a unique marker with `updateMode: "append"`, recalls it, and runs `reflect`. It uses the configured Hindsight server; it does not start a server and it prints step markers (`bank_ok`, `retain_ok`, `recall_ok`, `reflect_ok`) so failures identify the broken integration stage. For release verification, run:
 
 ```bash
 npm run check:release

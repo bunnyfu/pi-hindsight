@@ -55,21 +55,39 @@ export function safeConfig(config: ResolvedConfig): ResolvedConfig {
   };
 }
 
-export function formatDebugReport(args: DebugReportArgs): string {
-  const sessionId = stableSessionId(args.sessionFile, args.cwd);
-  const tags = baseTags(args.cwd, sessionId);
+export function observationScopeDiagnostics(args: {
+  cwd: string;
+  sessionFile?: string;
+  projectBankId: string;
+  config: ResolvedConfig;
+}): { enabled: boolean; scopes: string[][] | null; error: string | null; action: string | null } {
   const identity = {
     ...createMemoryIdentity(args.cwd, args.config, args.sessionFile),
     projectBankId: args.projectBankId,
   };
-  let observationScopes: string[][] | { error: string } = [];
   try {
-    observationScopes = args.config.observations.enabled
-      ? expandObservationScopes(args.config.observations.scopes, identity)
-      : [];
+    return {
+      enabled: args.config.observations.enabled,
+      scopes: args.config.observations.enabled
+        ? expandObservationScopes(args.config.observations.scopes, identity)
+        : [],
+      error: null,
+      action: null,
+    };
   } catch (error) {
-    observationScopes = { error: error instanceof Error ? error.message : String(error) };
+    return {
+      enabled: args.config.observations.enabled,
+      scopes: null,
+      error: error instanceof Error ? error.message : String(error),
+      action: "Fix observations.scopes placeholders or disable observations.enabled.",
+    };
   }
+}
+
+export function formatDebugReport(args: DebugReportArgs): string {
+  const sessionId = stableSessionId(args.sessionFile, args.cwd);
+  const tags = baseTags(args.cwd, sessionId);
+  const observationScopes = observationScopeDiagnostics(args);
   const health = args.health
     ? args.health.ok
       ? "reachable"
@@ -93,10 +111,7 @@ export function formatDebugReport(args: DebugReportArgs): string {
         projectConfigured: Boolean(args.config.banks.project.mission),
         globalConfigured: Boolean(args.config.banks.global.mission),
       },
-      observations: {
-        enabled: args.config.observations.enabled,
-        scopes: observationScopes,
-      },
+      observations: observationScopes,
       overrideProjectBankId:
         "Set PI_HINDSIGHT_PROJECT_BANK_ID or .pi/hindsight.json banks.project.bankId",
       globalBankId: args.config.banks.global.enabled
