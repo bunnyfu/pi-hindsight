@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import type { MemoryOperationsDeps } from "./memory-operations.js";
 import { createMemoryOperations } from "./memory-operations.js";
@@ -302,13 +303,18 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
     handler: async (args, ctx) => {
       const argsList = argList(args);
       const explicitFile = firstNonFlagArg(args);
-      const current = explicitFile ?? sessionFile(ctx);
+      const activeSessionFile = sessionFile(ctx);
+      const current = explicitFile ?? activeSessionFile;
       if (!current) {
         ctx.ui.notify("No session file available.", "warning");
         return;
       }
       const prune = argsList.includes("--prune");
-      if (prune && !explicitFile) {
+      if (
+        prune &&
+        (!explicitFile ||
+          (activeSessionFile && resolve(explicitFile) === resolve(activeSessionFile)))
+      ) {
         ctx.ui.notify(
           "Refusing to prune the active session file. Re-run with /hindsight:recall-cleanup <session.jsonl> --prune after the session is idle.",
           "warning",

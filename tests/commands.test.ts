@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../extensions/config.js";
@@ -110,6 +110,42 @@ describe("hindsight commands", () => {
       "Hindsight last recall 2026-04-27T00:00:00.000Z; memories=2; query=user: q",
       "info",
     );
+  });
+
+  it("refuses to prune explicit active session transcript", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-commands-"));
+    const activeSession = join(cwd, "session.jsonl");
+    const content = `${JSON.stringify({ type: "message", message: { content: "<hindsight-memory>m</hindsight-memory>" } })}\n`;
+    writeFileSync(activeSession, content);
+    const commands = new Map<string, { handler: (args: unknown, ctx: any) => Promise<void> }>();
+    registerCommands(
+      {
+        registerCommand: (
+          name: string,
+          command: { handler: (args: unknown, ctx: any) => Promise<void> },
+        ) => {
+          commands.set(name, command);
+        },
+      } as any,
+      {
+        getClient: () => client(),
+        getConfig: () => DEFAULT_CONFIG,
+        getProjectBankId: () => "bank",
+      },
+    );
+    const ctx = {
+      cwd,
+      ui: { notify: vi.fn(), setStatus: vi.fn() },
+      sessionManager: { getSessionFile: () => activeSession },
+    };
+
+    await commands.get("hindsight:recall-cleanup")?.handler([activeSession, "--prune"], ctx);
+
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining("Refusing to prune"),
+      "warning",
+    );
+    expect(readFileSync(activeSession, "utf8")).toBe(content);
   });
 
   it("reports requested and effective retain state under read-only mode", async () => {
