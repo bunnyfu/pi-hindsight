@@ -65,6 +65,8 @@ Or install the package path:
 pi install /Users/luxus/projects/pi-hindsight
 ```
 
+Published package name: `@luxus/pi-hindsight`.
+
 ## Configuration
 
 Defaults can be overridden by:
