@@ -20,6 +20,7 @@ import { createMemoryIdentity, explicitRetainTags } from "./memory-identity.js";
 import { expandObservationScopes } from "./observation-scopes.js";
 import { retainDurably } from "./retain-durable.js";
 import { readLastRecallSnapshot, resolveLastRecallPath } from "./recall-visibility.js";
+import { pruneTranscriptRecallBlocks, scanTranscriptForRecallBlocks } from "./recall-cleanup.js";
 import {
   addSessionMemoryTag,
   getEffectiveSessionMemoryMode,
@@ -282,6 +283,12 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
       const path = resolveLastRecallPath(cwd, config.recall.lastRecallPath);
       const snapshot = await readLastRecallSnapshot(cwd, config.recall.lastRecallPath);
       return { path, snapshot };
+    },
+
+    async recallCleanup(sessionFile: string, prune: boolean) {
+      return prune
+        ? pruneTranscriptRecallBlocks(sessionFile)
+        : scanTranscriptForRecallBlocks(sessionFile);
     },
 
     async flush(cwd: string) {

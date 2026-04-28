@@ -296,6 +296,36 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
     },
   });
 
+  pi.registerCommand("hindsight:recall-cleanup", {
+    description:
+      "Scan or prune accidentally persisted Hindsight recall blocks from the current session transcript.",
+    handler: async (args, ctx) => {
+      const argsList = argList(args);
+      const explicitFile = firstNonFlagArg(args);
+      const current = explicitFile ?? sessionFile(ctx);
+      if (!current) {
+        ctx.ui.notify("No session file available.", "warning");
+        return;
+      }
+      const prune = argsList.includes("--prune");
+      if (prune && !explicitFile) {
+        ctx.ui.notify(
+          "Refusing to prune the active session file. Re-run with /hindsight:recall-cleanup <session.jsonl> --prune after the session is idle.",
+          "warning",
+        );
+        return;
+      }
+      const result = await operations.recallCleanup(current, prune);
+      const message = prune
+        ? (() => {
+            const pruneResult = result as unknown as { pruned: number; backupPath: string };
+            return `Hindsight recall cleanup pruned ${pruneResult.pruned} transcript line${pruneResult.pruned === 1 ? "" : "s"}; backup ${pruneResult.backupPath}`;
+          })()
+        : `Hindsight recall cleanup found ${result.matchingLines.length} persisted recall line${result.matchingLines.length === 1 ? "" : "s"} in ${result.sessionFile}: ${result.matchingLines.slice(0, 10).join(", ") || "none"}`;
+      ctx.ui.notify(message, result.hasMatches ? "warning" : "info");
+    },
+  });
+
   pi.registerCommand("hindsight:flush", {
     description: "Flush queued retain jobs.",
     handler: async (_args, ctx) => {
