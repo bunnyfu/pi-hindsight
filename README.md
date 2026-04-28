@@ -243,11 +243,15 @@ export HINDSIGHT_BASE_URL=http://localhost:8888
 npm run smoke:hindsight
 ```
 
-The smoke test creates a temporary bank, retains a unique marker with `updateMode: "append"`, recalls it, and runs `reflect`. It uses the configured Hindsight server; it does not start a server and it prints step markers (`bank_ok`, `retain_ok`, `recall_ok`, `reflect_ok`) so failures identify the broken integration stage. For release verification, run:
+The smoke test creates a temporary bank, retains a unique marker with `updateMode: "append"`, recalls it, and runs `reflect`. It uses the configured Hindsight server; it does not start a server and it prints step markers (`bank_ok`, `retain_ok`, `recall_ok`, `reflect_ok`) so failures identify the broken integration stage. For release verification with a configured Hindsight server, run:
 
 ```bash
+export HINDSIGHT_BASE_URL=http://localhost:8888
+# export HINDSIGHT_API_KEY=... # if needed
 npm run check:release
 ```
+
+`check:release` runs the normal check suite, the `tsc` fallback typecheck, and the live smoke test. If no live server is available, run `npm run check` and `npm run typecheck:tsc`, then use the manual GitHub Actions `smoke-configured-server` job when credentials are available.
 
 GitHub Actions runs normal checks on PRs/pushes. The live Hindsight smoke job is manual (`workflow_dispatch`) and requires repository secrets:
 
@@ -281,7 +285,15 @@ That runs formatting (`oxfmt`), linting (`oxlint` with type-aware checks), `tsgo
 npm run changelog
 ```
 
-The `version` script also regenerates and stages `CHANGELOG.md` during `npm version`.
+The `version` script also regenerates and stages `CHANGELOG.md` during `npm version`. Do not hand-edit generated release entries as the source of truth; make Conventional Commits and regenerate the changelog before release.
+
+Before publishing or tagging a release:
+
+1. Ensure `main` is synced.
+2. Run `npm run check` and `npm run typecheck:tsc`.
+3. Run `npm run smoke:hindsight` or the manual `smoke-configured-server` workflow when a configured server is available.
+4. Run `npm run changelog` after final Conventional Commits.
+5. Use `npm version <patch|minor|major>` so the version script stages the regenerated changelog.
 
 Useful targeted checks:
 
