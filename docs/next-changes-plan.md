@@ -2161,12 +2161,13 @@ Completed in follow-up PRs:
 7. Setup deployment guidance and API key SecretRef support.
 8. Doctor/smoke diagnostics polish.
 
-In progress:
+Completed later:
 
-- Recall cleanup command for scanning/pruning accidentally persisted `<hindsight-memory>` transcript blocks.
+9. Recall cleanup command for scanning/pruning accidentally persisted `<hindsight-memory>` transcript blocks.
+10. Upstream Hindsight issue for single `retain()` observation-scope support: https://github.com/vectorize-io/hindsight/issues/1290
+11. Release verification documentation polish.
 
 Remaining candidates:
 
-1. Optional upstream Hindsight issue for single `retain()` observation-scope support.
-2. Optional transcript-persisted recall visibility only if Pi serialization/retain filtering is proven safe. Keep sidecar-only default indefinitely unless this is proven.
-3. Release readiness polish: changelog/version prep, package metadata review, and live configured-server smoke run when credentials are available.
+1. Optional transcript-persisted recall visibility only if Pi serialization/retain filtering is proven safe. Keep sidecar-only default indefinitely unless this is proven.
+2. Release execution: changelog/version prep and live configured-server smoke run when credentials are available.
