@@ -154,7 +154,7 @@ npm run format
 
 ### PR 11: Global codebase review loop
 
-**Status:** next.
+**Status:** completed.
 
 **Purpose:** Review the whole extension after MVP hardening and before more feature work.
 
@@ -180,6 +180,12 @@ npm run format
 - Findings are recorded in an issue or review document.
 - Every accepted finding has either a fix, test, doc update, or explicit no-action decision.
 - The loop stops only when remaining findings are deferred/non-blocking.
+
+**Completed outcome:**
+
+- Review findings were handled through PRs #41-#54.
+- Final blocker recheck returned LGTM.
+- Remaining reference-only ideas without blockers stay deferred until a new design discussion.
 
 **Checks:**
 
