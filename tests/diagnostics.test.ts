@@ -50,6 +50,17 @@ describe("diagnostics", () => {
     expect(report.projectBankId).toBe("bank");
     expect(report.health).toBe("reachable");
     expect(report.queueLength).toBe(2);
+    expect(report.queue).toEqual({
+      path: DEFAULT_CONFIG.retain.queuePath,
+      active: 2,
+      malformedLines: 0,
+      error: null,
+      deadLetterPath: null,
+      deadLetter: 0,
+      deadLetterMalformedLines: 0,
+      deadLetterError: null,
+      action: null,
+    });
     expect(report.capabilities).toMatchObject({
       appendUpdateMode: "not checked",
       appendFallback: "error",
@@ -146,5 +157,74 @@ describe("diagnostics", () => {
       probeDocumentId: "pi-hindsight-capability:append:bank",
       action: "Upgrade Hindsight or set retain.appendFallback to per-turn-documents.",
     });
+  });
+
+  it("formats queue remediation when malformed lines or dead letters exist", () => {
+    const report = JSON.parse(
+      formatDebugReport({
+        cwd: process.cwd(),
+        projectBankId: "bank",
+        config: DEFAULT_CONFIG,
+        queueLength: 1,
+        queuePath: "/tmp/q.jsonl",
+        queueMalformedLines: 2,
+        deadLetterPath: "/tmp/q.jsonl.dead.jsonl",
+        deadLetterLength: 3,
+        deadLetterMalformedLines: 1,
+      }),
+    ) as Record<string, any>;
+
+    expect(report.queue).toMatchObject({
+      path: "/tmp/q.jsonl",
+      active: 1,
+      malformedLines: 2,
+      deadLetterPath: "/tmp/q.jsonl.dead.jsonl",
+      deadLetter: 3,
+      deadLetterMalformedLines: 1,
+    });
+    expect(report.queue.action).toContain("Inspect queue files");
+    expect(report.queue.action).toContain("/hindsight:flush");
+  });
+
+  it("formats queue remediation when queue files cannot be read", () => {
+    const report = JSON.parse(
+      formatDebugReport({
+        cwd: process.cwd(),
+        projectBankId: "bank",
+        config: DEFAULT_CONFIG,
+        queueLength: 0,
+        queuePath: "/tmp/q.jsonl",
+        queueReadError: "EACCES: permission denied",
+        deadLetterPath: "/tmp/q.jsonl.dead.jsonl",
+        deadLetterLength: 0,
+        deadLetterReadError: "ENOTDIR: not a directory",
+      }),
+    ) as Record<string, any>;
+
+    expect(report.queue).toMatchObject({
+      path: "/tmp/q.jsonl",
+      active: 0,
+      error: "EACCES: permission denied",
+      deadLetterPath: "/tmp/q.jsonl.dead.jsonl",
+      deadLetter: 0,
+      deadLetterError: "ENOTDIR: not a directory",
+    });
+    expect(report.queue.action).toContain("Inspect queue files");
+  });
+
+  it("formats queue remediation when only dead-letter malformed lines exist", () => {
+    const report = JSON.parse(
+      formatDebugReport({
+        cwd: process.cwd(),
+        projectBankId: "bank",
+        config: DEFAULT_CONFIG,
+        queueLength: 0,
+        deadLetterLength: 0,
+        deadLetterMalformedLines: 1,
+      }),
+    ) as Record<string, any>;
+
+    expect(report.queue.deadLetterMalformedLines).toBe(1);
+    expect(report.queue.action).toContain("Inspect queue files");
   });
 });

@@ -48,6 +48,40 @@ function importOptions(args: unknown): {
   };
 }
 
+function importDocumentSummary(result: { documents: { updateMode: string; status: string }[] }) {
+  const modes = [...new Set(result.documents.map((document) => document.updateMode))].join(",");
+  const statuses = [...new Set(result.documents.map((document) => document.status))].join(",");
+  return `documents=${result.documents.length}; update=${modes || "n/a"}; status=${statuses || "n/a"}`;
+}
+
+function queueIssueSummary(queue?: {
+  active?: { error?: string | null; malformed?: number };
+  deadLetter?: { error?: string | null; valid?: number; malformed?: number };
+}): string {
+  if (!queue) return "";
+  const issues = [
+    queue.active?.error ? `queue unreadable: ${queue.active.error}` : "",
+    queue.deadLetter?.error ? `dead-letter unreadable: ${queue.deadLetter.error}` : "",
+    queue.active?.malformed ? `queue malformed=${queue.active.malformed}` : "",
+    queue.deadLetter?.valid ? `dead-letter=${queue.deadLetter.valid}` : "",
+    queue.deadLetter?.malformed ? `dead-letter malformed=${queue.deadLetter.malformed}` : "",
+  ].filter(Boolean);
+  return issues.length ? `; ${issues.join("; ")}` : "";
+}
+
+function hasQueueIssue(queue?: {
+  active?: { error?: string | null; malformed?: number };
+  deadLetter?: { error?: string | null; valid?: number; malformed?: number };
+}): boolean {
+  return Boolean(
+    queue?.active?.error ||
+    queue?.deadLetter?.error ||
+    queue?.active?.malformed ||
+    queue?.deadLetter?.valid ||
+    queue?.deadLetter?.malformed,
+  );
+}
+
 export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
   const operations = createMemoryOperations(deps);
 
@@ -63,9 +97,10 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
           ? "project+global"
           : "project-only"
         : "global-only";
+      const queueIssue = queueIssueSummary(status.queue);
       ctx.ui.notify(
-        `Hindsight ${status.config.enabled ? "on" : "off"}; profile ${profile}; bank ${bank}; queue ${status.queueLength}; imports ${status.imports.count}`,
-        "info",
+        `Hindsight ${status.config.enabled ? "on" : "off"}; profile ${profile}; bank ${bank}; queue ${status.queueLength}; imports ${status.imports.count}${queueIssue}`,
+        hasQueueIssue(status.queue) ? "warning" : "info",
       );
     },
   });
@@ -82,11 +117,13 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
       const observation = doctor.observations.error
         ? `; observations invalid: ${doctor.observations.error}`
         : "";
+      const queueIssue = queueIssueSummary(doctor.queue);
       ctx.ui.notify(
-        `Hindsight ${doctor.health.ok ? "reachable" : `unreachable: ${doctor.health.error}`}; ${append}; queue ${doctor.queueLength}; imports ${doctor.imports.count}${observation}`,
+        `Hindsight ${doctor.health.ok ? "reachable" : `unreachable: ${doctor.health.error}`}; ${append}; queue ${doctor.queueLength}; imports ${doctor.imports.count}${observation}${queueIssue}`,
         doctor.health.ok &&
           doctor.capabilities?.appendUpdateMode !== false &&
-          !doctor.observations.error
+          !doctor.observations.error &&
+          !hasQueueIssue(doctor.queue)
           ? "info"
           : "warning",
       );
@@ -143,8 +180,8 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
       });
       ctx.ui.notify(
         result.dryRun
-          ? `Import preview: ${result.messageCount} messages across ${result.documents.length} document${result.documents.length === 1 ? "" : "s"}; first ${result.documentId}; manifest unchanged ${result.manifestPath}`
-          : `Imported ${result.messageCount} messages as ${result.documentId}; manifest ${result.manifestPath}`,
+          ? `Import preview: messages=${result.messageCount}; ${importDocumentSummary(result)}; write=no; checkpoint=${result.checkpointPath}; manifest unchanged=${result.manifestPath}`
+          : `Imported messages=${result.messageCount}; ${importDocumentSummary(result)}; first=${result.documentId}; manifest=${result.manifestPath}`,
         "info",
       );
     },
@@ -164,8 +201,8 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
       });
       ctx.ui.notify(
         result.dryRun
-          ? `Import preview: current session ${result.messageCount} messages across ${result.documents.length} document${result.documents.length === 1 ? "" : "s"}`
-          : `Imported current session ${result.messageCount} messages as ${result.documentId}`,
+          ? `Import preview: current session; messages=${result.messageCount}; ${importDocumentSummary(result)}; write=no; checkpoint=${result.checkpointPath}; manifest unchanged=${result.manifestPath}`
+          : `Imported current session; messages=${result.messageCount}; ${importDocumentSummary(result)}; first=${result.documentId}`,
         "info",
       );
     },
@@ -182,8 +219,8 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
       const result = await operations.importSession({ sessionFile: file, ...importOptions(args) });
       ctx.ui.notify(
         result.dryRun
-          ? `Import preview: ${result.messageCount} messages from ${file} across ${result.documents.length} document${result.documents.length === 1 ? "" : "s"}`
-          : `Imported ${result.messageCount} messages from ${file} as ${result.documentId}`,
+          ? `Import preview: file=${file}; messages=${result.messageCount}; ${importDocumentSummary(result)}; write=no; checkpoint=${result.checkpointPath}; manifest unchanged=${result.manifestPath}`
+          : `Imported file=${file}; messages=${result.messageCount}; ${importDocumentSummary(result)}; first=${result.documentId}`,
         "info",
       );
     },
@@ -200,8 +237,8 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
       });
       ctx.ui.notify(
         result.dryRun
-          ? `Project import preview: ${result.documentCount} documents from ${result.sessionFiles.length}/${result.scanned} scoped sessions; ${result.messageCount} messages`
-          : `Imported ${result.documentCount} documents from ${result.sessionFiles.length}/${result.scanned} scoped sessions; ${result.messageCount} messages`,
+          ? `Project import preview: sessions=${result.sessionFiles.length}/${result.scanned}; documents=${result.documentCount}; messages=${result.messageCount}; write=no`
+          : `Imported project sessions: sessions=${result.sessionFiles.length}/${result.scanned}; documents=${result.documentCount}; messages=${result.messageCount}`,
         "info",
       );
     },

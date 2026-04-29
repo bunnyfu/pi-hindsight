@@ -16,6 +16,13 @@ export interface DebugReportArgs {
   projectBankId: string;
   config: ResolvedConfig;
   queueLength: number;
+  queuePath?: string;
+  queueMalformedLines?: number;
+  queueReadError?: string | null;
+  deadLetterPath?: string;
+  deadLetterLength?: number;
+  deadLetterMalformedLines?: number;
+  deadLetterReadError?: string | null;
   importManifestPath?: string;
   importCount?: number;
   latestImport?: ImportManifestEntry;
@@ -129,6 +136,24 @@ export function formatDebugReport(args: DebugReportArgs): string {
       tags,
       queuePath: args.config.retain.queuePath,
       queueLength: args.queueLength,
+      queue: {
+        path: args.queuePath ?? args.config.retain.queuePath,
+        active: args.queueLength,
+        malformedLines: args.queueMalformedLines ?? 0,
+        error: args.queueReadError ?? null,
+        deadLetterPath: args.deadLetterPath ?? null,
+        deadLetter: args.deadLetterLength ?? 0,
+        deadLetterMalformedLines: args.deadLetterMalformedLines ?? 0,
+        deadLetterError: args.deadLetterReadError ?? null,
+        action:
+          args.queueReadError ||
+          args.deadLetterReadError ||
+          (args.queueMalformedLines ?? 0) > 0 ||
+          (args.deadLetterMalformedLines ?? 0) > 0 ||
+          (args.deadLetterLength ?? 0) > 0
+            ? "Inspect queue files, fix malformed JSONL offline if needed, then run /hindsight:flush after Hindsight is reachable."
+            : null,
+      },
       capabilities: args.capabilities
         ? {
             appendUpdateMode: args.capabilities.appendUpdateMode ? "supported" : "unsupported",
