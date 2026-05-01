@@ -4,21 +4,15 @@ import type { HindsightLikeClient, ResolvedConfig } from "./types.js";
 import { importDocumentId } from "./session.js";
 import { parseImportSessionJsonl, parsePiSessionJsonl } from "./import-parser.js";
 import { selectImportBranches } from "./import-branches.js";
-import {
-  createImportCheckpoint,
-  readImportCheckpointSafe,
-  writeImportCheckpoint,
-  type ImportCheckpoint,
-} from "./import-checkpoint.js";
-import { hashImportContent, upsertImportManifestEntries } from "./import-manifest.js";
-import { previewImportBranch, retainImportBranch } from "./import-retain.js";
-import { redactError } from "./sanitize.js";
+import { hashImportContent } from "./import-manifest.js";
 import { buildImportPlan } from "./import-plan.js";
+import { executeImportPlan, type ImportSessionDocumentResult } from "./import-execution.js";
 
 export { parseImportSessionJsonl, parsePiSessionJsonl } from "./import-parser.js";
 export { selectImportBranches } from "./import-branches.js";
 export type { ImportBranch } from "./import-branches.js";
 export type { ParsedMessage, ParsedSession } from "./import-parser.js";
+export type { ImportSessionDocumentResult } from "./import-execution.js";
 
 function sameProjectCwd(sessionCwd: string | undefined, cwd: string): boolean {
   if (!sessionCwd) return false;
@@ -79,20 +73,6 @@ export interface ImportProjectSessionsResult {
   malformedLineCount: number;
 }
 
-export interface ImportSessionDocumentResult {
-  documentId: string;
-  leafId: string;
-  messageCount: number;
-  contentHash: string;
-  contentBytes: number;
-  tags: string[];
-  updateMode: "append" | "replace";
-  bankId: string;
-  wouldWrite: boolean;
-  status: "pending" | "completed" | "failed" | "skipped";
-  error?: string;
-}
-
 export interface ImportSessionResult {
   sessionFile: string;
   documentId: string;
@@ -125,151 +105,27 @@ export async function importPiSession(args: {
     ...(args.cwd ? { cwd: args.cwd } : {}),
     ...(args.includeBranches ? { includeBranches: args.includeBranches } : {}),
   });
-  const {
-    cwd,
-    sessionId,
-    leaves,
-    includeBranches,
-    branches,
-    manifestPath,
-    checkpointPath,
-    updateMode,
-    runId,
-    importConfig,
-  } = plan;
-  const now = new Date().toISOString();
-  const existingCheckpoint = args.config.import.resume
-    ? (await readImportCheckpointSafe(checkpointPath)).checkpoint
-    : undefined;
-  let checkpoint: ImportCheckpoint =
-    existingCheckpoint?.runId === runId
-      ? existingCheckpoint
-      : createImportCheckpoint({
-          runId,
-          sourceFile: args.sessionFile,
-          bankId: args.bankId,
-          sessionId,
-          cwd,
-          includeBranches,
-          updateMode,
-          now,
-        });
-  checkpoint = { ...checkpoint, updatedAt: now };
+  const execution = await executeImportPlan({
+    client: args.client,
+    parsed,
+    plan,
+    ...(args.dryRun !== undefined ? { dryRun: args.dryRun } : {}),
+  });
 
-  const results = [];
-  for (const branch of branches) {
-    const common = {
-      sessionFile: args.sessionFile,
-      bankId: args.bankId,
-      config: importConfig,
-      parsed,
-      cwd,
-      sessionId,
-      leaves,
-      branch,
-    };
-    const preview = previewImportBranch(common);
-    const previous = checkpoint.documents[preview.document.documentId];
-    const canSkip =
-      !args.dryRun &&
-      args.config.import.resume &&
-      previous?.status === "completed" &&
-      previous.contentHash === preview.document.contentHash;
-    if (args.dryRun || canSkip) {
-      results.push({
-        ...preview,
-        document: {
-          ...preview.document,
-          wouldWrite: false,
-          status: canSkip ? ("skipped" as const) : preview.document.status,
-        },
-      });
-      continue;
-    }
-
-    checkpoint.documents[preview.document.documentId] = {
-      documentId: preview.document.documentId,
-      leafId: preview.document.leafId,
-      contentHash: preview.document.contentHash,
-      messageCount: preview.document.messageCount,
-      status: "pending",
-      updatedAt: new Date().toISOString(),
-    };
-    await writeImportCheckpoint(checkpointPath, checkpoint);
-
-    try {
-      const retained = await retainImportBranch({ ...common, client: args.client });
-      const completedAt = new Date().toISOString();
-      checkpoint.documents[retained.document.documentId] = {
-        documentId: retained.document.documentId,
-        leafId: retained.document.leafId,
-        contentHash: retained.document.contentHash,
-        messageCount: retained.document.messageCount,
-        status: "completed",
-        updatedAt: completedAt,
-      };
-      checkpoint.updatedAt = completedAt;
-      await writeImportCheckpoint(checkpointPath, checkpoint);
-      results.push({
-        ...retained,
-        document: { ...retained.document, status: "completed" as const },
-      });
-    } catch (error) {
-      const failedAt = new Date().toISOString();
-      const message = redactError(error);
-      checkpoint.documents[preview.document.documentId] = {
-        documentId: preview.document.documentId,
-        leafId: preview.document.leafId,
-        contentHash: preview.document.contentHash,
-        messageCount: preview.document.messageCount,
-        status: "failed",
-        updatedAt: failedAt,
-        error: message,
-      };
-      checkpoint.updatedAt = failedAt;
-      await writeImportCheckpoint(checkpointPath, checkpoint);
-      results.push({
-        ...preview,
-        document: { ...preview.document, status: "failed" as const, error: message },
-      });
-      throw error;
-    }
-  }
-
-  const documents = results.map((result) => result.document);
-  const completedResults = results.filter(
-    (result) => result.document.status === "completed" || result.document.status === "skipped",
-  );
-  if (!args.dryRun && completedResults.length > 0) {
-    await upsertImportManifestEntries(
-      manifestPath,
-      completedResults.map((result) => result.manifestEntry),
-    );
-  }
-
-  const first = documents[0] ?? {
-    documentId: importDocumentId(sessionId, "root"),
-    leafId: "root",
-    messageCount: 0,
-    contentHash: "",
-    contentBytes: 0,
-    tags: [],
-    updateMode: args.config.import.replaceExistingImportedDocs ? "replace" : "append",
-    bankId: args.bankId,
-    wouldWrite: !args.dryRun,
-    status: "pending" as const,
+  const first = execution.documents[0] ?? {
+    documentId: importDocumentId(plan.sessionId, "root"),
   };
   return {
     sessionFile: args.sessionFile,
     documentId: first.documentId,
-    messageCount: documents.reduce((count, document) => count + document.messageCount, 0),
-    retained: !args.dryRun,
+    messageCount: execution.messageCount,
+    retained: execution.retained,
     dryRun: Boolean(args.dryRun),
-    manifestPath,
-    checkpointPath,
-    runId,
+    manifestPath: plan.manifestPath,
+    checkpointPath: plan.checkpointPath,
+    runId: plan.runId,
     malformedLineCount: parsed.malformedLineCount,
-    documents,
+    documents: execution.documents,
   };
 }
 

@@ -7,6 +7,8 @@ import { importRunId, resolveImportCheckpointPath } from "./import-checkpoint.js
 import { stableSessionId } from "./session.js";
 
 export interface ImportPlan {
+  sessionFile: string;
+  bankId: string;
   cwd: string;
   sessionId: string;
   leaves: string[];
@@ -48,6 +50,8 @@ export function buildImportPlan(args: {
     updateMode,
   });
   return {
+    sessionFile: args.sessionFile,
+    bankId: args.bankId,
     cwd,
     sessionId,
     leaves,
