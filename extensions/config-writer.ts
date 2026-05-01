@@ -4,40 +4,14 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { validEnvVarName } from "./config.js";
+import { resetPathsForConfigKeys, type ConfigResetKey } from "./config-field-paths.js";
 
 export type MemoryProfile = "project-only" | "project+global" | "global-only";
 
 export type ConfigScope = "project" | "global";
 
 export type ConfigSource = ConfigScope | "env" | "default";
-
-export type ConfigResetKey =
-  | "enabled"
-  | "hindsight.baseUrl"
-  | "hindsight.timeoutMs"
-  | "hindsight.apiKey"
-  | "banks.profile"
-  | "banks.project.bankId"
-  | "banks.global.enabled"
-  | "banks.global.bankId"
-  | "recall.enabled"
-  | "recall.budget"
-  | "recall.maxTokens"
-  | "retain.enabled"
-  | "retain.async"
-  | "retain.queuePath"
-  | "import.includeBranches"
-  | "import.manifestPath"
-  | "import.checkpointPath"
-  | "import.replaceExistingImportedDocs"
-  | "import.resume"
-  | "status.style"
-  | "status.detail"
-  | "status.maxLength"
-  | "status.showActivity"
-  | "notifications.startup"
-  | "notifications.recall"
-  | "notifications.retain";
+export type { ConfigResetKey } from "./config-field-paths.js";
 
 export const DEFAULT_GLOBAL_BANK_ID = "pi-global";
 
@@ -111,46 +85,8 @@ export interface ProjectConfigPatchInput {
   scope?: ConfigScope;
 }
 
-const RESET_PATHS: Record<ConfigResetKey, string[][]> = {
-  enabled: [["enabled"]],
-  "hindsight.baseUrl": [["hindsight", "baseUrl"]],
-  "hindsight.timeoutMs": [["hindsight", "timeoutMs"]],
-  "hindsight.apiKey": [
-    ["hindsight", "apiKey"],
-    ["hindsight", "apiKeyRef"],
-  ],
-  "banks.profile": [
-    ["banks", "project", "enabled"],
-    ["banks", "global", "enabled"],
-  ],
-  "banks.project.bankId": [
-    ["banks", "project", "bankId"],
-    ["banks", "project", "derive"],
-  ],
-  "banks.global.enabled": [["banks", "global", "enabled"]],
-  "banks.global.bankId": [["banks", "global", "bankId"]],
-  "recall.enabled": [["recall", "enabled"]],
-  "recall.budget": [["recall", "budget"]],
-  "recall.maxTokens": [["recall", "maxTokens"]],
-  "retain.enabled": [["retain", "enabled"]],
-  "retain.async": [["retain", "async"]],
-  "retain.queuePath": [["retain", "queuePath"]],
-  "import.includeBranches": [["import", "includeBranches"]],
-  "import.manifestPath": [["import", "manifestPath"]],
-  "import.checkpointPath": [["import", "checkpointPath"]],
-  "import.replaceExistingImportedDocs": [["import", "replaceExistingImportedDocs"]],
-  "import.resume": [["import", "resume"]],
-  "status.style": [["status", "style"]],
-  "status.detail": [["status", "detail"]],
-  "status.maxLength": [["status", "maxLength"]],
-  "status.showActivity": [["status", "showActivity"]],
-  "notifications.startup": [["notifications", "startup"]],
-  "notifications.recall": [["notifications", "recall"]],
-  "notifications.retain": [["notifications", "retain"]],
-};
-
 export function buildProjectConfigDeletes(input: ProjectConfigPatchInput): string[][] {
-  return (input.resetDefaults ?? []).flatMap((key) => RESET_PATHS[key]);
+  return resetPathsForConfigKeys(input.resetDefaults ?? []);
 }
 
 export function buildProjectConfigPatch(input: ProjectConfigPatchInput): Record<string, unknown> {

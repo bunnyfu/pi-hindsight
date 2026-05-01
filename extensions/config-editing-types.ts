@@ -1,32 +1,6 @@
-import type { ConfigResetKey, ConfigScope, ConfigSource } from "./config-writer.js";
-
-export type FieldId =
-  | "enabled"
-  | "baseUrl"
-  | "apiKeyEnv"
-  | "timeoutMs"
-  | "memoryProfile"
-  | "projectBankId"
-  | "globalBankEnabled"
-  | "globalBankId"
-  | "recallEnabled"
-  | "recallBudget"
-  | "recallMaxTokens"
-  | "retainEnabled"
-  | "retainAsync"
-  | "queuePath"
-  | "importBranches"
-  | "importManifest"
-  | "importCheckpoint"
-  | "importReplaceExisting"
-  | "importResume"
-  | "statusStyle"
-  | "statusDetail"
-  | "statusMaxLength"
-  | "statusActivity"
-  | "notifyStartup"
-  | "notifyRecall"
-  | "notifyRetain";
+import type { FieldId, ConfigResetKey } from "./config-field-paths.js";
+import type { ConfigScope, ConfigSource } from "./config-writer.js";
+export type { FieldId } from "./config-field-paths.js";
 
 export type TabId = "Status" | "Connection" | "Banks" | "Recall" | "Retain" | "Import" | "UI";
 

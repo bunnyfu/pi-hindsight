@@ -2,6 +2,7 @@ import { DEFAULT_CONFIG } from "./config.js";
 import type { ResolvedConfig } from "./types.js";
 import type { ConfigScope, MemoryProfile } from "./config-writer.js";
 import type { ConfigEditingField, FieldId } from "./config-editing-types.js";
+export { CONFIG_FIELD_PATHS } from "./config-field-paths.js";
 
 function memoryProfileLabel(config: ResolvedConfig): MemoryProfile {
   if (!config.banks.project.enabled) return "global-only";
@@ -362,35 +363,6 @@ export function buildBaseConfigEditingFields(
   ];
   return fields;
 }
-
-export const CONFIG_FIELD_PATHS: Record<FieldId, string[]> = {
-  enabled: ["enabled"],
-  baseUrl: ["hindsight", "baseUrl"],
-  apiKeyEnv: ["hindsight", "apiKey"],
-  timeoutMs: ["hindsight", "timeoutMs"],
-  memoryProfile: ["banks", "project", "enabled"],
-  projectBankId: ["banks", "project", "bankId"],
-  globalBankEnabled: ["banks", "global", "enabled"],
-  globalBankId: ["banks", "global", "bankId"],
-  recallEnabled: ["recall", "enabled"],
-  recallBudget: ["recall", "budget"],
-  recallMaxTokens: ["recall", "maxTokens"],
-  retainEnabled: ["retain", "enabled"],
-  retainAsync: ["retain", "async"],
-  queuePath: ["retain", "queuePath"],
-  importBranches: ["import", "includeBranches"],
-  importManifest: ["import", "manifestPath"],
-  importCheckpoint: ["import", "checkpointPath"],
-  importReplaceExisting: ["import", "replaceExistingImportedDocs"],
-  importResume: ["import", "resume"],
-  statusStyle: ["status", "style"],
-  statusDetail: ["status", "detail"],
-  statusMaxLength: ["status", "maxLength"],
-  statusActivity: ["status", "showActivity"],
-  notifyStartup: ["notifications", "startup"],
-  notifyRecall: ["notifications", "recall"],
-  notifyRetain: ["notifications", "retain"],
-};
 
 export const PROJECT_ONLY_FIELD_IDS = new Set<FieldId>([
   "projectBankId",

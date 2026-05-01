@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "../extensions/config.js";
+import { CONFIG_FIELD_PATHS, CONFIG_RESET_PATHS } from "../extensions/config-field-paths.js";
 import { buildConfigEditingFields, type ConfigLayers } from "../extensions/config-editing-model.js";
 
 describe("config editing model", () => {
@@ -66,6 +67,15 @@ describe("config editing model", () => {
       choices: ["project-only", "project+global", "global-only"],
     });
     expect(queuePath).toMatchObject({ kind: "text" });
+  });
+
+  it("keeps every field backed by path and reset metadata", () => {
+    const fields = buildConfigEditingFields(DEFAULT_CONFIG, "bank", layers());
+
+    for (const field of fields) {
+      expect(CONFIG_FIELD_PATHS).toHaveProperty(field.id);
+      expect(CONFIG_RESET_PATHS).toHaveProperty(field.resetKey);
+    }
   });
 
   it("reports source precedence and layer values", () => {
