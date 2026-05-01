@@ -8,9 +8,8 @@ import { recallForContext } from "./recall.js";
 import { enqueueRetainFromAgentEnd } from "./retain.js";
 import { detectAppendCapability } from "./capabilities.js";
 import { flushRetainQueue, resolveQueuePath } from "./queue.js";
-import { getSessionFile, stableSessionId } from "./session.js";
+import { stableSessionId } from "./session.js";
 import { bankSelectionMessage } from "./diagnostics.js";
-import { formatHindsightStatus, type HindsightActivity } from "./status.js";
 import { projectMessages } from "./messages.js";
 import { selectMemoryScopes } from "./memory-scope.js";
 import {
@@ -26,24 +25,15 @@ import {
 } from "./session-memory-meta.js";
 import { writeLastRecallSnapshot } from "./recall-visibility.js";
 import { redactError } from "./sanitize.js";
-
-export type RuntimeCtx = {
-  cwd: string;
-  ui: {
-    setStatus(key: string, text: string | undefined): void;
-    notify(message: string, level?: string): void;
-  };
-  sessionManager?: { getSessionFile?: () => string | undefined };
-};
-
-type RuntimeSnapshot = {
-  cwd: string;
-  ui: RuntimeCtx["ui"];
-  sessionFile?: string;
-};
-
-type ContextEvent = { messages: AgentMessage[] };
-type ContextPatch = { messages: AgentMessage[] };
+import {
+  notify,
+  setMemoryStatus as setRuntimeMemoryStatus,
+  snapshotRuntime,
+  type ContextEvent,
+  type ContextPatch,
+  type RuntimeCtx,
+  type RuntimeSnapshot,
+} from "./memory-lifecycle-runtime.js";
 
 export interface MemoryLifecycleDeps {
   getClient(): HindsightLikeClient;
@@ -62,17 +52,6 @@ export interface MemoryLifecycle {
     ctx: RuntimeCtx,
   ): Promise<{ queued: boolean; sent: number; remaining: number }>;
   shutdown(ctx: RuntimeCtx): Promise<void>;
-}
-
-function snapshotRuntime(ctx: RuntimeCtx): RuntimeSnapshot | undefined {
-  try {
-    const cwd = ctx.cwd;
-    const ui = ctx.ui;
-    const sessionFile = getSessionFile(ctx);
-    return { cwd, ui, ...(sessionFile ? { sessionFile } : {}) };
-  } catch {
-    return undefined;
-  }
 }
 
 export function createMemoryLifecycle(initialCwd: string = process.cwd()): MemoryLifecycle {
@@ -119,34 +98,19 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
   };
 
   const setMemoryStatus = (
-    ctx: RuntimeSnapshot,
-    activity: HindsightActivity,
+    runtime: RuntimeSnapshot,
+    activity: Parameters<typeof setRuntimeMemoryStatus>[0]["activity"],
     memoryCount?: number,
     queueRemaining?: number,
-  ) => {
-    try {
-      ctx.ui.setStatus(
-        "hindsight",
-        formatHindsightStatus(config, {
-          projectBankId,
-          cwd: ctx.cwd,
-          activity,
-          ...(memoryCount !== undefined ? { memoryCount } : {}),
-          ...(queueRemaining !== undefined ? { queueRemaining } : {}),
-        }),
-      );
-    } catch {
-      // Session ctx can go stale during replacement/reload; status is best effort.
-    }
-  };
-
-  const notify = (ctx: RuntimeSnapshot, message: string, level: string) => {
-    try {
-      ctx.ui.notify(message, level);
-    } catch {
-      // Session ctx can go stale during replacement/reload; notifications are best effort.
-    }
-  };
+  ) =>
+    setRuntimeMemoryStatus({
+      runtime,
+      config,
+      projectBankId,
+      activity,
+      ...(memoryCount !== undefined ? { memoryCount } : {}),
+      ...(queueRemaining !== undefined ? { queueRemaining } : {}),
+    });
 
   const newRetainMessages = async (
     runtime: RuntimeSnapshot,

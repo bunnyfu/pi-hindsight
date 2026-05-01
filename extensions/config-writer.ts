@@ -1,10 +1,43 @@
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { validEnvVarName } from "./config.js";
 
 export type MemoryProfile = "project-only" | "project+global" | "global-only";
+
+export type ConfigScope = "project" | "global";
+
+export type ConfigSource = ConfigScope | "env" | "default";
+
+export type ConfigResetKey =
+  | "enabled"
+  | "hindsight.baseUrl"
+  | "hindsight.timeoutMs"
+  | "hindsight.apiKey"
+  | "banks.profile"
+  | "banks.project.bankId"
+  | "banks.global.enabled"
+  | "banks.global.bankId"
+  | "recall.enabled"
+  | "recall.budget"
+  | "recall.maxTokens"
+  | "retain.enabled"
+  | "retain.async"
+  | "retain.queuePath"
+  | "import.includeBranches"
+  | "import.manifestPath"
+  | "import.checkpointPath"
+  | "import.replaceExistingImportedDocs"
+  | "import.resume"
+  | "status.style"
+  | "status.detail"
+  | "status.maxLength"
+  | "status.showActivity"
+  | "notifications.startup"
+  | "notifications.recall"
+  | "notifications.retain";
 
 export const DEFAULT_GLOBAL_BANK_ID = "pi-global";
 
@@ -16,12 +49,23 @@ export function projectConfigPath(cwd: string): string {
   return join(cwd, ".pi", "hindsight.json");
 }
 
-export function readProjectConfig(cwd: string): Record<string, unknown> {
-  const path = projectConfigPath(cwd);
+export function globalConfigPath(home = process.env.HOME || homedir()): string {
+  return join(home, ".pi", "agent", "hindsight.json");
+}
+
+function readConfig(path: string): Record<string, unknown> {
   if (!existsSync(path)) return {};
   const parsed = JSON.parse(readFileSync(path, "utf8")) as unknown;
   if (!isRecord(parsed)) throw new Error(`${path} must contain a JSON object`);
   return parsed;
+}
+
+export function readProjectConfig(cwd: string): Record<string, unknown> {
+  return readConfig(projectConfigPath(cwd));
+}
+
+export function readGlobalConfig(home?: string): Record<string, unknown> {
+  return readConfig(globalConfigPath(home));
 }
 
 export function deepMergeConfig(
@@ -53,6 +97,9 @@ export interface ProjectConfigPatchInput {
   queuePath?: string;
   importIncludeBranches?: "current-only" | "all-leaves";
   importManifestPath?: string;
+  importCheckpointPath?: string;
+  importReplaceExistingDocs?: boolean;
+  importResume?: boolean;
   statusStyle?: "off" | "text" | "emoji" | "nerdfont";
   statusDetail?: "minimal" | "project" | "activity" | "verbose";
   statusMaxLength?: number;
@@ -60,6 +107,50 @@ export interface ProjectConfigPatchInput {
   notifyStartup?: boolean;
   notifyRecall?: boolean;
   notifyRetain?: boolean;
+  resetDefaults?: ConfigResetKey[];
+  scope?: ConfigScope;
+}
+
+const RESET_PATHS: Record<ConfigResetKey, string[][]> = {
+  enabled: [["enabled"]],
+  "hindsight.baseUrl": [["hindsight", "baseUrl"]],
+  "hindsight.timeoutMs": [["hindsight", "timeoutMs"]],
+  "hindsight.apiKey": [
+    ["hindsight", "apiKey"],
+    ["hindsight", "apiKeyRef"],
+  ],
+  "banks.profile": [
+    ["banks", "project", "enabled"],
+    ["banks", "global", "enabled"],
+  ],
+  "banks.project.bankId": [
+    ["banks", "project", "bankId"],
+    ["banks", "project", "derive"],
+  ],
+  "banks.global.enabled": [["banks", "global", "enabled"]],
+  "banks.global.bankId": [["banks", "global", "bankId"]],
+  "recall.enabled": [["recall", "enabled"]],
+  "recall.budget": [["recall", "budget"]],
+  "recall.maxTokens": [["recall", "maxTokens"]],
+  "retain.enabled": [["retain", "enabled"]],
+  "retain.async": [["retain", "async"]],
+  "retain.queuePath": [["retain", "queuePath"]],
+  "import.includeBranches": [["import", "includeBranches"]],
+  "import.manifestPath": [["import", "manifestPath"]],
+  "import.checkpointPath": [["import", "checkpointPath"]],
+  "import.replaceExistingImportedDocs": [["import", "replaceExistingImportedDocs"]],
+  "import.resume": [["import", "resume"]],
+  "status.style": [["status", "style"]],
+  "status.detail": [["status", "detail"]],
+  "status.maxLength": [["status", "maxLength"]],
+  "status.showActivity": [["status", "showActivity"]],
+  "notifications.startup": [["notifications", "startup"]],
+  "notifications.recall": [["notifications", "recall"]],
+  "notifications.retain": [["notifications", "retain"]],
+};
+
+export function buildProjectConfigDeletes(input: ProjectConfigPatchInput): string[][] {
+  return (input.resetDefaults ?? []).flatMap((key) => RESET_PATHS[key]);
 }
 
 export function buildProjectConfigPatch(input: ProjectConfigPatchInput): Record<string, unknown> {
@@ -130,10 +221,21 @@ export function buildProjectConfigPatch(input: ProjectConfigPatchInput): Record<
       ...(input.queuePath ? { queuePath: input.queuePath } : {}),
     };
   }
-  if (input.importIncludeBranches || input.importManifestPath) {
+  if (
+    input.importIncludeBranches ||
+    input.importManifestPath ||
+    input.importCheckpointPath ||
+    input.importReplaceExistingDocs !== undefined ||
+    input.importResume !== undefined
+  ) {
     patch.import = {
       ...(input.importIncludeBranches ? { includeBranches: input.importIncludeBranches } : {}),
       ...(input.importManifestPath ? { manifestPath: input.importManifestPath } : {}),
+      ...(input.importCheckpointPath ? { checkpointPath: input.importCheckpointPath } : {}),
+      ...(input.importReplaceExistingDocs !== undefined
+        ? { replaceExistingImportedDocs: input.importReplaceExistingDocs }
+        : {}),
+      ...(input.importResume !== undefined ? { resume: input.importResume } : {}),
     };
   }
   if (
@@ -163,13 +265,42 @@ export function buildProjectConfigPatch(input: ProjectConfigPatchInput): Record<
   return patch;
 }
 
-export async function writeProjectConfig(
-  cwd: string,
+function deletePath(config: Record<string, unknown>, path: string[]): void {
+  const [head, ...rest] = path;
+  if (!head) return;
+  if (rest.length === 0) {
+    delete config[head];
+    return;
+  }
+  const child = config[head];
+  if (isRecord(child)) deletePath(child, rest);
+}
+
+async function writeConfig(
+  path: string,
+  base: Record<string, unknown>,
   patch: Record<string, unknown>,
+  deletePaths: string[][] = [],
 ): Promise<{ path: string; config: Record<string, unknown> }> {
-  const path = projectConfigPath(cwd);
-  const next = deepMergeConfig(readProjectConfig(cwd), patch);
+  for (const deletePathParts of deletePaths) deletePath(base, deletePathParts);
+  const next = deepMergeConfig(base, patch);
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${JSON.stringify(next, null, 2)}\n`, "utf8");
   return { path, config: next };
+}
+
+export async function writeProjectConfig(
+  cwd: string,
+  patch: Record<string, unknown>,
+  deletePaths: string[][] = [],
+): Promise<{ path: string; config: Record<string, unknown> }> {
+  return writeConfig(projectConfigPath(cwd), readProjectConfig(cwd), patch, deletePaths);
+}
+
+export async function writeGlobalConfig(
+  patch: Record<string, unknown>,
+  deletePaths: string[][] = [],
+  home?: string,
+): Promise<{ path: string; config: Record<string, unknown> }> {
+  return writeConfig(globalConfigPath(home), readGlobalConfig(home), patch, deletePaths);
 }

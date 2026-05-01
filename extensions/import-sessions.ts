@@ -1,24 +1,19 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import type { HindsightLikeClient, ResolvedConfig } from "./types.js";
-import { importDocumentId, stableSessionId } from "./session.js";
+import { importDocumentId } from "./session.js";
 import { parseImportSessionJsonl, parsePiSessionJsonl } from "./import-parser.js";
-import { leafIds, selectImportBranches } from "./import-branches.js";
+import { selectImportBranches } from "./import-branches.js";
 import {
   createImportCheckpoint,
-  importRunId,
   readImportCheckpointSafe,
-  resolveImportCheckpointPath,
   writeImportCheckpoint,
   type ImportCheckpoint,
 } from "./import-checkpoint.js";
-import {
-  hashImportContent,
-  resolveImportManifestPath,
-  upsertImportManifestEntries,
-} from "./import-manifest.js";
+import { hashImportContent, upsertImportManifestEntries } from "./import-manifest.js";
 import { previewImportBranch, retainImportBranch } from "./import-retain.js";
 import { redactError } from "./sanitize.js";
+import { buildImportPlan } from "./import-plan.js";
 
 export { parseImportSessionJsonl, parsePiSessionJsonl } from "./import-parser.js";
 export { selectImportBranches } from "./import-branches.js";
@@ -122,28 +117,26 @@ export async function importPiSession(args: {
 }): Promise<ImportSessionResult> {
   const text = await readFile(args.sessionFile, "utf8");
   const parsed = parseImportSessionJsonl(text);
-  if (args.cwd && parsed.cwd && parsed.cwd !== args.cwd) {
-    throw new Error(
-      `Refusing to import session from cwd ${parsed.cwd}; current cwd is ${args.cwd}. Use project-scoped import from the matching repo.`,
-    );
-  }
-  const cwd = args.cwd ?? parsed.cwd ?? dirname(args.sessionFile);
-  const sessionId = parsed.sessionId ?? stableSessionId(args.sessionFile, cwd);
-  const leaves = leafIds(parsed.messages);
-  const includeBranches = args.includeBranches ?? args.config.import.includeBranches;
-  const branches = selectImportBranches(parsed, includeBranches);
-  const manifestPath = resolveImportManifestPath(cwd, args.config.import.manifestPath);
-  const checkpointPath = resolveImportCheckpointPath(cwd, args.config.import.checkpointPath);
-  const updateMode = args.config.import.replaceExistingImportedDocs ? "replace" : "append";
-  const runId = importRunId({
-    sourceFile: args.sessionFile,
+  const plan = buildImportPlan({
+    sessionFile: args.sessionFile,
+    parsed,
     bankId: args.bankId,
-    sessionId,
-    includeBranches,
-    updateMode,
+    config: args.config,
+    ...(args.cwd ? { cwd: args.cwd } : {}),
+    ...(args.includeBranches ? { includeBranches: args.includeBranches } : {}),
   });
-
-  const importConfig = { ...args.config, import: { ...args.config.import, includeBranches } };
+  const {
+    cwd,
+    sessionId,
+    leaves,
+    includeBranches,
+    branches,
+    manifestPath,
+    checkpointPath,
+    updateMode,
+    runId,
+    importConfig,
+  } = plan;
   const now = new Date().toISOString();
   const existingCheckpoint = args.config.import.resume
     ? (await readImportCheckpointSafe(checkpointPath)).checkpoint

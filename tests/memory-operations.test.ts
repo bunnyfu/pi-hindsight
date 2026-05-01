@@ -55,31 +55,27 @@ describe("memory operations", () => {
     });
   });
 
-  it("checks the active global bank in global-only diagnostics", async () => {
-    const checkedBanks: string[] = [];
-    const operations = createMemoryOperations({
-      getClient: () => ({
-        ...client(),
-        getBankProfile: async (bankId: string) => {
-          checkedBanks.push(bankId);
-          return {};
-        },
-      }),
-      getConfig: () => ({
-        ...DEFAULT_CONFIG,
-        banks: {
-          project: { enabled: false, derive: "repo" },
-          global: { enabled: true, bankId: "global-bank" },
-        },
-      }),
-      getProjectBankId: () => "project-bank",
-    });
-    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-ops-"));
+  it("configures global scope without writing project config", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-ops-project-"));
+    const home = mkdtempSync(join(tmpdir(), "pi-hindsight-ops-home-"));
+    const oldHome = process.env.HOME;
+    process.env.HOME = home;
+    try {
+      const operations = createMemoryOperations({
+        getClient: () => client(),
+        getConfig: () => DEFAULT_CONFIG,
+        getProjectBankId: () => "project-bank",
+      });
 
-    await operations.doctor(cwd);
-    await operations.debug({ cwd, ui: {} as any, sessionManager: {} as any } as any);
+      await operations.configure(cwd, { scope: "global", baseUrl: "http://global" });
 
-    expect(checkedBanks).toEqual(["global-bank", "global-bank"]);
+      const written = JSON.parse(
+        readFileSync(join(home, ".pi", "agent", "hindsight.json"), "utf8"),
+      ) as Record<string, any>;
+      expect(written.hindsight.baseUrl).toBe("http://global");
+    } finally {
+      process.env.HOME = oldHome;
+    }
   });
 
   it("passes query timestamps, explicit entities, and reflect response schemas", async () => {

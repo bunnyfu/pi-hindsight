@@ -1,19 +1,9 @@
-import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 import type { HindsightCapabilities, HindsightLikeClient, ResolvedConfig } from "./types.js";
-import { checkHindsight } from "./client.js";
-import { flushRetainQueue, resolveQueuePath, summarizeRetainQueue } from "./queue.js";
-import { formatDebugReport, observationScopeDiagnostics, safeConfig } from "./diagnostics.js";
-import {
-  buildProjectConfigPatch,
-  writeProjectConfig,
-  type ProjectConfigPatchInput,
-} from "./config-writer.js";
-import { importPiSession, importProjectSessions } from "./import-sessions.js";
-import {
-  importManifestSummary,
-  readImportManifestSafe,
-  resolveImportManifestPath,
-} from "./import-manifest.js";
+import { flushRetain } from "./retain-queue.js";
+import { type ProjectConfigPatchInput } from "./config-writer.js";
+import { configureMemory, initMemoryConfig } from "./config-operations.js";
+import { importMemoryProjectSessions, importMemorySession } from "./import-operations.js";
+
 import { recallScopeTags } from "./banking.js";
 import { stableSessionId } from "./session.js";
 import { createMemoryIdentity, explicitRetainTags } from "./memory-identity.js";
@@ -22,15 +12,18 @@ import { retainDurably } from "./retain-durable.js";
 import { readLastRecallSnapshot, resolveLastRecallPath } from "./recall-visibility.js";
 import { pruneTranscriptRecallBlocks, scanTranscriptForRecallBlocks } from "./recall-cleanup.js";
 import {
-  addSessionMemoryTag,
   getEffectiveSessionMemoryMode,
   readSessionMemoryMeta,
-  removeSessionMemoryTag,
-  setNextSessionRetainMode,
-  setSessionMemoryMode,
-  setSessionRetainEnabled,
   type SessionMemoryMode,
 } from "./session-memory-meta.js";
+import {
+  addMemorySessionTag,
+  readMemorySession,
+  removeMemorySessionTag,
+  setMemorySessionMode,
+  setMemorySessionRetain,
+  setNextMemoryRetainOff,
+} from "./session-operations.js";
 
 export interface MemoryOperationsDeps {
   getClient(): HindsightLikeClient;
@@ -51,12 +44,6 @@ function recallTagsForBank(
   return config.banks.global.enabled && bankId === config.banks.global.bankId
     ? ["source:pi"]
     : recallScopeTags(cwd);
-}
-
-function diagnosticHealthBankId(config: ResolvedConfig, projectBankId: string): string {
-  if (config.banks.project.enabled) return projectBankId;
-  if (config.banks.global.enabled && config.banks.global.bankId) return config.banks.global.bankId;
-  return projectBankId;
 }
 
 export function createMemoryOperations(deps: MemoryOperationsDeps) {
@@ -134,11 +121,7 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
     },
 
     async configure(cwd: string, args: ConfigureMemoryArgs) {
-      const projectBankId = args.projectBankId || deps.getProjectBankId();
-      const patch = buildProjectConfigPatch(args);
-      const result = await writeProjectConfig(cwd, patch);
-      deps.reloadConfig?.(cwd);
-      return { ...result, projectBankId };
+      return configureMemory(cwd, args, deps);
     },
 
     async importSession(args: {
@@ -148,17 +131,7 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
       dryRun?: boolean;
       includeBranches?: ResolvedConfig["import"]["includeBranches"];
     }) {
-      const bankId = args.bank || deps.getProjectBankId();
-      const result = await importPiSession({
-        sessionFile: args.sessionFile,
-        ...(args.cwd ? { cwd: args.cwd } : {}),
-        bankId,
-        client: deps.getClient(),
-        config: deps.getConfig(),
-        ...(args.dryRun !== undefined ? { dryRun: args.dryRun } : {}),
-        ...(args.includeBranches ? { includeBranches: args.includeBranches } : {}),
-      });
-      return { bankId, ...result };
+      return importMemorySession(args, deps);
     },
 
     async importProjectSessions(args: {
@@ -169,18 +142,7 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
       dryRun?: boolean;
       includeBranches?: ResolvedConfig["import"]["includeBranches"];
     }) {
-      const bankId = args.bank || deps.getProjectBankId();
-      const result = await importProjectSessions({
-        cwd: args.cwd,
-        ...(args.currentSessionFile ? { currentSessionFile: args.currentSessionFile } : {}),
-        ...(args.searchDir ? { searchDir: args.searchDir } : {}),
-        bankId,
-        client: deps.getClient(),
-        config: deps.getConfig(),
-        ...(args.dryRun !== undefined ? { dryRun: args.dryRun } : {}),
-        ...(args.includeBranches ? { includeBranches: args.includeBranches } : {}),
-      });
-      return { bankId, ...result };
+      return importMemoryProjectSessions(args, deps);
     },
 
     async reflect(
@@ -202,138 +164,34 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
       return { bankId, result };
     },
 
-    async status(cwd: string) {
-      const config = deps.getConfig();
-      const queuePath = resolveQueuePath(cwd, config.retain.queuePath);
-      const [queue, manifestRead] = await Promise.all([
-        summarizeRetainQueue(queuePath),
-        readImportManifestSafe(resolveImportManifestPath(cwd, config.import.manifestPath)),
-      ]);
-      const manifest = manifestRead.manifest;
-      return {
-        config,
-        bankId: deps.getProjectBankId(),
-        queueLength: queue.active.valid,
-        queue,
-        imports: {
-          ...importManifestSummary(manifest),
-          error: manifestRead.error,
-          action: manifestRead.action,
-        },
-      };
-    },
-
-    async doctor(cwd: string) {
-      const config = deps.getConfig();
-      const queuePath = resolveQueuePath(cwd, config.retain.queuePath);
-      const healthBankId = diagnosticHealthBankId(config, deps.getProjectBankId());
-      const [health, queue, manifestRead] = await Promise.all([
-        checkHindsight(deps.getClient(), healthBankId),
-        summarizeRetainQueue(queuePath),
-        readImportManifestSafe(resolveImportManifestPath(cwd, config.import.manifestPath)),
-      ]);
-      const manifest = manifestRead.manifest;
-      return {
-        health,
-        ...(deps.getCapabilities?.() ? { capabilities: deps.getCapabilities() } : {}),
-        queueLength: queue.active.valid,
-        queue,
-        imports: {
-          ...importManifestSummary(manifest),
-          error: manifestRead.error,
-          action: manifestRead.action,
-        },
-        observations: observationScopeDiagnostics({
-          cwd,
-          projectBankId: deps.getProjectBankId(),
-          config,
-        }),
-      };
-    },
-
-    config() {
-      return safeConfig(deps.getConfig());
-    },
-
-    async debug(ctx: ExtensionCommandContext) {
-      const config = deps.getConfig();
-      const queuePath = resolveQueuePath(ctx.cwd, config.retain.queuePath);
-      const healthBankId = diagnosticHealthBankId(config, deps.getProjectBankId());
-      const [queue, health] = await Promise.all([
-        summarizeRetainQueue(queuePath),
-        checkHindsight(deps.getClient(), healthBankId),
-      ]);
-      const manifestPath = resolveImportManifestPath(ctx.cwd, config.import.manifestPath);
-      const manifestRead = await readImportManifestSafe(manifestPath);
-      const imports = importManifestSummary(manifestRead.manifest);
-      const sessionFile = ctx.sessionManager.getSessionFile?.();
-      const capabilities = deps.getCapabilities?.();
-      return {
-        health,
-        report: formatDebugReport({
-          cwd: ctx.cwd,
-          ...(sessionFile ? { sessionFile } : {}),
-          projectBankId: deps.getProjectBankId(),
-          config,
-          queueLength: queue.active.valid,
-          queuePath: queue.active.path,
-          queueMalformedLines: queue.active.malformed,
-          queueReadError: queue.active.error,
-          deadLetterPath: queue.deadLetter.path,
-          deadLetterLength: queue.deadLetter.valid,
-          deadLetterMalformedLines: queue.deadLetter.malformed,
-          deadLetterReadError: queue.deadLetter.error,
-          importManifestPath: manifestPath,
-          importCount: imports.count,
-          ...(imports.latest ? { latestImport: imports.latest } : {}),
-          importManifestError: manifestRead.error,
-          importManifestAction: manifestRead.action,
-          health,
-          ...(capabilities ? { capabilities } : {}),
-        }),
-      };
-    },
-
     async init(cwd: string) {
-      const result = await writeProjectConfig(
-        cwd,
-        buildProjectConfigPatch({
-          projectBankId: deps.getProjectBankId(),
-          baseUrl: deps.getConfig().hindsight.baseUrl,
-        }),
-      );
+      const result = await initMemoryConfig(cwd, deps);
       deps.reloadConfig?.(cwd);
-      return { ...result, projectBankId: deps.getProjectBankId() };
+      return result;
     },
 
     async session(cwd: string, sessionFile?: string) {
-      const meta = await readSessionMemoryMeta(cwd, sessionFile);
-      return { meta, effective: getEffectiveSessionMemoryMode(meta) };
+      return readMemorySession(cwd, sessionFile);
     },
 
     async setSessionMode(cwd: string, sessionFile: string | undefined, mode: SessionMemoryMode) {
-      const meta = await setSessionMemoryMode(cwd, sessionFile, mode);
-      return { meta, effective: getEffectiveSessionMemoryMode(meta) };
+      return setMemorySessionMode(cwd, sessionFile, mode);
     },
 
     async setSessionRetain(cwd: string, sessionFile: string | undefined, enabled: boolean) {
-      const meta = await setSessionRetainEnabled(cwd, sessionFile, enabled);
-      return { meta, effective: getEffectiveSessionMemoryMode(meta) };
+      return setMemorySessionRetain(cwd, sessionFile, enabled);
     },
 
     async setNextRetainOff(cwd: string, sessionFile: string | undefined) {
-      const meta = await setNextSessionRetainMode(cwd, sessionFile, "off");
-      return { meta, effective: getEffectiveSessionMemoryMode(meta) };
+      return setNextMemoryRetainOff(cwd, sessionFile);
     },
 
     async addSessionTag(cwd: string, sessionFile: string | undefined, tag: string) {
-      const meta = await addSessionMemoryTag(cwd, sessionFile, tag);
-      return { meta, effective: getEffectiveSessionMemoryMode(meta) };
+      return addMemorySessionTag(cwd, sessionFile, tag);
     },
 
     async removeSessionTag(cwd: string, sessionFile: string | undefined, tag: string) {
-      const meta = await removeSessionMemoryTag(cwd, sessionFile, tag);
-      return { meta, effective: getEffectiveSessionMemoryMode(meta) };
+      return removeMemorySessionTag(cwd, sessionFile, tag);
     },
 
     async lastRecall(cwd: string) {
@@ -350,10 +208,7 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
     },
 
     async flush(cwd: string) {
-      return flushRetainQueue(
-        resolveQueuePath(cwd, deps.getConfig().retain.queuePath),
-        deps.getClient(),
-      );
+      return flushRetain(cwd, deps.getConfig(), deps.getClient());
     },
   };
 }

@@ -4,7 +4,7 @@ import type { MemoryOperationsDeps } from "./memory-operations.js";
 import { createMemoryOperations } from "./memory-operations.js";
 import { runHindsightSetupTui } from "./setup-tui.js";
 import type { SessionMemoryMode } from "./session-memory-meta.js";
-import { memoryProfile } from "./diagnostics.js";
+import { renderImportSessionMessage, renderProjectImportMessage } from "./import-presentation.js";
 
 function firstArg(args: unknown): string | undefined {
   if (Array.isArray(args)) return typeof args[0] === "string" ? args[0] : undefined;
@@ -49,50 +49,6 @@ function importOptions(args: unknown): {
   };
 }
 
-function importDocumentSummary(result: {
-  documents: { updateMode: string; status: string }[];
-  malformedLineCount?: number;
-}) {
-  const modes = [...new Set(result.documents.map((document) => document.updateMode))].join(",");
-  const statuses = [...new Set(result.documents.map((document) => document.status))].join(",");
-  const malformed = result.malformedLineCount
-    ? `; malformedLines=${result.malformedLineCount}`
-    : "";
-  return `documents=${result.documents.length}; update=${modes || "n/a"}; status=${statuses || "n/a"}${malformed}`;
-}
-
-function queueIssueSummary(queue?: {
-  active?: { error?: string | null; malformed?: number };
-  deadLetter?: { error?: string | null; valid?: number; malformed?: number };
-}): string {
-  if (!queue) return "";
-  const issues = [
-    queue.active?.error ? `queue unreadable: ${queue.active.error}` : "",
-    queue.deadLetter?.error ? `dead-letter unreadable: ${queue.deadLetter.error}` : "",
-    queue.active?.malformed ? `queue malformed=${queue.active.malformed}` : "",
-    queue.deadLetter?.valid ? `dead-letter=${queue.deadLetter.valid}` : "",
-    queue.deadLetter?.malformed ? `dead-letter malformed=${queue.deadLetter.malformed}` : "",
-  ].filter(Boolean);
-  return issues.length ? `; ${issues.join("; ")}` : "";
-}
-
-function hasQueueIssue(queue?: {
-  active?: { error?: string | null; malformed?: number };
-  deadLetter?: { error?: string | null; valid?: number; malformed?: number };
-}): boolean {
-  return Boolean(
-    queue?.active?.error ||
-    queue?.deadLetter?.error ||
-    queue?.active?.malformed ||
-    queue?.deadLetter?.valid ||
-    queue?.deadLetter?.malformed,
-  );
-}
-
-function importIssueSummary(imports?: { error?: string | null }): string {
-  return imports?.error ? `; import manifest unreadable: ${imports.error}` : "";
-}
-
 function compactText(value: string, maxLength: number): string {
   const compact = value.replace(/\s+/g, " ").trim();
   return compact.length <= maxLength ? compact : `${compact.slice(0, Math.max(0, maxLength - 1))}…`;
@@ -125,67 +81,8 @@ function completeFlags(argumentPrefix: string, flags: string[]) {
 export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
   const operations = createMemoryOperations(deps);
 
-  pi.registerCommand("hindsight:status", {
-    description: "Show Hindsight extension status.",
-    handler: async (args, ctx) => {
-      const status = await operations.status(ctx.cwd);
-      const bank = status.config.banks.project.enabled
-        ? status.bankId
-        : (status.config.banks.global.bankId ?? "none");
-      const profile = memoryProfile(status.config);
-      const queueIssue = queueIssueSummary(status.queue);
-      const importIssue = importIssueSummary(status.imports);
-      ctx.ui.notify(
-        `Hindsight ${status.config.enabled ? "on" : "off"}; profile ${profile}; bank ${bank}; queue ${status.queueLength}; imports ${status.imports.count}${queueIssue}${importIssue}`,
-        hasQueueIssue(status.queue) || Boolean(status.imports.error) ? "warning" : "info",
-      );
-    },
-  });
-
-  pi.registerCommand("hindsight:doctor", {
-    description: "Check Hindsight connectivity and queue.",
-    handler: async (args, ctx) => {
-      const doctor = await operations.doctor(ctx.cwd);
-      const append = doctor.capabilities
-        ? doctor.capabilities.appendUpdateMode
-          ? "append supported"
-          : "append unsupported"
-        : "append not checked";
-      const observation = doctor.observations.error
-        ? `; observations invalid: ${doctor.observations.error}`
-        : "";
-      const queueIssue = queueIssueSummary(doctor.queue);
-      const importIssue = importIssueSummary(doctor.imports);
-      ctx.ui.notify(
-        `Hindsight ${doctor.health.ok ? "reachable" : `unreachable: ${doctor.health.error}`}; ${append}; queue ${doctor.queueLength}; imports ${doctor.imports.count}${observation}${queueIssue}${importIssue}`,
-        doctor.health.ok &&
-          doctor.capabilities?.appendUpdateMode !== false &&
-          !doctor.observations.error &&
-          !hasQueueIssue(doctor.queue) &&
-          !doctor.imports.error
-          ? "info"
-          : "warning",
-      );
-    },
-  });
-
-  pi.registerCommand("hindsight:config", {
-    description: "Show effective Hindsight config.",
-    handler: async (_args, ctx) => {
-      ctx.ui.notify(JSON.stringify(operations.config(), null, 2), "info");
-    },
-  });
-
-  pi.registerCommand("hindsight:debug", {
-    description: "Show detailed Hindsight diagnostics.",
-    handler: async (_args, ctx) => {
-      const debug = await operations.debug(ctx);
-      ctx.ui.notify(debug.report, debug.health.ok ? "info" : "warning");
-    },
-  });
-
-  pi.registerCommand("hindsight:setup", {
-    description: "Open interactive Hindsight configuration TUI.",
+  pi.registerCommand("hindsight", {
+    description: "Open Hindsight memory TUI.",
     handler: async (_args, ctx) => {
       await runHindsightSetupTui(ctx, deps);
     },
@@ -196,7 +93,7 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
     handler: async (_args, ctx) => {
       const result = await operations.init(ctx.cwd);
       ctx.ui.notify(
-        `Wrote ${result.path}; project bank ${result.projectBankId}. Run /hindsight:debug to verify.`,
+        `Wrote ${result.path}; project bank ${result.projectBankId}. Run /hindsight to inspect status.`,
         "info",
       );
     },
@@ -219,12 +116,7 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
         cwd: ctx.cwd,
         ...importOptions(args),
       });
-      ctx.ui.notify(
-        result.dryRun
-          ? `Import preview: messages=${result.messageCount}; ${importDocumentSummary(result)}; write=no; checkpoint=${result.checkpointPath}; manifest unchanged=${result.manifestPath}`
-          : `Imported messages=${result.messageCount}; ${importDocumentSummary(result)}; first=${result.documentId}; manifest=${result.manifestPath}`,
-        "info",
-      );
+      ctx.ui.notify(renderImportSessionMessage(result), "info");
     },
   });
 
@@ -242,12 +134,7 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
         cwd: ctx.cwd,
         ...importOptions(args),
       });
-      ctx.ui.notify(
-        result.dryRun
-          ? `Import preview: current session; messages=${result.messageCount}; ${importDocumentSummary(result)}; write=no; checkpoint=${result.checkpointPath}; manifest unchanged=${result.manifestPath}`
-          : `Imported current session; messages=${result.messageCount}; ${importDocumentSummary(result)}; first=${result.documentId}`,
-        "info",
-      );
+      ctx.ui.notify(renderImportSessionMessage(result, "current"), "info");
     },
   });
 
@@ -265,12 +152,7 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
         cwd: ctx.cwd,
         ...importOptions(args),
       });
-      ctx.ui.notify(
-        result.dryRun
-          ? `Import preview: file=${file}; messages=${result.messageCount}; ${importDocumentSummary(result)}; write=no; checkpoint=${result.checkpointPath}; manifest unchanged=${result.manifestPath}`
-          : `Imported file=${file}; messages=${result.messageCount}; ${importDocumentSummary(result)}; first=${result.documentId}`,
-        "info",
-      );
+      ctx.ui.notify(renderImportSessionMessage(result, { file }), "info");
     },
   });
 
@@ -284,12 +166,7 @@ export function registerCommands(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
         ...(current ? { currentSessionFile: current } : {}),
         ...importOptions(args),
       });
-      ctx.ui.notify(
-        result.dryRun
-          ? `Project import preview: sessions=${result.sessionFiles.length}/${result.scanned}; documents=${result.documentCount}; messages=${result.messageCount}; malformedLines=${result.malformedLineCount}; write=no`
-          : `Imported project sessions: sessions=${result.sessionFiles.length}/${result.scanned}; documents=${result.documentCount}; messages=${result.messageCount}; malformedLines=${result.malformedLineCount}`,
-        "info",
-      );
+      ctx.ui.notify(renderProjectImportMessage(result), "info");
     },
   });
 

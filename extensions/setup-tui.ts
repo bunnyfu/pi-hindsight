@@ -1,16 +1,46 @@
-import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
-import type { ResolvedConfig } from "./types.js";
-import { createMemoryOperations, type MemoryOperationsDeps } from "./memory-operations.js";
+import { DynamicBorder, type ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 import {
-  DEFAULT_GLOBAL_BANK_ID,
-  type MemoryProfile,
-  type ProjectConfigPatchInput,
-} from "./config-writer.js";
+  Key,
+  matchesKey,
+  truncateToWidth,
+  visibleWidth,
+  type Component,
+} from "@mariozechner/pi-tui";
+import type { ResolvedConfig } from "./types.js";
+import {
+  buildConfigEditingFields,
+  buildConfigEditingTabs,
+  inputDefaultForConfigEditingField,
+  patchForConfigEditingField,
+  readConfigLayers,
+  type ConfigEditingField,
+  type ConfigEditingTab,
+  type FieldId,
+  type TabId,
+} from "./config-editing-model.js";
+import { createMemoryOperations, type MemoryOperationsDeps } from "./memory-operations.js";
+import { type ConfigScope, type ProjectConfigPatchInput } from "./config-writer.js";
 
 type Deps = MemoryOperationsDeps;
 
-const DONE = "Done";
+type SetupActionId = FieldId | `reset:${FieldId}` | "choose-deployment" | "done";
+
+type SetupUiState = {
+  tabIndex: number;
+  selectedByTab: Partial<Record<TabId, number>>;
+};
+
+type ThemeLike = {
+  fg(
+    color: "accent" | "muted" | "dim" | "success" | "error" | "warning" | "borderAccent" | "text",
+    text: string,
+  ): string;
+  bg(color: "selectedBg", text: string): string;
+  bold(text: string): string;
+};
+
 const CANCEL = "Cancel";
+const MIN_BODY_LINES = 30;
 
 const LOCAL_EMBED_GUIDANCE = [
   "Local hindsight-embed guidance:",
@@ -31,208 +61,404 @@ async function writeAndReload(
   ctx: ExtensionCommandContext,
   deps: Deps,
   patch: ProjectConfigPatchInput,
+  scope: ConfigScope = "project",
 ): Promise<void> {
-  const result = await createMemoryOperations(deps).configure(ctx.cwd, patch);
-  ctx.ui.notify(`Wrote ${result.path}`, "info");
+  const result = await createMemoryOperations(deps).configure(ctx.cwd, { ...patch, scope });
+  ctx.ui.notify(`Saved ${scope} config to ${result.path}; setup view reloaded.`, "info");
 }
 
-function memoryProfileLabel(config: ResolvedConfig): MemoryProfile {
-  if (!config.banks.project.enabled) return "global-only";
-  if (config.banks.global.enabled) return "project+global";
-  return "project-only";
+function fitColumns(left: string, right: string, width: number): string {
+  if (width <= 0) return "";
+  if (width < 40) return truncateToWidth(`${left} ${right}`, width);
+  const rightWidth = Math.min(Math.max(12, visibleWidth(right)), Math.floor(width * 0.38));
+  const leftWidth = Math.max(1, width - rightWidth - 1);
+  return `${truncateToWidth(left, leftWidth)} ${truncateToWidth(right, rightWidth)}`;
 }
 
-function statusLines(config: ResolvedConfig, projectBankId: string): string[] {
+function borderLine(
+  width: number,
+  left: string,
+  fill: string,
+  right: string,
+  theme: ThemeLike,
+): string {
+  return theme.fg("borderAccent", `${left}${fill.repeat(Math.max(0, width - 2))}${right}`);
+}
+
+function padVisibleRight(content: string, width: number): string {
+  const truncated = truncateToWidth(content, width);
+  return `${truncated}${" ".repeat(Math.max(0, width - visibleWidth(truncated)))}`;
+}
+
+function boxed(content: string, width: number, theme: ThemeLike): string {
+  if (width < 2) return truncateToWidth(content, width);
+  return `${theme.fg("borderAccent", "│")}${padVisibleRight(content, width - 2)}${theme.fg("borderAccent", "│")}`;
+}
+
+export function createSetupComponent(
+  tabs: ConfigEditingTab[],
+  theme: ThemeLike,
+  state: SetupUiState,
+  done: (action: SetupActionId | null) => void,
+): Component {
+  state.tabIndex = Math.min(Math.max(0, state.tabIndex), Math.max(0, tabs.length - 1));
+
+  function currentTab(): ConfigEditingTab {
+    return tabs[state.tabIndex] ?? tabs[0]!;
+  }
+
+  function selectedIndex(): number {
+    const tab = currentTab();
+    return Math.min(state.selectedByTab[tab.id] ?? 0, Math.max(0, tab.fields.length - 1));
+  }
+
+  function setSelectedIndex(index: number): void {
+    state.selectedByTab[currentTab().id] = index;
+  }
+
+  function selectedField(): ConfigEditingField | undefined {
+    return currentTab().fields[selectedIndex()];
+  }
+
+  function moveTab(delta: number): void {
+    state.tabIndex = (state.tabIndex + delta + tabs.length) % tabs.length;
+    setSelectedIndex(selectedIndex());
+  }
+
+  function moveSelection(delta: number): void {
+    const fields = currentTab().fields;
+    if (fields.length === 0) return;
+    setSelectedIndex((selectedIndex() + delta + fields.length) % fields.length);
+  }
+
+  return {
+    render(width: number): string[] {
+      const tab = currentTab();
+      const lines: string[] = [];
+      const innerWidth = Math.max(0, width - 2);
+      const changedCount = tabs.reduce(
+        (count, item) => count + item.fields.filter((field) => field.changed).length,
+        0,
+      );
+      const horizontal = new DynamicBorder((s: string) => theme.fg("borderAccent", s));
+
+      lines.push(...horizontal.render(width));
+      lines.push(borderLine(width, "╭", "─", "╮", theme));
+      lines.push(
+        boxed(
+          ` ${theme.fg("accent", theme.bold("Hindsight setup"))} ${theme.fg("dim", "saved immediately after edit · changed values marked *")}`,
+          width,
+          theme,
+        ),
+      );
+      lines.push(
+        boxed(` ${theme.fg("dim", `${changedCount} changed from defaults`)}`, width, theme),
+      );
+      lines.push(boxed("", width, theme));
+
+      const tabLine = tabs
+        .map((item, index) => {
+          const dirty = item.fields.some((field) => field.changed) ? "*" : "";
+          const label = ` ${item.id}${dirty} `;
+          return index === state.tabIndex
+            ? theme.bg("selectedBg", theme.fg("accent", theme.bold(label)))
+            : theme.fg("muted", label);
+        })
+        .join(" ");
+      lines.push(boxed(tabLine, width, theme));
+      lines.push(boxed("", width, theme));
+
+      lines.push(
+        boxed(
+          theme.fg(
+            "accent",
+            theme.bold(tab.id === "Status" ? "Memory status" : `${tab.id} settings`),
+          ),
+          width,
+          theme,
+        ),
+      );
+      if (tab.facts) {
+        for (const [label, value] of tab.facts) {
+          lines.push(
+            boxed(
+              fitColumns(
+                `   ${theme.fg("muted", `${label}:`)}`,
+                theme.fg("text", value),
+                innerWidth,
+              ),
+              width,
+              theme,
+            ),
+          );
+        }
+      } else {
+        lines.push(
+          boxed(theme.fg("dim", fitColumns("Setting", "Value", innerWidth)), width, theme),
+        );
+      }
+
+      for (const [index, field] of tab.fields.entries()) {
+        const isSelected = index === selectedIndex();
+        const marker = isSelected ? theme.fg("accent", "→") : " ";
+        const dirty = field.changed ? theme.fg("warning", "*") : " ";
+        const label = isSelected
+          ? theme.fg("accent", theme.bold(field.label))
+          : theme.fg("text", field.label);
+        const rawValue = `${field.value} [${field.source ?? "default"}]`;
+        const value = field.changed ? theme.fg("warning", rawValue) : theme.fg("text", rawValue);
+        lines.push(
+          boxed(fitColumns(`${marker}${dirty} ${label}`, value, innerWidth), width, theme),
+        );
+      }
+
+      while (lines.length < MIN_BODY_LINES) lines.push(boxed("", width, theme));
+
+      lines.push(
+        boxed(
+          theme.fg(
+            "dim",
+            " h/l or </> tabs · j/k move · enter edit · r reset · d deployment · q close ",
+          ),
+          width,
+          theme,
+        ),
+      );
+      lines.push(borderLine(width, "╰", "─", "╯", theme));
+      lines.push(...horizontal.render(width));
+      return lines.map((line) => truncateToWidth(line, width));
+    },
+    handleInput(data: string): void {
+      if (matchesKey(data, Key.escape) || data === "q") {
+        done(null);
+        return;
+      }
+      if (data === "d") {
+        done("choose-deployment");
+        return;
+      }
+      if (matchesKey(data, Key.left) || data === "h" || data === "<") {
+        moveTab(-1);
+        return;
+      }
+      if (matchesKey(data, Key.right) || data === "l" || data === ">") {
+        moveTab(1);
+        return;
+      }
+      if (matchesKey(data, Key.up) || data === "k") {
+        moveSelection(-1);
+        return;
+      }
+      if (matchesKey(data, Key.down) || data === "j") {
+        moveSelection(1);
+        return;
+      }
+      if (data === "r") {
+        const field = selectedField();
+        if (field?.changed) done(`reset:${field.id}`);
+        return;
+      }
+      if (matchesKey(data, Key.enter)) {
+        done(selectedField()?.id ?? null);
+      }
+    },
+    invalidate(): void {},
+  };
+}
+
+async function showSetupTui(
+  ctx: ExtensionCommandContext,
+  config: ResolvedConfig,
+  projectBankId: string,
+  state: SetupUiState,
+): Promise<SetupActionId | null> {
+  const tabs = buildConfigEditingTabs(config, projectBankId, readConfigLayers(ctx.cwd));
+  return ctx.ui.custom<SetupActionId | null>((tui, theme, _keybindings, done) => {
+    const component = createSetupComponent(tabs, theme as ThemeLike, state, done);
+    return {
+      render: (width: number) => component.render(width),
+      invalidate: () => component.invalidate(),
+      handleInput: (data: string) => {
+        component.handleInput?.(data);
+        tui.requestRender();
+      },
+    };
+  });
+}
+
+async function resetField(
+  ctx: ExtensionCommandContext,
+  deps: Deps,
+  field: ConfigEditingField,
+  scope: ConfigScope = "project",
+): Promise<void> {
+  await writeAndReload(ctx, deps, { resetDefaults: [field.resetKey] }, scope);
+}
+
+function settingPrompt(field: ConfigEditingField): string {
   return [
-    `enabled: ${config.enabled}`,
-    `baseUrl: ${config.hindsight.baseUrl}`,
-    `timeoutMs: ${config.hindsight.timeoutMs}`,
-    `memory profile: ${memoryProfileLabel(config)}`,
-    `projectBankId: ${projectBankId}${config.banks.project.bankId ? " (configured)" : " (auto)"}`,
-    `project mission: ${config.banks.project.mission ? "configured" : "default"}`,
-    `global: ${config.banks.global.enabled ? (config.banks.global.bankId ?? "enabled, no id") : "disabled"}`,
-    `global mission: ${config.banks.global.mission ? "configured" : "default"}`,
-    `observations: ${config.observations.enabled ? "enabled" : "disabled"}, scopes=${config.observations.scopes.length}`,
-    `recall: ${config.recall.enabled}, ${config.recall.budget}, ${config.recall.maxTokens} tokens`,
-    `retain: ${config.retain.enabled}, async=${config.retain.async}, update=${config.retain.updateMode}`,
-    `queuePath: ${config.retain.queuePath}`,
-    `import branches: ${config.import.includeBranches}`,
-    `import manifest: ${config.import.manifestPath}`,
-    `status: ${config.status.style}, ${config.status.detail}, max=${config.status.maxLength}, activity=${config.status.showActivity}`,
-    `notifications: startup=${config.notifications.startup}, recall=${config.notifications.recall}, retain=${config.notifications.retain}`,
-  ];
+    field.label,
+    field.description,
+    `Effective: ${field.value} (${field.source ?? "default"})`,
+    `Environment: ${field.envValue ?? "not set"}`,
+    `Project: ${field.projectValue ?? "not set"}`,
+    `Global: ${field.globalValue ?? "not set"}`,
+    `Default: ${field.defaultValue}`,
+    field.source === "env"
+      ? "Environment currently wins; project/global edits save for when env override is removed."
+      : "Changes save immediately.",
+  ].join("\n");
+}
+
+function scopeLabel(scope: ConfigScope): string {
+  return scope === "project" ? "Project" : "Global";
+}
+
+function withScopedValues(field: ConfigEditingField, values: string[]): string[] {
+  const scoped = (field.editableScopes ?? ["project"]).flatMap((scope) =>
+    values.map((value) => `${scopeLabel(scope)}: ${value}`),
+  );
+  const resets = (field.editableScopes ?? ["project"]).flatMap((scope) => {
+    if (scope === "project" && field.projectValue !== undefined) return ["Remove project override"];
+    if (scope === "global" && field.globalValue !== undefined) return ["Remove global override"];
+    return [];
+  });
+  return [...scoped, ...resets, CANCEL];
+}
+
+function parseScopedAction(action: string): { scope: ConfigScope; value: string } | undefined {
+  if (action.startsWith("Project: "))
+    return { scope: "project", value: action.slice("Project: ".length) };
+  if (action.startsWith("Global: "))
+    return { scope: "global", value: action.slice("Global: ".length) };
+  return undefined;
+}
+
+async function chooseScope(
+  ctx: ExtensionCommandContext,
+  field: ConfigEditingField,
+): Promise<ConfigScope | undefined> {
+  const scopes = field.editableScopes ?? ["project"];
+  if (scopes.length === 1) return scopes[0];
+  const value = await ctx.ui.select(settingPrompt(field), scopes.map(scopeLabel).concat(CANCEL));
+  if (!value || value === CANCEL) return undefined;
+  return value === "Global" ? "global" : "project";
+}
+
+async function handleResetAction(
+  action: string,
+  ctx: ExtensionCommandContext,
+  deps: Deps,
+  field: ConfigEditingField,
+): Promise<boolean> {
+  if (action === "Remove project override") {
+    await resetField(ctx, deps, field, "project");
+    return true;
+  }
+  if (action === "Remove global override") {
+    await resetField(ctx, deps, field, "global");
+    return true;
+  }
+  return false;
+}
+
+async function promptScopedValue(
+  ctx: ExtensionCommandContext,
+  deps: Deps,
+  field: ConfigEditingField,
+): Promise<{ scope: ConfigScope; value: string } | undefined> {
+  if (field.kind === "boolean" || field.kind === "select") {
+    const values = field.kind === "boolean" ? ["Enable", "Disable"] : (field.choices ?? []);
+    const action = await ctx.ui.select(settingPrompt(field), withScopedValues(field, values));
+    if (!action || action === CANCEL) return undefined;
+    if (await handleResetAction(action, ctx, deps, field)) return undefined;
+    return parseScopedAction(action);
+  }
+
+  const scope = await chooseScope(ctx, field);
+  if (!scope) return undefined;
+  const value = await ctx.ui.input(
+    settingPrompt(field),
+    inputDefaultForConfigEditingField(field.id, deps.getConfig(), deps.getProjectBankId()),
+  );
+  if (!value) return undefined;
+  if (field.kind === "positive-int" && parsePositiveInt(value, field.id) === undefined) {
+    return undefined;
+  }
+  return { scope, value };
+}
+
+async function handleFieldEdit(
+  fieldId: FieldId,
+  ctx: ExtensionCommandContext,
+  deps: Deps,
+  config: ResolvedConfig,
+  projectBankId: string,
+): Promise<void> {
+  const layers = readConfigLayers(ctx.cwd);
+  const field = buildConfigEditingFields(config, projectBankId, layers).find(
+    (item) => item.id === fieldId,
+  );
+  if (!field) return;
+
+  const scoped = await promptScopedValue(ctx, deps, field);
+  if (!scoped) return;
+  const patch = patchForConfigEditingField(field.id, scoped.value, config);
+  if (patch) await writeAndReload(ctx, deps, patch, scoped.scope);
+}
+
+async function handleDeployment(
+  ctx: ExtensionCommandContext,
+  deps: Deps,
+  config: ResolvedConfig,
+): Promise<void> {
+  const value = await ctx.ui.select("Hindsight deployment", [
+    "Hindsight Cloud",
+    "Existing local/external API",
+    "Local hindsight-embed guidance",
+    CANCEL,
+  ]);
+  if (value === "Hindsight Cloud") {
+    const baseUrl = await ctx.ui.input("Hindsight Cloud base URL", config.hindsight.baseUrl);
+    if (baseUrl) await writeAndReload(ctx, deps, { baseUrl: baseUrl.trim() });
+    const envName = await ctx.ui.input("API key env var name", "HINDSIGHT_API_KEY");
+    if (envName) await writeAndReload(ctx, deps, { apiKeyEnvVar: envName.trim() });
+  } else if (value === "Existing local/external API") {
+    const baseUrl = await ctx.ui.input("Hindsight API base URL", config.hindsight.baseUrl);
+    if (baseUrl) await writeAndReload(ctx, deps, { baseUrl: baseUrl.trim() });
+  } else if (value === "Local hindsight-embed guidance") {
+    ctx.ui.notify(LOCAL_EMBED_GUIDANCE, "info");
+    const useDefault = await ctx.ui.select("Set API URL to http://localhost:8888?", [
+      "Yes",
+      "No",
+      CANCEL,
+    ]);
+    if (useDefault === "Yes") await writeAndReload(ctx, deps, { baseUrl: "http://localhost:8888" });
+  }
 }
 
 export async function runHindsightSetupTui(
   ctx: ExtensionCommandContext,
   deps: Deps,
 ): Promise<void> {
+  const state: SetupUiState = { tabIndex: 0, selectedByTab: {} };
   while (true) {
     const config = deps.getConfig();
     const projectBankId = deps.getProjectBankId();
-    const choice = await ctx.ui.select("Hindsight setup", [
-      ...statusLines(config, projectBankId).map((line) => `· ${line}`),
-      "Choose Hindsight deployment",
-      "Set project memory bank ID",
-      "Set Hindsight base URL",
-      "Set API key env reference",
-      "Set timeout (ms)",
-      config.enabled ? "Disable extension" : "Enable extension",
-      "Choose memory scope profile",
-      config.banks.global.enabled ? "Disable global bank" : "Enable global bank",
-      "Set global bank ID",
-      config.recall.enabled ? "Disable recall" : "Enable recall",
-      "Set recall budget",
-      "Set recall token budget",
-      config.retain.enabled ? "Disable retain" : "Enable retain",
-      config.retain.async ? "Use sync retain flush" : "Use async retain mode",
-      "Set durable retain queue path",
-      "Set import branch mode",
-      "Set import manifest path",
-      "Set status style",
-      "Set status detail",
-      "Set status max length",
-      config.status.showActivity ? "Hide status activity" : "Show status activity",
-      config.notifications.startup ? "Hide startup notification" : "Show startup notification",
-      config.notifications.recall ? "Hide recall notifications" : "Show recall notifications",
-      config.notifications.retain ? "Hide retain notifications" : "Show retain notifications",
-      DONE,
-      CANCEL,
-    ]);
-
-    if (!choice || choice === CANCEL || choice === DONE) return;
-    if (choice.startsWith("· ")) continue;
-
+    const action = await showSetupTui(ctx, config, projectBankId, state);
+    if (!action || action === "done") return;
     try {
-      if (choice === "Choose Hindsight deployment") {
-        const value = await ctx.ui.select("Hindsight deployment", [
-          "Hindsight Cloud",
-          "Existing local/external API",
-          "Local hindsight-embed guidance",
-          CANCEL,
-        ]);
-        if (value === "Hindsight Cloud") {
-          const baseUrl = await ctx.ui.input("Hindsight Cloud base URL", config.hindsight.baseUrl);
-          if (baseUrl) await writeAndReload(ctx, deps, { baseUrl: baseUrl.trim() });
-          const envName = await ctx.ui.input("API key env var name", "HINDSIGHT_API_KEY");
-          if (envName) await writeAndReload(ctx, deps, { apiKeyEnvVar: envName.trim() });
-          ctx.ui.notify("Cloud profile selected. API key stored as env SecretRef.", "info");
-        } else if (value === "Existing local/external API") {
-          const baseUrl = await ctx.ui.input("Hindsight API base URL", config.hindsight.baseUrl);
-          if (baseUrl) await writeAndReload(ctx, deps, { baseUrl: baseUrl.trim() });
-        } else if (value === "Local hindsight-embed guidance") {
-          ctx.ui.notify(LOCAL_EMBED_GUIDANCE, "info");
-          const useDefault = await ctx.ui.select("Set base URL to http://localhost:8888?", [
-            "Yes",
-            "No",
-            CANCEL,
-          ]);
-          if (useDefault === "Yes")
-            await writeAndReload(ctx, deps, { baseUrl: "http://localhost:8888" });
-        }
-      } else if (choice === "Set project memory bank ID") {
-        const value = await ctx.ui.input("Project memory bank ID", projectBankId);
-        if (value) await writeAndReload(ctx, deps, { projectBankId: value.trim() });
-      } else if (choice === "Set Hindsight base URL") {
-        const value = await ctx.ui.input("Hindsight base URL", config.hindsight.baseUrl);
-        if (value) await writeAndReload(ctx, deps, { baseUrl: value.trim() });
-      } else if (choice === "Set API key env reference") {
-        const value = await ctx.ui.input("API key env var name", "HINDSIGHT_API_KEY");
-        if (value) await writeAndReload(ctx, deps, { apiKeyEnvVar: value.trim() });
-      } else if (choice === "Set timeout (ms)") {
-        const value = await ctx.ui.input(
-          "Timeout in milliseconds",
-          String(config.hindsight.timeoutMs),
-        );
-        const timeoutMs = parsePositiveInt(value, "timeoutMs");
-        if (timeoutMs !== undefined) await writeAndReload(ctx, deps, { timeoutMs });
-      } else if (choice === "Disable extension" || choice === "Enable extension") {
-        await writeAndReload(ctx, deps, { enabled: choice === "Enable extension" });
-      } else if (choice === "Choose memory scope profile") {
-        const value = await ctx.ui.select("Memory scope profile", [
-          "project-only",
-          "project+global",
-          "global-only",
-          CANCEL,
-        ]);
-        if (value && value !== CANCEL) {
-          await writeAndReload(ctx, deps, {
-            memoryProfile: value as MemoryProfile,
-            globalBankId: config.banks.global.bankId ?? DEFAULT_GLOBAL_BANK_ID,
-          });
-        }
-      } else if (choice === "Disable global bank" || choice === "Enable global bank") {
-        await writeAndReload(ctx, deps, { enableGlobalBank: choice === "Enable global bank" });
-      } else if (choice === "Set global bank ID") {
-        const value = await ctx.ui.input("Global bank ID", config.banks.global.bankId ?? "");
-        if (value) await writeAndReload(ctx, deps, { globalBankId: value.trim() });
-      } else if (choice === "Disable recall" || choice === "Enable recall") {
-        await writeAndReload(ctx, deps, { recallEnabled: choice === "Enable recall" });
-      } else if (choice === "Set recall budget") {
-        const value = await ctx.ui.select("Recall budget", ["low", "mid", "high", CANCEL]);
-        if (value && value !== CANCEL)
-          await writeAndReload(ctx, deps, { recallBudget: value as "low" | "mid" | "high" });
-      } else if (choice === "Set recall token budget") {
-        const value = await ctx.ui.input("Recall max tokens", String(config.recall.maxTokens));
-        const recallMaxTokens = parsePositiveInt(value, "recallMaxTokens");
-        if (recallMaxTokens !== undefined) await writeAndReload(ctx, deps, { recallMaxTokens });
-      } else if (choice === "Disable retain" || choice === "Enable retain") {
-        await writeAndReload(ctx, deps, { retainEnabled: choice === "Enable retain" });
-      } else if (choice === "Use sync retain flush" || choice === "Use async retain mode") {
-        await writeAndReload(ctx, deps, { retainAsync: choice === "Use async retain mode" });
-      } else if (choice === "Set durable retain queue path") {
-        const value = await ctx.ui.input("Retain queue path", config.retain.queuePath);
-        if (value) await writeAndReload(ctx, deps, { queuePath: value.trim() });
-      } else if (choice === "Set import branch mode") {
-        const value = await ctx.ui.select("Import branch mode", [
-          "current-only",
-          "all-leaves",
-          CANCEL,
-        ]);
-        if (value && value !== CANCEL)
-          await writeAndReload(ctx, deps, {
-            importIncludeBranches: value as "current-only" | "all-leaves",
-          });
-      } else if (choice === "Set import manifest path") {
-        const value = await ctx.ui.input("Import manifest path", config.import.manifestPath);
-        if (value) await writeAndReload(ctx, deps, { importManifestPath: value.trim() });
-      } else if (choice === "Set status style") {
-        const value = await ctx.ui.select("Status style", [
-          "off",
-          "text",
-          "emoji",
-          "nerdfont",
-          CANCEL,
-        ]);
-        if (value && value !== CANCEL)
-          await writeAndReload(ctx, deps, {
-            statusStyle: value as "off" | "text" | "emoji" | "nerdfont",
-          });
-      } else if (choice === "Set status detail") {
-        const value = await ctx.ui.select("Status detail", [
-          "minimal",
-          "project",
-          "activity",
-          "verbose",
-          CANCEL,
-        ]);
-        if (value && value !== CANCEL)
-          await writeAndReload(ctx, deps, {
-            statusDetail: value as "minimal" | "project" | "activity" | "verbose",
-          });
-      } else if (choice === "Set status max length") {
-        const value = await ctx.ui.input("Status max length", String(config.status.maxLength));
-        const statusMaxLength = parsePositiveInt(value, "statusMaxLength");
-        if (statusMaxLength !== undefined) await writeAndReload(ctx, deps, { statusMaxLength });
-      } else if (choice === "Hide status activity" || choice === "Show status activity") {
-        await writeAndReload(ctx, deps, { statusShowActivity: choice === "Show status activity" });
-      } else if (choice === "Hide startup notification" || choice === "Show startup notification") {
-        await writeAndReload(ctx, deps, { notifyStartup: choice === "Show startup notification" });
-      } else if (choice === "Hide recall notifications" || choice === "Show recall notifications") {
-        await writeAndReload(ctx, deps, { notifyRecall: choice === "Show recall notifications" });
-      } else if (choice === "Hide retain notifications" || choice === "Show retain notifications") {
-        await writeAndReload(ctx, deps, { notifyRetain: choice === "Show retain notifications" });
-      }
+      if (action === "choose-deployment") await handleDeployment(ctx, deps, config);
+      else if (action.startsWith("reset:")) {
+        const fieldId = action.slice("reset:".length) as FieldId;
+        const field = buildConfigEditingFields(
+          config,
+          projectBankId,
+          readConfigLayers(ctx.cwd),
+        ).find((item) => item.id === fieldId);
+        if (field)
+          await resetField(ctx, deps, field, field.source === "global" ? "global" : "project");
+      } else await handleFieldEdit(action as FieldId, ctx, deps, config, projectBankId);
     } catch (error) {
       ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
     }

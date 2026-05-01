@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import type {
   HindsightCapabilities,
   HindsightLikeClient,
@@ -6,14 +5,8 @@ import type {
   RetainJob,
   UpdateMode,
 } from "./types.js";
-import {
-  enqueueRetainJobWithStats,
-  flushRetainQueue,
-  resolveQueuePath,
-  summarizeRetainQueue,
-} from "./queue.js";
-import { redactSecrets } from "./sanitize.js";
-import { resolveRetainDocumentTarget } from "./capabilities.js";
+import { enqueueRetainWithStats, flushRetain, summarizeRetain } from "./retain-queue.js";
+import { buildRetainJob } from "./retain-job-builder.js";
 
 export type DurableRetainSource = "auto" | "tool" | "command" | "import";
 
@@ -43,44 +36,24 @@ export interface RetainDurablyResult {
 }
 
 export function buildDurableRetainJob(args: Omit<RetainDurablyArgs, "client">): RetainJob {
-  const content = args.config.retain.redactSecrets ? redactSecrets(args.content) : args.content;
-  const target = resolveRetainDocumentTarget({
-    config: args.config,
-    ...(args.capabilities ? { capabilities: args.capabilities } : {}),
-    documentId: args.documentId,
-    updateMode: args.updateMode,
-  });
-  return {
-    id: randomUUID(),
-    bankId: args.bankId,
-    createdAt: new Date().toISOString(),
-    documentId: target.documentId,
-    updateMode: target.updateMode,
-    item: {
-      content,
-      context: args.context,
-      timestamp: args.timestamp ?? new Date().toISOString(),
-      async: args.config.retain.async,
-      ...((args.entities?.length ?? args.config.retain.entities.length)
-        ? { entities: [...args.config.retain.entities, ...(args.entities ?? [])] }
-        : {}),
-      tags: args.tags,
-      metadata: {
-        source: "pi-hindsight",
-        retainSource: args.source,
-        ...args.metadata,
-      },
-      ...(args.observationScopes?.length ? { observationScopes: args.observationScopes } : {}),
+  return buildRetainJob({
+    ...args,
+    metadata: {
+      source: "pi-hindsight",
+      retainSource: args.source,
+      ...args.metadata,
     },
-    retries: 0,
-  };
+  });
 }
 
 export async function retainDurably(args: RetainDurablyArgs): Promise<RetainDurablyResult> {
-  const queuePath = resolveQueuePath(args.cwd, args.config.retain.queuePath);
-  const enqueueResult = await enqueueRetainJobWithStats(queuePath, buildDurableRetainJob(args));
+  const enqueueResult = await enqueueRetainWithStats(
+    args.cwd,
+    args.config,
+    buildDurableRetainJob(args),
+  );
   if (enqueueResult.previousLength > 0) {
-    const summary = await summarizeRetainQueue(queuePath);
+    const summary = await summarizeRetain(args.cwd, args.config);
     return {
       enqueued: true,
       sent: 0,
@@ -88,6 +61,6 @@ export async function retainDurably(args: RetainDurablyArgs): Promise<RetainDura
       deadLettered: 0,
     };
   }
-  const result = await flushRetainQueue(queuePath, args.client, { maxJobs: 1 });
+  const result = await flushRetain(args.cwd, args.config, args.client, { maxJobs: 1 });
   return { enqueued: true, ...result };
 }

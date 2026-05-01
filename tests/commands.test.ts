@@ -353,86 +353,11 @@ describe("hindsight commands", () => {
     );
   });
 
-  it("warns when status cannot read the retain queue", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-commands-"));
-    writeFileSync(join(cwd, "not-a-dir"), "file blocks queue directory");
-    const commands = new Map<string, { handler: (args: unknown, ctx: any) => Promise<void> }>();
+  it("registers /hindsight TUI command and removes legacy status/debug commands", async () => {
+    const commands = new Map<string, RegisteredTestCommand>();
     registerCommands(
       {
-        registerCommand: (
-          name: string,
-          command: { handler: (args: unknown, ctx: any) => Promise<void> },
-        ) => {
-          commands.set(name, command);
-        },
-      } as any,
-      {
-        getClient: () => client(),
-        getConfig: () => ({
-          ...DEFAULT_CONFIG,
-          retain: { ...DEFAULT_CONFIG.retain, queuePath: "not-a-dir/retain-queue.jsonl" },
-        }),
-        getProjectBankId: () => "bank",
-      },
-    );
-    const ctx = { cwd, ui: { notify: vi.fn(), setStatus: vi.fn() }, sessionManager: {} };
-
-    await commands.get("hindsight:status")?.handler([], ctx);
-
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("queue unreadable:"),
-      "warning",
-    );
-  });
-
-  it("reports no-bank profile without calling it global-only", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-commands-"));
-    const commands = new Map<string, { handler: (args: unknown, ctx: any) => Promise<void> }>();
-    registerCommands(
-      {
-        registerCommand: (
-          name: string,
-          command: { handler: (args: unknown, ctx: any) => Promise<void> },
-        ) => {
-          commands.set(name, command);
-        },
-      } as any,
-      {
-        getClient: () => client(),
-        getConfig: () => ({
-          ...DEFAULT_CONFIG,
-          banks: {
-            project: { enabled: false, derive: "repo" },
-            global: { enabled: false },
-          },
-        }),
-        getProjectBankId: () => "bank",
-      },
-    );
-    const ctx = { cwd, ui: { notify: vi.fn(), setStatus: vi.fn() }, sessionManager: {} };
-
-    await commands.get("hindsight:status")?.handler([], ctx);
-
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("profile none; bank none"),
-      "info",
-    );
-  });
-
-  it("warns on corrupt import manifest in status and debug", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-commands-"));
-    mkdirSync(join(cwd, ".pi", "hindsight"), { recursive: true });
-    writeFileSync(
-      join(cwd, ".pi/hindsight/import-manifest.json"),
-      JSON.stringify({ imports: "bad" }),
-    );
-    const commands = new Map<string, { handler: (args: unknown, ctx: any) => Promise<void> }>();
-    registerCommands(
-      {
-        registerCommand: (
-          name: string,
-          command: { handler: (args: unknown, ctx: any) => Promise<void> },
-        ) => {
+        registerCommand: (name: string, command: RegisteredTestCommand) => {
           commands.set(name, command);
         },
       } as any,
@@ -442,52 +367,12 @@ describe("hindsight commands", () => {
         getProjectBankId: () => "bank",
       },
     );
-    const ctx = { cwd, ui: { notify: vi.fn(), setStatus: vi.fn() }, sessionManager: {} };
 
-    await commands.get("hindsight:status")?.handler([], ctx);
-    await commands.get("hindsight:debug")?.handler([], ctx);
-
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("import manifest unreadable:"),
-      "warning",
-    );
-    const debugCall = vi
-      .mocked(ctx.ui.notify)
-      .mock.calls.find(([message]) => String(message).includes('"imports"'));
-    expect(String(debugCall?.[0])).toContain('"error"');
-    expect(String(debugCall?.[0])).toContain('"action"');
-  });
-
-  it("warns when doctor cannot read the retain queue", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-commands-"));
-    writeFileSync(join(cwd, "not-a-dir"), "file blocks queue directory");
-    const commands = new Map<string, { handler: (args: unknown, ctx: any) => Promise<void> }>();
-    registerCommands(
-      {
-        registerCommand: (
-          name: string,
-          command: { handler: (args: unknown, ctx: any) => Promise<void> },
-        ) => {
-          commands.set(name, command);
-        },
-      } as any,
-      {
-        getClient: () => client(),
-        getConfig: () => ({
-          ...DEFAULT_CONFIG,
-          retain: { ...DEFAULT_CONFIG.retain, queuePath: "not-a-dir/retain-queue.jsonl" },
-        }),
-        getProjectBankId: () => "bank",
-        getCapabilities: () => ({ appendUpdateMode: true, checkedAt: new Date().toISOString() }),
-      },
-    );
-    const ctx = { cwd, ui: { notify: vi.fn(), setStatus: vi.fn() }, sessionManager: {} };
-
-    await commands.get("hindsight:doctor")?.handler([], ctx);
-
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("queue unreadable:"),
-      "warning",
-    );
+    expect(commands.has("hindsight")).toBe(true);
+    expect(commands.has("hindsight:status")).toBe(false);
+    expect(commands.has("hindsight:doctor")).toBe(false);
+    expect(commands.has("hindsight:config")).toBe(false);
+    expect(commands.has("hindsight:debug")).toBe(false);
+    expect(commands.has("hindsight:setup")).toBe(false);
   });
 });

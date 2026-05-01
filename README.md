@@ -110,11 +110,7 @@ Implemented:
   - `hindsight_import`
   - `hindsight_reflect`
 - commands:
-  - `/hindsight:status`
-  - `/hindsight:doctor`
-  - `/hindsight:config`
-  - `/hindsight:debug`
-  - `/hindsight:setup`
+  - `/hindsight`
   - `/hindsight:init`
   - `/hindsight:import`
   - `/hindsight:import-current`
@@ -154,7 +150,7 @@ See [`docs/risky-memory-modes.md`](docs/risky-memory-modes.md) for why persisted
 
 See [`docs/next-opt-out-design.md`](docs/next-opt-out-design.md) for the implemented one-turn memory opt-out command design.
 
-Historical import supports importing the current Pi session, an explicit JSONL path, or all Pi session JSONL files in the current session directory that belong to the current repo/cwd. Imports write deterministic document IDs and update an import manifest so `/hindsight:debug` can show imported document count and latest import provenance. Use `/hindsight:import --dry-run`, `/hindsight:import-project-sessions --dry-run`, or `hindsight_import` with `dryRun: true` to preview documents, message counts, content sizes, tags, update mode, and target bank without writing Hindsight memory or mutating the manifest. Add `--all-leaves` or `allLeaves: true` to preview/import every branch leaf instead of only the current branch. Project session discovery intentionally avoids broad history imports: it scans only the current session file's directory and keeps only `.jsonl` session files whose parsed `cwd` exactly matches the current repo/cwd. Imports maintain `.pi/hindsight/import-checkpoint.json` by default and resume completed documents without re-retaining them when `import.resume` is enabled.
+Historical import supports importing the current Pi session, an explicit JSONL path, or all Pi session JSONL files in the current session directory that belong to the current repo/cwd. Imports write deterministic document IDs and update an import manifest that is summarized in `/hindsight`. Use `/hindsight:import --dry-run`, `/hindsight:import-project-sessions --dry-run`, or `hindsight_import` with `dryRun: true` to preview documents, message counts, content sizes, tags, update mode, and target bank without writing Hindsight memory or mutating the manifest. Add `--all-leaves` or `allLeaves: true` to preview/import every branch leaf instead of only the current branch. Project session discovery intentionally avoids broad history imports: it scans only the current session file's directory and keeps only `.jsonl` session files whose parsed `cwd` exactly matches the current repo/cwd. Imports maintain `.pi/hindsight/import-checkpoint.json` by default and resume completed documents without re-retaining them when `import.resume` is enabled.
 
 Historical import examples:
 
@@ -260,15 +256,15 @@ Most users should choose one memory scope profile and leave the advanced fields 
 - `project+global` is useful for personal coding. Project facts stay project-scoped, while durable preferences and cross-project habits can also be recalled from a global bank.
 - `global-only` is intentionally broad. It disables the project bank and automatic retain because there is no project-scoped write route.
 
-Use `/hindsight:setup` for guided configuration, or `/hindsight:init` for a quick project config with the currently selected project bank.
+Use `/hindsight` for guided configuration and memory status, or `/hindsight:init` for a quick project config with the currently selected project bank.
 
 Inside Pi, open the interactive configuration TUI:
 
 ```text
-/hindsight:setup
+/hindsight
 ```
 
-The setup TUI is organized around user intent: choose the Hindsight deployment, choose the memory scope profile, set the project memory bank ID, and then adjust advanced settings only when needed. Deployment choices cover Hindsight Cloud, an existing local/external API, and local `hindsight-embed` guidance. The local `hindsight-embed` profile gives commands to run yourself and can set the base URL to `http://localhost:8888`; it does not manage daemons. It writes `.pi/hindsight.json` and reloads the extension config after each change. Active import config covers branch mode, replace-vs-append behavior, manifest path, checkpoint path, and resume behavior.
+The setup TUI opens with a Status tab for memory health, then offers focused edit tabs for connection, banks, recall, retain, import, and UI settings. Use `h`/`l` or `<`/`>` to switch tabs, `j`/`k` to move between settings, `Enter` to open the selected setting, `r` to remove the selected setting's active override, and `d` for deployment setup. Setting rows show the effective value plus its source (`project`, `global`, `env`, or `default`). Setting descriptions, default values, and all layers are shown inside the edit modal. Settings that support both scopes can be saved to project config (`.pi/hindsight.json`) or global config (`~/.pi/agent/hindsight.json`) from that modal. Project-specific settings such as project bank ID and memory profile are fixed to project scope. Environment overrides win the effective value, but project/global stored values can still be edited for future runs after the environment override is removed. Changes are saved immediately and the extension config is reloaded after each change. Deployment choices cover Hindsight Cloud, an existing local/external API, and local `hindsight-embed` guidance. The local `hindsight-embed` profile gives commands to run yourself and can set the base URL to `http://localhost:8888`; it does not manage daemons.
 
 Memory profiles make global memory explicit. Choose the narrowest route that fits the repo:
 
@@ -278,10 +274,7 @@ Memory profiles make global memory explicit. Choose the narrowest route that fit
 
 When a profile enables global memory without an existing bank ID, setup writes `pi-global` as the global bank ID. Override it with `PI_HINDSIGHT_GLOBAL_BANK_ID`, `.pi/hindsight.json` `banks.global.bankId`, or the setup TUI if you prefer a different shared bank. `banks.global.bankId` is used only when `banks.global.enabled` is `true`.
 
-Profile routing is inspectable:
-
-- `/hindsight:status` shows the active profile, primary/project bank, queue length, and import count.
-- `/hindsight:debug` includes `memoryProfile` and `memoryRoutes`, where `memoryRoutes.recall` lists configured automatic recall routes and `memoryRoutes.autoRetain` shows the configured automatic retain route or `null` when automatic retain has no route.
+Profile routing is inspectable in `/hindsight`, which shows memory health, active profile, project/global banks, queue path, and import status.
 
 For a quick default config, run:
 
@@ -403,7 +396,7 @@ Retain jobs are written to a JSONL queue before sending. If Hindsight is down, j
 
 Set `retain.flushIntervalMs` to a positive interval to flush queued jobs periodically while Pi is running. The default `0` disables periodic flushing, so retain still flushes on new retain attempts, manual `/hindsight:flush`, and shutdown.
 
-Shutdown queue flushing is intentionally bounded by `retain.shutdownFlushMaxJobs` and `retain.shutdownFlushTimeoutMs`. The timeout is a soft bound checked between queued jobs so shutdown does not leave a background flush holding the queue lock. If jobs remain after shutdown, they stay on disk and are visible through `/hindsight:debug` queue length for later flushing.
+Shutdown queue flushing is intentionally bounded by `retain.shutdownFlushMaxJobs` and `retain.shutdownFlushTimeoutMs`. The timeout is a soft bound checked between queued jobs so shutdown does not leave a background flush holding the queue lock. If jobs remain after shutdown, they stay on disk and are visible through `/hindsight` for later flushing.
 
 At session start, the extension shows the selected bank ID. If no bank ID is configured, it reports the automatically derived bank ID and how to override it. Project and global banks can define `mission` text; configured missions are sent to Hindsight as both `reflectMission` and `retainMission` during bank ensure so extraction and reflection stay aligned with the bank purpose. If no mission is configured, Pi-specific defaults are used: project banks focus on repo architecture, decisions, constraints, bugs, fixes, TODOs, conventions, and project-local preferences; global banks focus on durable user preferences, recurring workflows, coding habits, and stable assistant behavior while excluding repo-specific code facts by default.
 
@@ -422,13 +415,7 @@ Pi window notifications are configurable under `notifications`. Startup bank sel
 
 ## Debug and smoke tests
 
-Use the debug command inside Pi to inspect what the extension believes:
-
-```text
-/hindsight:debug
-```
-
-The report includes the project bank ID, whether it was configured or derived, current tags, queue path, queue length, import manifest summary, Hindsight reachability, observation-scope expansion or errors with remediation hints, and redacted effective config. `/hindsight:doctor` also warns when observation-scope placeholders are invalid.
+Use `/hindsight` inside Pi to inspect what the extension believes. The TUI status view includes memory health, selected banks, retain queue path, import status, and key configuration state. Advanced one-off diagnostics remain available through tests and explicit tools rather than separate status/debug/doctor commands.
 
 Run the local smoke test against a real Hindsight server:
 

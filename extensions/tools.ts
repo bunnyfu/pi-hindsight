@@ -69,7 +69,7 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
         ...(params.entities ? { entities: params.entities } : {}),
       });
       const deadLetterStatus = result.deadLettered
-        ? ` ${result.deadLettered} job${result.deadLettered === 1 ? "" : "s"} moved to dead-letter queue; run /hindsight:debug to inspect.`
+        ? ` ${result.deadLettered} job${result.deadLettered === 1 ? "" : "s"} moved to dead-letter queue; run /hindsight to inspect.`
         : "";
       const status =
         result.remaining > 0
@@ -115,7 +115,7 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
         content: [
           {
             type: "text",
-            text: `Wrote ${result.path}\nProject bank: ${result.projectBankId}\nRun /hindsight:debug to verify.`,
+            text: `Wrote ${result.path}\nProject bank: ${result.projectBankId}\nRun /hindsight to verify.`,
           },
         ],
         details: { path: result.path, projectBankId: result.projectBankId },

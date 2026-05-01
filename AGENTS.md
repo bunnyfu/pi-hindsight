@@ -246,3 +246,17 @@ A change is done only when:
 4. user-visible behavior is documented if changed
 5. the diff is minimal and focused
 6. no new memory anti-pattern was introduced
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues for `luxus/pi-hindsight` using the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Triage uses the default five-label vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This repo uses a single-context domain documentation layout. See `docs/agents/domain.md`.
