@@ -5,24 +5,12 @@ import { deriveProjectBankId } from "./banking.js";
 import { createHindsightClient } from "./client.js";
 import { ensureGlobalBank, ensureProjectBank } from "./bank-operations.js";
 import { recallForContext } from "./recall.js";
-import { enqueueRetainFromAgentEnd } from "./retain.js";
 import { detectAppendCapability } from "./capabilities.js";
 import { flushRetainQueue, resolveQueuePath } from "./queue.js";
-import { stableSessionId } from "./session.js";
 import { bankSelectionMessage } from "./diagnostics.js";
-import { projectMessages } from "./messages.js";
 import { selectMemoryScopes } from "./memory-scope.js";
-import {
-  addRetainFingerprints,
-  messageFingerprint,
-  readRetainFingerprints,
-} from "./retain-cursor.js";
 import type { HindsightCapabilities, HindsightLikeClient, ResolvedConfig } from "./types.js";
-import {
-  clearNextSessionRetainMode,
-  getEffectiveSessionMemoryMode,
-  readSessionMemoryMeta,
-} from "./session-memory-meta.js";
+import { getEffectiveSessionMemoryMode, readSessionMemoryMeta } from "./session-memory-meta.js";
 import { writeLastRecallSnapshot } from "./recall-visibility.js";
 import { redactError } from "./sanitize.js";
 import {
@@ -34,6 +22,7 @@ import {
   type RuntimeCtx,
   type RuntimeSnapshot,
 } from "./memory-lifecycle-runtime.js";
+import { createRetainTurnPolicy } from "./memory-lifecycle-retain.js";
 
 export interface MemoryLifecycleDeps {
   getClient(): HindsightLikeClient;
@@ -61,8 +50,6 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
   let capabilities: HindsightCapabilities | undefined;
   let periodicFlush: NodeJS.Timeout | undefined;
   let periodicFlushActive = false;
-  const retainedBySession = new Map<string, Set<string>>();
-
   const stopPeriodicFlush = () => {
     if (!periodicFlush) return;
     clearInterval(periodicFlush);
@@ -112,34 +99,6 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       ...(queueRemaining !== undefined ? { queueRemaining } : {}),
     });
 
-  const newRetainMessages = async (
-    runtime: RuntimeSnapshot,
-    messages: AgentEndEvent["messages"],
-  ): Promise<AgentEndEvent["messages"]> => {
-    const sessionId = stableSessionId(runtime.sessionFile, runtime.cwd);
-    const seen =
-      retainedBySession.get(sessionId) ?? (await readRetainFingerprints(runtime.cwd, sessionId));
-    retainedBySession.set(sessionId, seen);
-    return messages.filter(
-      (message) => !seen.has(messageFingerprint(message as AgentMessage)),
-    ) as AgentEndEvent["messages"];
-  };
-
-  const markRetainedMessages = async (
-    runtime: RuntimeSnapshot,
-    messages: AgentEndEvent["messages"],
-  ): Promise<void> => {
-    const sessionId = stableSessionId(runtime.sessionFile, runtime.cwd);
-    const seen = retainedBySession.get(sessionId) ?? new Set<string>();
-    const fingerprints = messages.map((message) => messageFingerprint(message as AgentMessage));
-    for (const fingerprint of fingerprints) seen.add(fingerprint);
-    retainedBySession.set(sessionId, seen);
-    await addRetainFingerprints(runtime.cwd, sessionId, fingerprints);
-  };
-
-  const retainableMessageCount = (messages: AgentEndEvent["messages"]): number =>
-    projectMessages(messages as AgentMessage[], config).length;
-
   const deps: MemoryLifecycleDeps = {
     getClient: () => client,
     getConfig: () => config,
@@ -147,6 +106,16 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
     getCapabilities: () => capabilities,
     reloadConfig,
   };
+
+  const retainPolicy = createRetainTurnPolicy({
+    getConfig: () => config,
+    getClient: () => client,
+    getProjectBankId: () => projectBankId,
+    getCapabilities: () => capabilities,
+    setMemoryStatus: (runtime, activity, queueRemaining) =>
+      setMemoryStatus(runtime, activity, undefined, queueRemaining),
+    notify,
+  });
 
   return {
     deps,
@@ -282,62 +251,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
         return { queued: false, sent: 0, remaining: 0 };
       const runtime = snapshotRuntime(ctx);
       if (!runtime) return { queued: false, sent: 0, remaining: 0 };
-      const sessionMeta = await readSessionMemoryMeta(runtime.cwd, runtime.sessionFile);
-      const nextRetainMode = sessionMeta.nextRetainMode;
-      const sessionMemory = getEffectiveSessionMemoryMode(sessionMeta);
-      if (!sessionMemory.retain || nextRetainMode === "off") {
-        try {
-          await markRetainedMessages(runtime, event.messages);
-        } catch (error) {
-          setMemoryStatus(runtime, "retain-failed");
-          notify(
-            runtime,
-            `Hindsight retain cursor update failed: ${(error as Error).message}`,
-            "warning",
-          );
-          return { queued: false, sent: 0, remaining: 0 };
-        }
-        if (nextRetainMode === "off") {
-          await clearNextSessionRetainMode(runtime.cwd, runtime.sessionFile);
-          notify(runtime, "Hindsight skipped retain for this run due to next-opt-out.", "info");
-        }
-        return { queued: false, sent: 0, remaining: 0 };
-      }
-      const messages = await newRetainMessages(runtime, event.messages);
-      const messageCount = retainableMessageCount(messages);
-      if (!messageCount) return { queued: false, sent: 0, remaining: 0 };
-      try {
-        setMemoryStatus(runtime, "retaining");
-        const result = await enqueueRetainFromAgentEnd({
-          event: { ...event, messages },
-          cwd: runtime.cwd,
-          ...(runtime.sessionFile ? { sessionFile: runtime.sessionFile } : {}),
-          config,
-          client,
-          bankId: projectBankId,
-          ...(capabilities ? { capabilities } : {}),
-          extraTags: sessionMemory.tags,
-        });
-        if (result.queued) await markRetainedMessages(runtime, messages);
-        setMemoryStatus(
-          runtime,
-          result.remaining > 0 ? "retain-queued" : "retained",
-          undefined,
-          result.remaining,
-        );
-        if (config.notifications.retain) {
-          notify(
-            runtime,
-            `Hindsight retained ${messageCount} new message${messageCount === 1 ? "" : "s"} to ${projectBankId}${result.remaining > 0 ? `; ${result.remaining} queued` : ""}`,
-            "info",
-          );
-        }
-        return result;
-      } catch (error) {
-        setMemoryStatus(runtime, "retain-failed");
-        notify(runtime, `Hindsight retain queue failed: ${redactError(error)}`, "warning");
-        return { queued: false, sent: 0, remaining: 0 };
-      }
+      return retainPolicy.retain(event, runtime);
     },
 
     async shutdown(ctx: RuntimeCtx): Promise<void> {
