@@ -3,75 +3,29 @@ import type { ResolvedConfig } from "./types.js";
 import {
   readGlobalConfig,
   readProjectConfig,
-  DEFAULT_GLOBAL_BANK_ID,
-  type ConfigResetKey,
   type ConfigScope,
   type ConfigSource,
   type MemoryProfile,
-  type ProjectConfigPatchInput,
 } from "./config-writer.js";
-
-export type FieldId =
-  | "enabled"
-  | "baseUrl"
-  | "apiKeyEnv"
-  | "timeoutMs"
-  | "memoryProfile"
-  | "projectBankId"
-  | "globalBankEnabled"
-  | "globalBankId"
-  | "recallEnabled"
-  | "recallBudget"
-  | "recallMaxTokens"
-  | "retainEnabled"
-  | "retainAsync"
-  | "queuePath"
-  | "importBranches"
-  | "importManifest"
-  | "importCheckpoint"
-  | "importReplaceExisting"
-  | "importResume"
-  | "statusStyle"
-  | "statusDetail"
-  | "statusMaxLength"
-  | "statusActivity"
-  | "notifyStartup"
-  | "notifyRecall"
-  | "notifyRetain";
-
-export type TabId = "Status" | "Connection" | "Banks" | "Recall" | "Retain" | "Import" | "UI";
-
-export type ConfigEditingKind = "boolean" | "select" | "text" | "positive-int";
-
-export type ConfigEditingField = {
-  id: FieldId;
-  tab: Exclude<TabId, "Status">;
-  label: string;
-  description: string;
-  value: string;
-  defaultValue: string;
-  projectValue?: string;
-  globalValue?: string;
-  envValue?: string;
-  source: ConfigSource;
-  editableScopes: ConfigScope[];
-  changed: boolean;
-  resetKey: ConfigResetKey;
-  kind: ConfigEditingKind;
-  choices?: string[];
-};
-
-export type ConfigLayers = {
-  project: Record<string, unknown>;
-  global: Record<string, unknown>;
-  env: NodeJS.ProcessEnv;
-};
-
-export type ConfigEditingTab = {
-  id: TabId;
-  fields: ConfigEditingField[];
-  facts?: Array<[string, string]>;
-};
+import type {
+  ConfigEditingField,
+  ConfigEditingTab,
+  ConfigLayers,
+  FieldId,
+  TabId,
+} from "./config-editing-types.js";
+export type {
+  ConfigEditingField,
+  ConfigEditingKind,
+  ConfigEditingTab,
+  ConfigLayers,
+  FieldId,
+  TabId,
+} from "./config-editing-types.js";
+export {
+  inputDefaultForConfigEditingField,
+  patchForConfigEditingField,
+} from "./config-editing-actions.js";
 
 function memoryProfileLabel(config: ResolvedConfig): MemoryProfile {
   if (!config.banks.project.enabled) return "global-only";
@@ -547,101 +501,6 @@ export function buildConfigEditingFields(
     );
     return enriched;
   });
-}
-
-export function patchForConfigEditingField(
-  fieldId: FieldId,
-  value: string,
-  config: ResolvedConfig,
-): ProjectConfigPatchInput | undefined {
-  switch (fieldId) {
-    case "enabled":
-      return { enabled: value === "Enable" };
-    case "baseUrl":
-      return { baseUrl: value.trim() };
-    case "apiKeyEnv":
-      return { apiKeyEnvVar: value.trim() };
-    case "timeoutMs":
-      return { timeoutMs: Number(value) };
-    case "memoryProfile":
-      return {
-        memoryProfile: value as MemoryProfile,
-        globalBankId: config.banks.global.bankId ?? DEFAULT_GLOBAL_BANK_ID,
-      };
-    case "projectBankId":
-      return { projectBankId: value.trim() };
-    case "globalBankEnabled":
-      return { enableGlobalBank: value === "Enable" };
-    case "globalBankId":
-      return { globalBankId: value.trim() };
-    case "recallEnabled":
-      return { recallEnabled: value === "Enable" };
-    case "recallBudget":
-      return { recallBudget: value as "low" | "mid" | "high" };
-    case "recallMaxTokens":
-      return { recallMaxTokens: Number(value) };
-    case "retainEnabled":
-      return { retainEnabled: value === "Enable" };
-    case "retainAsync":
-      return { retainAsync: value === "Enable" };
-    case "queuePath":
-      return { queuePath: value.trim() };
-    case "importBranches":
-      return { importIncludeBranches: value as "current-only" | "all-leaves" };
-    case "importManifest":
-      return { importManifestPath: value.trim() };
-    case "importCheckpoint":
-      return { importCheckpointPath: value.trim() };
-    case "importReplaceExisting":
-      return { importReplaceExistingDocs: value === "Enable" };
-    case "importResume":
-      return { importResume: value === "Enable" };
-    case "statusStyle":
-      return { statusStyle: value as "off" | "text" | "emoji" | "nerdfont" };
-    case "statusDetail":
-      return { statusDetail: value as "minimal" | "project" | "activity" | "verbose" };
-    case "statusMaxLength":
-      return { statusMaxLength: Number(value) };
-    case "statusActivity":
-      return { statusShowActivity: value === "Enable" };
-    case "notifyStartup":
-      return { notifyStartup: value === "Enable" };
-    case "notifyRecall":
-      return { notifyRecall: value === "Enable" };
-    case "notifyRetain":
-      return { notifyRetain: value === "Enable" };
-  }
-}
-
-export function inputDefaultForConfigEditingField(
-  fieldId: FieldId,
-  config: ResolvedConfig,
-  projectBankId: string,
-): string {
-  switch (fieldId) {
-    case "apiKeyEnv":
-      return apiKeyEnvName(config) === "not set" ? "HINDSIGHT_API_KEY" : apiKeyEnvName(config);
-    case "projectBankId":
-      return projectBankId;
-    case "globalBankId":
-      return config.banks.global.bankId ?? DEFAULT_GLOBAL_BANK_ID;
-    case "timeoutMs":
-      return String(config.hindsight.timeoutMs);
-    case "recallMaxTokens":
-      return String(config.recall.maxTokens);
-    case "statusMaxLength":
-      return String(config.status.maxLength);
-    case "baseUrl":
-      return config.hindsight.baseUrl;
-    case "queuePath":
-      return config.retain.queuePath;
-    case "importManifest":
-      return config.import.manifestPath;
-    case "importCheckpoint":
-      return config.import.checkpointPath;
-    default:
-      return "";
-  }
 }
 
 export function buildConfigEditingTabs(
