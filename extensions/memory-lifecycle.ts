@@ -1,17 +1,12 @@
 import type { AgentEndEvent } from "@mariozechner/pi-coding-agent";
-import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { resolveConfig } from "./config.js";
 import { deriveProjectBankId } from "./banking.js";
 import { createHindsightClient } from "./client.js";
 import { ensureGlobalBank, ensureProjectBank } from "./bank-operations.js";
-import { recallForContext } from "./recall.js";
 import { detectAppendCapability } from "./capabilities.js";
 import { flushRetainQueue, resolveQueuePath } from "./queue.js";
 import { bankSelectionMessage } from "./diagnostics.js";
-import { selectMemoryScopes } from "./memory-scope.js";
 import type { HindsightCapabilities, HindsightLikeClient, ResolvedConfig } from "./types.js";
-import { getEffectiveSessionMemoryMode, readSessionMemoryMeta } from "./session-memory-meta.js";
-import { writeLastRecallSnapshot } from "./recall-visibility.js";
 import { redactError } from "./sanitize.js";
 import {
   notify,
@@ -23,6 +18,7 @@ import {
   type RuntimeSnapshot,
 } from "./memory-lifecycle-runtime.js";
 import { createRetainTurnPolicy } from "./memory-lifecycle-retain.js";
+import { createRecallTurnPolicy } from "./memory-lifecycle-recall.js";
 
 export interface MemoryLifecycleDeps {
   getClient(): HindsightLikeClient;
@@ -117,6 +113,14 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
     notify,
   });
 
+  const recallPolicy = createRecallTurnPolicy({
+    getConfig: () => config,
+    getClient: () => client,
+    setMemoryStatus: (runtime, activity, memoryCount) =>
+      setMemoryStatus(runtime, activity, memoryCount),
+    notify,
+  });
+
   return {
     deps,
 
@@ -170,77 +174,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       if (!config.enabled || !config.recall.enabled) return undefined;
       const runtime = snapshotRuntime(ctx);
       if (!runtime) return undefined;
-      const sessionMemory = getEffectiveSessionMemoryMode(
-        await readSessionMemoryMeta(runtime.cwd, runtime.sessionFile),
-      );
-      if (!sessionMemory.recall) return undefined;
-      const scopes = selectMemoryScopes(runtime.cwd, config);
-      if (scopes.length === 0) return undefined;
-      if (config.recall.injectionPosition === "append") {
-        const last = event.messages[event.messages.length - 1];
-        const lastRole = (last as unknown as { role?: string } | undefined)?.role;
-        if (!last || lastRole !== "user") return undefined;
-      }
-      try {
-        setMemoryStatus(runtime, "recalling");
-        const { rendered, blocks, failed } = await recallForContext({
-          client,
-          config,
-          scopes,
-          messages: event.messages,
-          cwd: runtime.cwd,
-        });
-        const memoryCount = blocks.reduce((count, block) => count + block.memoryCount, 0);
-        setMemoryStatus(
-          runtime,
-          memoryCount > 0 ? "recalled" : failed > 0 ? "recall-failed" : "recall-empty",
-          memoryCount,
-        );
-        if (config.notifications.recall) {
-          notify(
-            runtime,
-            memoryCount > 0
-              ? `Hindsight recalled ${memoryCount} memory item${memoryCount === 1 ? "" : "s"} from ${blocks.map((block) => block.bankId).join(", ")}${failed > 0 ? `; ${failed} bank${failed === 1 ? "" : "s"} failed` : ""}`
-              : failed > 0
-                ? `Hindsight recall failed for ${failed} bank${failed === 1 ? "" : "s"}`
-                : "Hindsight recalled no matching memory",
-            failed > 0 && memoryCount === 0 ? "warning" : "info",
-          );
-        }
-        if (config.recall.storeLastRecall && (rendered || failed === 0)) {
-          try {
-            await writeLastRecallSnapshot(runtime.cwd, config.recall.lastRecallPath, {
-              query: blocks[0]?.query ?? "",
-              rendered,
-              blocks,
-            });
-          } catch (error) {
-            notify(
-              runtime,
-              `Hindsight last recall snapshot write failed: ${(error as Error).message}`,
-              "warning",
-            );
-          }
-        }
-        if (!rendered) return undefined;
-        const recallMessage = {
-          role: "user",
-          content: rendered,
-          timestamp: Date.now(),
-        } as AgentMessage;
-        if (config.recall.injectionPosition === "append") {
-          const last = event.messages[event.messages.length - 1];
-          const lastRole = (last as unknown as { role?: string } | undefined)?.role;
-          if (last && lastRole === "user") {
-            return { messages: [...event.messages.slice(0, -1), recallMessage, last] };
-          }
-          return undefined;
-        }
-        return { messages: [recallMessage, ...event.messages] };
-      } catch {
-        setMemoryStatus(runtime, "recall-failed");
-        return undefined;
-      }
+      return recallPolicy.recall(event, runtime);
     },
 
     async retain(
