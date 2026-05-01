@@ -1177,6 +1177,7 @@ describe("extension hooks", () => {
     writeFileSync(
       join(cwd, ".pi", "hindsight.json"),
       JSON.stringify({
+        banks: { global: { enabled: false } },
         notifications: { startup: false, recall: true, retain: true },
       }),
     );
