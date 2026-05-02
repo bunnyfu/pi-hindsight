@@ -1,5 +1,5 @@
 import { readdir, readFile, stat } from "node:fs/promises";
-import { dirname, extname, join } from "node:path";
+import { dirname, extname, join, resolve } from "node:path";
 import type { HindsightLikeClient, ResolvedConfig } from "./types.js";
 import { importDocumentId } from "./session.js";
 import { parseImportSessionJsonl, parsePiSessionJsonl } from "./import-parser.js";
@@ -16,7 +16,7 @@ export type { ImportSessionDocumentResult } from "./import-execution.js";
 
 function sameProjectCwd(sessionCwd: string | undefined, cwd: string): boolean {
   if (!sessionCwd) return false;
-  return sessionCwd === cwd;
+  return resolve(sessionCwd) === resolve(cwd);
 }
 
 async function isFile(path: string): Promise<boolean> {

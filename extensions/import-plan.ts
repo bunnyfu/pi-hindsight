@@ -1,4 +1,4 @@
-import { dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import type { ResolvedConfig } from "./types.js";
 import type { ParsedSession } from "./import-parser.js";
 import { leafIds, selectImportBranches, type ImportBranch } from "./import-branches.js";
@@ -21,6 +21,11 @@ export interface ImportPlan {
   importConfig: ResolvedConfig;
 }
 
+function sameCwd(left: string | undefined, right: string | undefined): boolean {
+  if (!left || !right) return false;
+  return resolve(left) === resolve(right);
+}
+
 export function buildImportPlan(args: {
   sessionFile: string;
   parsed: ParsedSession;
@@ -29,12 +34,12 @@ export function buildImportPlan(args: {
   cwd?: string;
   includeBranches?: ResolvedConfig["import"]["includeBranches"];
 }): ImportPlan {
-  if (args.cwd && args.parsed.cwd && args.parsed.cwd !== args.cwd) {
+  if (args.cwd && args.parsed.cwd && !sameCwd(args.parsed.cwd, args.cwd)) {
     throw new Error(
       `Refusing to import session from cwd ${args.parsed.cwd}; current cwd is ${args.cwd}. Use project-scoped import from the matching repo.`,
     );
   }
-  const cwd = args.cwd ?? args.parsed.cwd ?? dirname(args.sessionFile);
+  const cwd = resolve(args.cwd ?? args.parsed.cwd ?? dirname(args.sessionFile));
   const sessionId = args.parsed.sessionId ?? stableSessionId(args.sessionFile, cwd);
   const leaves = leafIds(args.parsed.messages);
   const includeBranches = args.includeBranches ?? args.config.import.includeBranches;

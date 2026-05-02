@@ -18,4 +18,4 @@ These are deferred deepening opportunities identified after the mission/global-m
 
 ## Historical import queue seam
 
-- Import delivery now has an import-specific queue seam and records queued-but-not-delivered imports as `queued` in checkpoints/results.
+- Import delivery now has an import-specific queue seam, records queued-but-not-delivered imports as `queued` in checkpoints/results, and normalizes equivalent cwd paths before project-scope checks.

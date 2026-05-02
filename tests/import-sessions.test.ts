@@ -593,6 +593,38 @@ describe("Pi session import", () => {
     expect(result.runId).toContain(":replace:");
   });
 
+  it("accepts equivalent normalized project cwd paths", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-"));
+    mkdirSync(join(dir, ".git"));
+    const sessionFile = join(dir, "session.jsonl");
+    writeFileSync(
+      sessionFile,
+      [
+        JSON.stringify({ type: "session", id: "session-normalized", cwd: `${dir}/` }),
+        JSON.stringify({
+          type: "message",
+          id: "root",
+          parentId: null,
+          message: { role: "user", content: "normalized cwd" },
+        }),
+      ].join("\n"),
+    );
+
+    const result = await importPiSession({
+      sessionFile,
+      cwd: dir,
+      bankId: "bank",
+      config: DEFAULT_CONFIG,
+      client: {
+        retain: async () => undefined,
+        recall: async () => [],
+        reflect: async () => ({}),
+      },
+    });
+
+    expect(result.documents[0]?.documentId).toBe("pi-import:session-normalized:leaf:root");
+  });
+
   it("rejects explicit imports from a different project cwd", async () => {
     const current = mkdtempSync(join(tmpdir(), "pi-hindsight-import-current-"));
     const other = mkdtempSync(join(tmpdir(), "pi-hindsight-import-other-"));
