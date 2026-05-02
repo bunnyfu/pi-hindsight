@@ -65,6 +65,27 @@ describe("memory router", () => {
     expect(decision.writes).toEqual(["project", "global"]);
   });
 
+  it("uses mission terms as routing signals", () => {
+    const decision = routeMemoryCandidate({
+      content: "The importer checkpoint should preserve manifests safely.",
+      config: {
+        ...DEFAULT_CONFIG,
+        banks: {
+          ...DEFAULT_CONFIG.banks,
+          project: {
+            ...DEFAULT_CONFIG.banks.project,
+            mission: "Importer checkpoint manifest architecture",
+          },
+        },
+      },
+    });
+
+    expect(decision.route).toBe("project");
+    expect(decision.matchedSignals).toEqual(
+      expect.arrayContaining(["project mission:importer/checkpoint/manifest"]),
+    );
+  });
+
   it("passes mission context through the router adapter seam", () => {
     const calls: unknown[] = [];
     const adapter: MemoryRouterAdapter = {

@@ -99,17 +99,44 @@ function classifyFromSignals(args: {
   };
 }
 
-export function createHeuristicMemoryRouter(): MemoryRouterAdapter {
+function missionTerms(mission: string | undefined): string[] {
+  return (mission ?? "")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(
+      (term) =>
+        term.length >= 5 &&
+        !["built", "global", "memory", "mission", "project", "retain", "reflect"].includes(term),
+    );
+}
+
+function missionMatches(text: string, mission: string | undefined, label: string): string[] {
+  const lower = text.toLowerCase();
+  const matched = missionTerms(mission).filter((term) => lower.includes(term));
+  return matched.length ? [`${label} mission:${matched.slice(0, 3).join("/")}`] : [];
+}
+
+export function createMissionAwareMemoryRouter(): MemoryRouterAdapter {
   return {
     classify(args) {
       const text = `${args.content}\n${args.context ?? ""}`;
       return classifyFromSignals({
-        globalMatches: matchSignals(text, GLOBAL_PATTERNS),
-        projectMatches: matchSignals(text, PROJECT_PATTERNS),
+        globalMatches: [
+          ...matchSignals(text, GLOBAL_PATTERNS),
+          ...missionMatches(text, args.globalMission, "global"),
+        ],
+        projectMatches: [
+          ...matchSignals(text, PROJECT_PATTERNS),
+          ...missionMatches(text, args.projectMission, "project"),
+        ],
         skipMatches: matchSignals(text, SKIP_PATTERNS),
       });
     },
   };
+}
+
+export function createHeuristicMemoryRouter(): MemoryRouterAdapter {
+  return createMissionAwareMemoryRouter();
 }
 
 function missionSummary(mission: string | undefined, fallback: string): string {
@@ -119,7 +146,7 @@ function missionSummary(mission: string | undefined, fallback: string): string {
 
 export function routeMemoryCandidate(
   args: MemoryRouteInput,
-  adapter: MemoryRouterAdapter = createHeuristicMemoryRouter(),
+  adapter: MemoryRouterAdapter = createMissionAwareMemoryRouter(),
 ): MemoryRouteDecision {
   const projectMission = missionSummary(
     args.config.banks.project.mission,

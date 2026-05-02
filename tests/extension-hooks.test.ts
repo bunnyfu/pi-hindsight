@@ -379,6 +379,80 @@ describe("extension hooks", () => {
     expect(mocked.client.retain).not.toHaveBeenCalled();
   });
 
+  it("routes automatic retain to global bank when router mode selects global", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({
+        globalRetain: { mode: "router" },
+        banks: { global: { enabled: true, bankId: "global-luxus" } },
+      }),
+    );
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { createMemoryLifecycle } = await import("../extensions/memory-lifecycle.js");
+    const lifecycle = createMemoryLifecycle(cwd);
+    await lifecycle.initialize(ctx);
+    mocked.client.retain.mockClear();
+    const result = await lifecycle.retain(
+      {
+        messages: [
+          { role: "user", content: "Kai prefers terse replies across projects", timestamp: 1 },
+          {
+            role: "assistant",
+            content: "I will remember this durable user preference.",
+            timestamp: 2,
+          },
+        ],
+      } as any,
+      ctx,
+    );
+
+    expect(result).toMatchObject({ queued: true });
+    expect(mocked.client.retain).toHaveBeenCalledTimes(1);
+    expect(mocked.client.retain.mock.calls[0]?.[0]).toBe("global-luxus");
+  });
+
+  it("skips automatic retain when router mode classifies content as skip", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ globalRetain: { mode: "router" } }),
+    );
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { createMemoryLifecycle } = await import("../extensions/memory-lifecycle.js");
+    const lifecycle = createMemoryLifecycle(cwd);
+    await lifecycle.initialize(ctx);
+    mocked.client.retain.mockClear();
+    await lifecycle.retain(
+      {
+        messages: [
+          {
+            role: "user",
+            content: "Temporary screenshot at /var/folders/x/Screenshot 2026-05-02.png",
+            timestamp: 1,
+          },
+        ],
+      } as any,
+      ctx,
+    );
+
+    expect(mocked.client.retain).not.toHaveBeenCalled();
+  });
+
   it("deletes an exact Hindsight document only with confirmation", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-tools-"));
     mkdirSync(join(cwd, ".git"));

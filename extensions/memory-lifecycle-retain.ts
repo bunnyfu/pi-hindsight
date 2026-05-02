@@ -1,6 +1,7 @@
 import type { AgentEndEvent } from "@mariozechner/pi-coding-agent";
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { projectMessages } from "./messages.js";
+import { routeMemoryCandidate, type MemoryRouteDecision } from "./memory-router.js";
 import { enqueueRetainFromAgentEnd } from "./retain.js";
 import {
   addRetainFingerprints,
@@ -74,13 +75,41 @@ export function createRetainTurnPolicy(deps: RetainTurnPolicyDeps): RetainTurnPo
     await addRetainFingerprints(runtime.cwd, sessionId, fingerprints);
   };
 
+  const retainableMessages = (messages: AgentEndEvent["messages"]): Record<string, unknown>[] =>
+    projectMessages(messages as AgentMessage[], deps.getConfig());
+
   const retainableMessageCount = (messages: AgentEndEvent["messages"]): number =>
-    projectMessages(messages as AgentMessage[], deps.getConfig()).length;
+    retainableMessages(messages).length;
+
+  const retainTargets = (
+    runtime: RuntimeSnapshot,
+    messages: AgentEndEvent["messages"],
+  ): { targets: string[]; decision?: MemoryRouteDecision } => {
+    const config = deps.getConfig();
+    if (config.globalRetain.mode !== "router") {
+      return { targets: config.banks.project.enabled ? [deps.getProjectBankId()] : [] };
+    }
+    const content = JSON.stringify(retainableMessages(messages), null, 2);
+    const decision = routeMemoryCandidate({
+      content,
+      context: "Automatic retain from Pi agent_end.",
+      config,
+    });
+    const targets = decision.writes.flatMap((target) => {
+      if (target === "project" && config.banks.project.enabled) return [deps.getProjectBankId()];
+      if (target === "global" && config.banks.global.enabled && config.banks.global.bankId)
+        return [config.banks.global.bankId];
+      return [];
+    });
+    return { targets: [...new Set(targets)], decision };
+  };
 
   return {
     async retain(event: AgentEndEvent, runtime: RuntimeSnapshot): Promise<RetainTurnResult> {
       const config = deps.getConfig();
-      if (!config.enabled || !config.retain.enabled || !config.banks.project.enabled)
+      const canRetainProject = config.banks.project.enabled;
+      const canRetainGlobal = config.banks.global.enabled && Boolean(config.banks.global.bankId);
+      if (!config.enabled || !config.retain.enabled || (!canRetainProject && !canRetainGlobal))
         return { queued: false, sent: 0, remaining: 0 };
 
       const sessionMeta = await readSessionMemoryMeta(runtime.cwd, runtime.sessionFile);
@@ -116,30 +145,47 @@ export function createRetainTurnPolicy(deps: RetainTurnPolicyDeps): RetainTurnPo
       try {
         deps.setMemoryStatus(runtime, "retaining");
         const capabilities = deps.getCapabilities();
-        const result = await enqueueRetainFromAgentEnd({
-          event: { ...event, messages },
-          cwd: runtime.cwd,
-          ...(runtime.sessionFile ? { sessionFile: runtime.sessionFile } : {}),
-          config,
-          client: deps.getClient(),
-          bankId: deps.getProjectBankId(),
-          ...(capabilities ? { capabilities } : {}),
-          extraTags: sessionMemory.tags,
-        });
-        if (result.queued) await markRetainedMessages(runtime, messages);
-        deps.setMemoryStatus(
-          runtime,
-          result.remaining > 0 ? "retain-queued" : "retained",
-          result.remaining,
-        );
+        const { targets, decision } = retainTargets(runtime, messages);
+        if (targets.length === 0) {
+          await markRetainedMessages(runtime, messages);
+          deps.setMemoryStatus(runtime, "retained", 0);
+          if (config.notifications.retain) {
+            deps.notify(
+              runtime,
+              `Hindsight router skipped ${messageCount} new message${messageCount === 1 ? "" : "s"}${decision ? `; ${decision.reason}` : ""}`,
+              "info",
+            );
+          }
+          return { queued: false, sent: 0, remaining: 0 };
+        }
+        let sent = 0;
+        let remaining = 0;
+        let queued = false;
+        for (const bankId of targets) {
+          const result = await enqueueRetainFromAgentEnd({
+            event: { ...event, messages },
+            cwd: runtime.cwd,
+            ...(runtime.sessionFile ? { sessionFile: runtime.sessionFile } : {}),
+            config,
+            client: deps.getClient(),
+            bankId,
+            ...(capabilities ? { capabilities } : {}),
+            extraTags: sessionMemory.tags,
+          });
+          queued ||= result.queued;
+          sent += result.sent;
+          remaining = result.remaining;
+        }
+        if (queued) await markRetainedMessages(runtime, messages);
+        deps.setMemoryStatus(runtime, remaining > 0 ? "retain-queued" : "retained", remaining);
         if (config.notifications.retain) {
           deps.notify(
             runtime,
-            `Hindsight retained ${messageCount} new message${messageCount === 1 ? "" : "s"} to ${deps.getProjectBankId()}${result.remaining > 0 ? `; ${result.remaining} queued` : ""}`,
+            `Hindsight retained ${messageCount} new message${messageCount === 1 ? "" : "s"} to ${targets.join(", ")}${decision ? `; ${decision.reason}` : ""}${remaining > 0 ? `; ${remaining} queued` : ""}`,
             "info",
           );
         }
-        return result;
+        return { queued, sent, remaining };
       } catch (error) {
         deps.setMemoryStatus(runtime, "retain-failed");
         deps.notify(runtime, `Hindsight retain queue failed: ${redactError(error)}`, "warning");
