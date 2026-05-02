@@ -6,6 +6,7 @@ import {
   configureToolResponse,
   deleteDocumentToolResponse,
   importToolResponse,
+  retainReceiptListToolResponse,
   retainToolResponse,
   routeMemoryToolResponse,
 } from "./tool-presenters.js";
@@ -109,6 +110,21 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
         ...(params.entities ? { entities: params.entities } : {}),
       });
       return retainToolResponse(result);
+    },
+  });
+
+  pi.registerTool({
+    name: "hindsight_retain_receipts",
+    label: "Hindsight Retain Receipts",
+    description: "List recent explicit retain receipts so exact document IDs can be deleted.",
+    parameters: Type.Object({
+      limit: Type.Optional(
+        Type.Number({ description: "Maximum receipts to return. Defaults to 10." }),
+      ),
+    }),
+    async execute(_id, params, _signal, _onUpdate, ctx) {
+      const result = await operations.listRetainReceipts(ctx.cwd, params.limit);
+      return retainReceiptListToolResponse(result);
     },
   });
 

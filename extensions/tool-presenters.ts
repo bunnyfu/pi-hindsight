@@ -10,6 +10,7 @@ export type RouteMemoryToolResult = ReturnType<MemoryOperations["routeMemory"]>;
 export type DeleteDocumentToolResult = Awaited<ReturnType<MemoryOperations["deleteDocument"]>>;
 export type ConfigureToolResult = Awaited<ReturnType<MemoryOperations["configure"]>>;
 export type ImportToolResult = Awaited<ReturnType<MemoryOperations["importSession"]>>;
+export type RetainReceiptListResult = Awaited<ReturnType<MemoryOperations["listRetainReceipts"]>>;
 
 export function retainToolResponse(result: RetainToolResult): ToolTextResponse<RetainToolResult> {
   const deadLetterStatus = result.deadLettered
@@ -70,4 +71,17 @@ export function importToolResponse(result: ImportToolResult): ToolTextResponse<I
     ? `Import preview: ${result.messageCount} messages would write ${result.documents.length} ${documentLabel} to ${result.bankId}. First document: ${result.documentId}. Manifest unchanged: ${result.manifestPath}.`
     : `Imported ${result.messageCount} messages into ${result.bankId} as ${result.documentId}. Manifest: ${result.manifestPath}.`;
   return { content: [{ type: "text", text }], details: result };
+}
+
+export function retainReceiptListToolResponse(
+  result: RetainReceiptListResult,
+): ToolTextResponse<RetainReceiptListResult> {
+  const lines = result.map(
+    (receipt, index) =>
+      `${index + 1}. ${receipt.createdAt} ${receipt.bankId} ${receipt.documentId} (${receipt.updateMode})`,
+  );
+  return {
+    content: [{ type: "text", text: lines.length ? lines.join("\n") : "No retain receipts." }],
+    details: result,
+  };
 }

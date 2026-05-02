@@ -5,6 +5,7 @@ import { explicitMemoryDocumentId } from "./session.js";
 import { createMemoryIdentity, explicitRetainTags } from "./memory-identity.js";
 import { expandObservationScopes } from "./observation-scopes.js";
 import { retainDurably } from "./retain-durable.js";
+import { appendRetainReceipt, listRetainReceipts } from "./retain-receipts.js";
 import { getEffectiveSessionMemoryMode, readSessionMemoryMeta } from "./session-memory-meta.js";
 import type { ResolvedConfig } from "./types.js";
 
@@ -65,7 +66,21 @@ export function createRetainOperations(deps: MemoryOperationsDeps) {
         ...(args.entities?.length ? { entities: args.entities } : {}),
         ...(capabilities ? { capabilities } : {}),
       });
-      return { ...result, tags, queued: result.enqueued };
+      const response = { ...result, tags, queued: result.enqueued };
+      await appendRetainReceipt(args.cwd, {
+        bankId: result.bankId,
+        documentId: result.documentId,
+        queueJobId: result.queueJobId,
+        updateMode: result.updateMode,
+        source: "tool",
+        context: args.context,
+        tags,
+      });
+      return response;
+    },
+
+    async listRetainReceipts(cwd: string, limit?: number) {
+      return listRetainReceipts(cwd, limit);
     },
 
     async flush(cwd: string) {

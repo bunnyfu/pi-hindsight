@@ -126,6 +126,35 @@ describe("memory operations", () => {
     });
   });
 
+  it("records explicit retain receipts for exact deletion", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-ops-"));
+    const operations = createMemoryOperations({
+      getClient: () => client(),
+      getConfig: () => ({ ...DEFAULT_CONFIG, retain: { ...DEFAULT_CONFIG.retain, async: false } }),
+      getProjectBankId: () => "project-bank",
+    });
+
+    const retained = await operations.retainExplicit({
+      cwd,
+      content: "remember exact fact",
+      context: "user asked to keep exact fact",
+      tags: ["preference"],
+    });
+    const receipts = await operations.listRetainReceipts(cwd);
+
+    expect(receipts).toEqual([
+      expect.objectContaining({
+        bankId: "project-bank",
+        documentId: retained.documentId,
+        queueJobId: retained.queueJobId,
+        updateMode: "replace",
+        source: "tool",
+        context: "user asked to keep exact fact",
+        tags: expect.arrayContaining(["preference", "source:pi"]),
+      }),
+    ]);
+  });
+
   it("resolves project/global bank aliases for explicit operations", async () => {
     const calls: Array<{ method: string; bank: string }> = [];
     const config = {
