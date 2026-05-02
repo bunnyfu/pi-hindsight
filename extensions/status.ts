@@ -91,7 +91,7 @@ export function formatHindsightStatus(
   let body: string;
   if (detail === "minimal") body = "";
   else if (detail === "project") body = bank;
-  else if (detail === "activity") body = activity === "ready" ? bank : `${bank}:${activity}`;
+  else if (detail === "activity") body = activity;
   else body = `${project}:${bank}:${activity}`;
 
   const separator = style === "text" ? ":" : " ";

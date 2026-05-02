@@ -39,7 +39,7 @@ describe("formatHindsightStatus", () => {
     ).toBe("🧠");
   });
 
-  it("shows bank and activity after emoji when detail allows text", () => {
+  it("shows activity without long bank name when detail is activity", () => {
     const config = {
       ...DEFAULT_CONFIG,
       status: {
@@ -55,7 +55,7 @@ describe("formatHindsightStatus", () => {
         projectBankId: "pi-project-bank-123",
         activity: "recalling",
       }),
-    ).toBe("🧠 bank-123:recalling");
+    ).toBe("🧠 recalling");
   });
 
   it("uses brain explosion for failed emoji status", () => {
@@ -74,7 +74,7 @@ describe("formatHindsightStatus", () => {
         projectBankId: "bank",
         activity: "recall-failed",
       }),
-    ).toBe("🤯 bank:recall-failed");
+    ).toBe("🤯 recall-failed");
   });
 
   it("can hide status", () => {
