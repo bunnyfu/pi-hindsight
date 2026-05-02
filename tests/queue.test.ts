@@ -23,6 +23,7 @@ import {
   summarizeRetainQueue,
   writeRetainQueue,
 } from "../extensions/queue.js";
+import { retainOptionsForJob } from "../extensions/queue-delivery.js";
 import type { RetainJob } from "../extensions/types.js";
 
 const job: RetainJob = {
@@ -37,10 +38,14 @@ const job: RetainJob = {
 
 function runWorker(mode: string, path: string, id: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ["tests/fixtures/queue-worker.mjs", mode, path, id], {
-      cwd: process.cwd(),
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    const child = spawn(
+      "node_modules/.bin/vite-node",
+      ["tests/fixtures/queue-worker.mjs", mode, path, id],
+      {
+        cwd: process.cwd(),
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
     let stderr = "";
     child.stderr.on("data", (chunk) => {
       stderr += String(chunk);
@@ -64,6 +69,31 @@ describe("retain queue", () => {
     ).toBe(true);
     expect(isQueueLockOwnerStale(undefined, now, 2_000)).toBe(true);
     expect(isQueueLockOwnerStale({ pid: 123, acquiredAt: "not-a-date" }, now, 2_000)).toBe(true);
+  });
+
+  it("maps retain jobs to Hindsight retain options", () => {
+    expect(
+      retainOptionsForJob({
+        ...job,
+        item: {
+          ...job.item,
+          timestamp: "2026-01-01T00:00:00.000Z",
+          metadata: { source: "test" },
+          entities: [{ text: "entity", type: "thing" }],
+          observationScopes: [["repo:abc"]],
+        },
+      }),
+    ).toMatchObject({
+      context: "ctx",
+      timestamp: "2026-01-01T00:00:00.000Z",
+      metadata: { source: "test" },
+      async: true,
+      entities: [{ text: "entity", type: "thing" }],
+      tags: ["source:pi"],
+      observationScopes: [["repo:abc"]],
+      documentId: "doc",
+      updateMode: "append",
+    });
   });
 
   it("persists and flushes jobs", async () => {
