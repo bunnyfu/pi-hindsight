@@ -1,166 +1,17 @@
-import type { HindsightCapabilities, HindsightLikeClient, ResolvedConfig } from "./types.js";
-import { flushRetain } from "./retain-queue.js";
-import { type ProjectConfigPatchInput } from "./config-writer.js";
-import { configureMemory, initMemoryConfig } from "./config-operations.js";
+import type { ConfigureMemoryArgs, MemoryOperationsDeps } from "./memory-operation-types.js";
 import { importMemoryProjectSessions, importMemorySession } from "./import-operations.js";
+import { createConfigOperations } from "./memory-config-operations.js";
+import { createDocumentOperations } from "./memory-document-operations.js";
+import { createRecallOperations } from "./memory-recall-operations.js";
+import { createRetainOperations } from "./memory-retain-operations.js";
+import { createRoutingOperations } from "./memory-routing-operations.js";
+import { createSessionOperations } from "./memory-session-operations.js";
+import type { ResolvedConfig } from "./types.js";
 
-import { recallScopeTags } from "./banking.js";
-import { resolveOperationBank } from "./bank-selection.js";
-import { routeMemoryCandidate } from "./memory-router.js";
-import { explicitMemoryDocumentId } from "./session.js";
-import { createMemoryIdentity, explicitRetainTags } from "./memory-identity.js";
-import { expandObservationScopes } from "./observation-scopes.js";
-import { retainDurably } from "./retain-durable.js";
-import { readLastRecallSnapshot, resolveLastRecallPath } from "./recall-visibility.js";
-import { pruneTranscriptRecallBlocks, scanTranscriptForRecallBlocks } from "./recall-cleanup.js";
-import {
-  getEffectiveSessionMemoryMode,
-  readSessionMemoryMeta,
-  type SessionMemoryMode,
-} from "./session-memory-meta.js";
-import {
-  addMemorySessionTag,
-  readMemorySession,
-  removeMemorySessionTag,
-  setMemorySessionMode,
-  setMemorySessionRetain,
-  setNextMemoryRetainOff,
-} from "./session-operations.js";
+export type { ConfigureMemoryArgs, MemoryOperationsDeps } from "./memory-operation-types.js";
 
-export interface MemoryOperationsDeps {
-  getClient(): HindsightLikeClient;
-  getConfig(): ResolvedConfig;
-  getProjectBankId(): string;
-  getCapabilities?(): HindsightCapabilities | undefined;
-  reloadConfig?(cwd: string): void;
-}
-
-export type ConfigureMemoryArgs = ProjectConfigPatchInput;
-
-function recallTagsForBank(
-  cwd: string,
-  config: ResolvedConfig,
-  projectBankId: string,
-  bankId: string,
-): string[] {
-  return config.banks.global.enabled && bankId === config.banks.global.bankId
-    ? ["source:pi"]
-    : recallScopeTags(cwd);
-}
-
-export function createMemoryOperations(deps: MemoryOperationsDeps) {
+function createImportOperations(deps: MemoryOperationsDeps) {
   return {
-    async recall(
-      cwd: string,
-      query: string,
-      bank?: string,
-      sessionFile?: string,
-      queryTimestamp?: string,
-    ) {
-      const meta = await readSessionMemoryMeta(cwd, sessionFile);
-      if (!getEffectiveSessionMemoryMode(meta).recall)
-        throw new Error("Hindsight recall is disabled for this session");
-      const config = deps.getConfig();
-      const bankId = resolveOperationBank({
-        requestedBank: bank,
-        config,
-        projectBankId: deps.getProjectBankId(),
-      });
-      const result = await deps.getClient().recall(bankId, query, {
-        budget: config.recall.budget,
-        maxTokens: config.recall.maxTokens,
-        ...(queryTimestamp || config.recall.queryTimestamp
-          ? { queryTimestamp: queryTimestamp ?? config.recall.queryTimestamp }
-          : {}),
-        tags: recallTagsForBank(cwd, config, deps.getProjectBankId(), bankId),
-        tagsMatch: "any_strict",
-      });
-      return { bankId, result };
-    },
-
-    async retainExplicit(args: {
-      cwd: string;
-      sessionFile?: string;
-      content: string;
-      context: string;
-      bank?: string;
-      tags?: string[];
-      entities?: ResolvedConfig["retain"]["entities"];
-    }) {
-      const meta = await readSessionMemoryMeta(args.cwd, args.sessionFile);
-      if (!getEffectiveSessionMemoryMode(meta).retain)
-        throw new Error("Hindsight retain is disabled for this session");
-      const config = deps.getConfig();
-      const bankId = resolveOperationBank({
-        requestedBank: args.bank,
-        config,
-        projectBankId: deps.getProjectBankId(),
-      });
-      const tags = explicitRetainTags(args.cwd, args.sessionFile, [
-        ...(args.tags ?? []),
-        ...meta.tags,
-      ]);
-      const capabilities = deps.getCapabilities?.();
-      const identity = createMemoryIdentity(args.cwd, config, args.sessionFile);
-      const observationScopes = config.observations.enabled
-        ? expandObservationScopes(config.observations.scopes, {
-            ...identity,
-            projectBankId: bankId,
-          })
-        : [];
-      const result = await retainDurably({
-        cwd: args.cwd,
-        config,
-        client: deps.getClient(),
-        bankId,
-        content: args.content,
-        context: args.context,
-        tags,
-        updateMode: "replace",
-        documentId: explicitMemoryDocumentId({
-          cwd: args.cwd,
-          ...(args.sessionFile ? { sessionFile: args.sessionFile } : {}),
-          bankId,
-          content: args.content,
-          context: args.context,
-        }),
-        metadata: {
-          cwd: args.cwd,
-          ...(args.sessionFile ? { pi_session_file: args.sessionFile } : {}),
-        },
-        source: "tool",
-        ...(observationScopes.length ? { observationScopes } : {}),
-        ...(args.entities?.length ? { entities: args.entities } : {}),
-        ...(capabilities ? { capabilities } : {}),
-      });
-      return { ...result, tags, queued: result.enqueued };
-    },
-
-    async deleteDocument(args: { bank: string; documentId: string }) {
-      const bankId = resolveOperationBank({
-        requestedBank: args.bank,
-        config: deps.getConfig(),
-        projectBankId: deps.getProjectBankId(),
-      });
-      const client = deps.getClient();
-      if (!client.deleteDocument)
-        throw new Error("Hindsight delete document is unavailable in this client");
-      const result = await client.deleteDocument(bankId, args.documentId);
-      return { bankId, documentId: args.documentId, result };
-    },
-
-    routeMemory(args: { content: string; context?: string }) {
-      return routeMemoryCandidate({
-        content: args.content,
-        ...(args.context ? { context: args.context } : {}),
-        config: deps.getConfig(),
-      });
-    },
-
-    async configure(cwd: string, args: ConfigureMemoryArgs) {
-      return configureMemory(cwd, args, deps);
-    },
-
     async importSession(args: {
       sessionFile: string;
       cwd?: string;
@@ -181,76 +32,18 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
     }) {
       return importMemoryProjectSessions(args, deps);
     },
+  };
+}
 
-    async reflect(
-      cwd: string,
-      query: string,
-      context?: string,
-      bank?: string,
-      responseSchema?: Record<string, unknown>,
-    ) {
-      const config = deps.getConfig();
-      const bankId = resolveOperationBank({
-        requestedBank: bank,
-        config,
-        projectBankId: deps.getProjectBankId(),
-      });
-      const result = await deps.getClient().reflect(bankId, query, {
-        ...(context ? { context } : {}),
-        budget: config.recall.budget,
-        ...(responseSchema ? { responseSchema } : {}),
-        tags: recallTagsForBank(cwd, config, deps.getProjectBankId(), bankId),
-        tagsMatch: "any_strict",
-      });
-      return { bankId, result };
-    },
-
-    async init(cwd: string) {
-      const result = await initMemoryConfig(cwd, deps);
-      deps.reloadConfig?.(cwd);
-      return result;
-    },
-
-    async session(cwd: string, sessionFile?: string) {
-      return readMemorySession(cwd, sessionFile);
-    },
-
-    async setSessionMode(cwd: string, sessionFile: string | undefined, mode: SessionMemoryMode) {
-      return setMemorySessionMode(cwd, sessionFile, mode);
-    },
-
-    async setSessionRetain(cwd: string, sessionFile: string | undefined, enabled: boolean) {
-      return setMemorySessionRetain(cwd, sessionFile, enabled);
-    },
-
-    async setNextRetainOff(cwd: string, sessionFile: string | undefined) {
-      return setNextMemoryRetainOff(cwd, sessionFile);
-    },
-
-    async addSessionTag(cwd: string, sessionFile: string | undefined, tag: string) {
-      return addMemorySessionTag(cwd, sessionFile, tag);
-    },
-
-    async removeSessionTag(cwd: string, sessionFile: string | undefined, tag: string) {
-      return removeMemorySessionTag(cwd, sessionFile, tag);
-    },
-
-    async lastRecall(cwd: string) {
-      const config = deps.getConfig();
-      const path = resolveLastRecallPath(cwd, config.recall.lastRecallPath);
-      const snapshot = await readLastRecallSnapshot(cwd, config.recall.lastRecallPath);
-      return { path, snapshot };
-    },
-
-    async recallCleanup(sessionFile: string, prune: boolean) {
-      return prune
-        ? pruneTranscriptRecallBlocks(sessionFile)
-        : scanTranscriptForRecallBlocks(sessionFile);
-    },
-
-    async flush(cwd: string) {
-      return flushRetain(cwd, deps.getConfig(), deps.getClient());
-    },
+export function createMemoryOperations(deps: MemoryOperationsDeps) {
+  return {
+    ...createRecallOperations(deps),
+    ...createRetainOperations(deps),
+    ...createDocumentOperations(deps),
+    ...createRoutingOperations(deps),
+    ...createConfigOperations(deps),
+    ...createImportOperations(deps),
+    ...createSessionOperations(),
   };
 }
 
