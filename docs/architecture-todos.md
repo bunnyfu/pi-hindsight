@@ -6,7 +6,7 @@ These are deferred deepening opportunities identified after the mission/global-m
 
 - Keep `globalRetain.mode = "explicit-only"` as the default until routing is proven safe.
 - Replace or augment the current heuristic router Adapter with a mission-aware LLM Adapter before enabling automatic writes.
-- Add evaluation fixtures for project/global/both/skip decisions before any router mode writes memory.
+- Evaluation fixtures now cover project/global/both/skip dry-run decisions. Expand these fixtures and add a mission-aware LLM Adapter before any router mode writes memory automatically.
 
 ## Config editing
 

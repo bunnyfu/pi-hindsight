@@ -1,0 +1,30 @@
+[
+  {
+    "name": "durable global response style",
+    "content": "User prefers terse caveman-style replies across projects and wants that remembered globally.",
+    "context": "Explicit long-term preference from user.",
+    "expectedRoute": "global",
+    "expectedSignals": ["global"]
+  },
+  {
+    "name": "project implementation decision",
+    "content": "In this repo, import delivery should preserve deterministic document IDs and use replace mode for historical reimports.",
+    "context": "Architecture decision for pi-hindsight importer implementation.",
+    "expectedRoute": "project",
+    "expectedSignals": ["project"]
+  },
+  {
+    "name": "project-specific user preference",
+    "content": "User always wants this repo's /hindsight status to hide long bank names and show activity instead.",
+    "context": "Preference scoped to the current project TUI implementation.",
+    "expectedRoute": "both",
+    "expectedSignals": ["global", "project"]
+  },
+  {
+    "name": "temporary screenshot artifact",
+    "content": "Temporary screenshot saved under /var/folders/abc/Screenshot 2026-05-02.png while debugging UI.",
+    "context": "Ephemeral artifact path, not durable memory.",
+    "expectedRoute": "skip",
+    "expectedSignals": ["skip"]
+  }
+]

@@ -1,8 +1,42 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { routeMemoryCandidate, type MemoryRouterAdapter } from "../extensions/memory-router.js";
+import {
+  routeMemoryCandidate,
+  type MemoryRoute,
+  type MemoryRouteSignal,
+  type MemoryRouterAdapter,
+} from "../extensions/memory-router.js";
+
+interface RouterEvalFixture {
+  name: string;
+  content: string;
+  context?: string;
+  expectedRoute: MemoryRoute;
+  expectedSignals: MemoryRouteSignal[];
+}
+
+const routerEvalFixtures = JSON.parse(
+  readFileSync(join(process.cwd(), "tests/fixtures/memory-router-evals.json"), "utf8"),
+) as RouterEvalFixture[];
 
 describe("memory router", () => {
+  it.each(routerEvalFixtures)(
+    "classifies eval fixture: $name",
+    ({ content, context, expectedRoute, expectedSignals }) => {
+      const decision = routeMemoryCandidate({
+        content,
+        ...(context ? { context } : {}),
+        config: DEFAULT_CONFIG,
+      });
+
+      expect(decision.route).toBe(expectedRoute);
+      expect(decision.signals).toEqual(expect.arrayContaining(expectedSignals));
+      expect(decision.writes).toEqual([]);
+    },
+  );
+
   it("defaults to explicit-only dry-run with no writes", () => {
     const decision = routeMemoryCandidate({
       content: "Kai prefers terse replies across projects",
