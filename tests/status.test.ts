@@ -58,6 +58,24 @@ describe("formatHindsightStatus", () => {
     ).toBe("🧠 recalling");
   });
 
+  it("uses connected and offline health labels", () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      status: {
+        style: "emoji" as const,
+        detail: "activity" as const,
+        maxLength: 40,
+        showActivity: true,
+      },
+    };
+    expect(
+      formatHindsightStatus(config, { cwd: "/repo", projectBankId: "bank", activity: "connected" }),
+    ).toBe("🧠 connected");
+    expect(
+      formatHindsightStatus(config, { cwd: "/repo", projectBankId: "bank", activity: "offline" }),
+    ).toBe("🤯 offline");
+  });
+
   it("uses brain explosion for failed emoji status", () => {
     const config = {
       ...DEFAULT_CONFIG,

@@ -3,6 +3,8 @@ import type { ResolvedConfig, StatusStyle } from "./types.js";
 
 export type HindsightActivity =
   | "idle"
+  | "connected"
+  | "offline"
   | "recalling"
   | "recalled"
   | "recall-empty"
@@ -40,6 +42,10 @@ export function formatHindsightActivity(
   queueRemaining?: number,
 ): string {
   switch (activity) {
+    case "connected":
+      return "connected";
+    case "offline":
+      return "offline";
     case "recalling":
       return "recalling";
     case "recalled":
@@ -63,11 +69,11 @@ export function formatHindsightActivity(
 
 function prefix(style: StatusStyle, activity: HindsightActivity): string {
   if (style === "emoji") {
-    if (activity.includes("failed")) return "🤯";
+    if (activity.includes("failed") || activity === "offline") return "🤯";
     return "🧠";
   }
   if (style === "nerdfont") {
-    if (activity.includes("failed")) return "󰧑";
+    if (activity.includes("failed") || activity === "offline") return "󰧑";
     if (activity === "recalling" || activity === "recalled") return "󰑓";
     if (activity === "retaining" || activity === "retained") return "󰆓";
     return "󰍛";

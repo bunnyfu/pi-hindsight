@@ -129,14 +129,18 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       if (!runtime) return;
       reloadConfig(runtime.cwd);
       if (!config.enabled) return;
+      let ensureFailed = false;
+      let ensureSucceeded = false;
       if (config.banks.project.enabled) {
         try {
           await ensureProjectBank(client, projectBankId, {
             ...config.banks.project,
             enableObservations: config.observations.enabled,
           });
+          ensureSucceeded = true;
         } catch (error) {
-          setMemoryStatus(runtime, "recall-failed");
+          ensureFailed = true;
+          setMemoryStatus(runtime, "offline");
           notify(runtime, `Hindsight project bank ensure failed: ${redactError(error)}`, "warning");
         }
       }
@@ -146,8 +150,10 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
             ...config.banks.global,
             enableObservations: config.observations.enabled,
           });
+          ensureSucceeded = true;
         } catch (error) {
-          setMemoryStatus(runtime, "recall-failed");
+          ensureFailed = true;
+          setMemoryStatus(runtime, "offline");
           notify(runtime, `Hindsight global bank ensure failed: ${redactError(error)}`, "warning");
         }
       }
@@ -160,12 +166,13 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
         try {
           capabilities = await detectAppendCapability(client, capabilityProbeBankId);
         } catch (error) {
-          setMemoryStatus(runtime, "recall-failed");
+          ensureFailed = true;
+          setMemoryStatus(runtime, "offline");
           notify(runtime, `Hindsight capability check failed: ${redactError(error)}`, "warning");
         }
       }
       startPeriodicFlush(runtime);
-      setMemoryStatus(runtime, "idle");
+      setMemoryStatus(runtime, ensureFailed ? "offline" : ensureSucceeded ? "connected" : "idle");
       if (config.notifications.startup)
         notify(runtime, bankSelectionMessage(projectBankId, config), "info");
     },

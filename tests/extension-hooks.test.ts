@@ -59,6 +59,51 @@ describe("extension hooks", () => {
     mocked.client.retain.mockImplementation(async (..._args: unknown[]) => undefined);
   });
 
+  it("marks startup status connected after bank ensure succeeds", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ hindsight: { baseUrl: "http://unused.test" } }),
+    );
+    const { createMemoryLifecycle } = await import("../extensions/memory-lifecycle.js");
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    await createMemoryLifecycle(cwd).initialize(ctx);
+
+    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("hindsight", "🧠 connected");
+  });
+
+  it("marks startup status offline after bank ensure fails", async () => {
+    mocked.ensureProjectBank.mockRejectedValueOnce(new Error("down"));
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ hindsight: { baseUrl: "http://unused.test" } }),
+    );
+    const { createMemoryLifecycle } = await import("../extensions/memory-lifecycle.js");
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    await createMemoryLifecycle(cwd).initialize(ctx);
+
+    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("hindsight", "🤯 offline");
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining("Hindsight project bank ensure failed"),
+      "warning",
+    );
+  });
+
   it("appends recalled memory before current user by default and keeps that block out of retained transcript content", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
     mkdirSync(join(cwd, ".git"));
