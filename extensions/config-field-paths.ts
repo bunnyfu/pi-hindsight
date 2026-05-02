@@ -136,6 +136,45 @@ export const CONFIG_RESET_PATHS = {
 
 export type ConfigResetKey = keyof typeof CONFIG_RESET_PATHS;
 
+export const CONFIG_FIELD_RESET_KEYS: Record<FieldId, ConfigResetKey> = {
+  enabled: "enabled",
+  baseUrl: "hindsight.baseUrl",
+  apiKeyEnv: "hindsight.apiKey",
+  apiKeyDirect: "hindsight.apiKey",
+  timeoutMs: "hindsight.timeoutMs",
+  memoryProfile: "banks.profile",
+  projectBankId: "banks.project.bankId",
+  projectMission: "banks.project.mission",
+  projectRetainMission: "banks.project.retainMission",
+  projectReflectMission: "banks.project.reflectMission",
+  projectObservationsMission: "banks.project.observationsMission",
+  globalBankEnabled: "banks.global.enabled",
+  globalBankId: "banks.global.bankId",
+  globalMission: "banks.global.mission",
+  globalRetainMission: "banks.global.retainMission",
+  globalReflectMission: "banks.global.reflectMission",
+  globalObservationsMission: "banks.global.observationsMission",
+  globalRetainMode: "globalRetain.mode",
+  recallEnabled: "recall.enabled",
+  recallBudget: "recall.budget",
+  recallMaxTokens: "recall.maxTokens",
+  retainEnabled: "retain.enabled",
+  retainAsync: "retain.async",
+  queuePath: "retain.queuePath",
+  importBranches: "import.includeBranches",
+  importManifest: "import.manifestPath",
+  importCheckpoint: "import.checkpointPath",
+  importReplaceExisting: "import.replaceExistingImportedDocs",
+  importResume: "import.resume",
+  statusStyle: "status.style",
+  statusDetail: "status.detail",
+  statusMaxLength: "status.maxLength",
+  statusActivity: "status.showActivity",
+  notifyStartup: "notifications.startup",
+  notifyRecall: "notifications.recall",
+  notifyRetain: "notifications.retain",
+};
+
 export function resetPathsForConfigKeys(keys: ConfigResetKey[]): string[][] {
   return keys.flatMap((key) => CONFIG_RESET_PATHS[key].map((path) => [...path]));
 }

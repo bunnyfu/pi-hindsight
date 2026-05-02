@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { CONFIG_FIELD_PATHS, CONFIG_RESET_PATHS } from "../extensions/config-field-paths.js";
+import {
+  CONFIG_FIELD_PATHS,
+  CONFIG_FIELD_RESET_KEYS,
+  CONFIG_RESET_PATHS,
+} from "../extensions/config-field-paths.js";
 import {
   buildConfigEditingFields,
   buildConfigEditingTabs,
@@ -135,6 +139,8 @@ describe("config editing model", () => {
 
     for (const field of fields) {
       expect(CONFIG_FIELD_PATHS).toHaveProperty(field.id);
+      expect(CONFIG_FIELD_RESET_KEYS).toHaveProperty(field.id);
+      expect(CONFIG_FIELD_RESET_KEYS[field.id]).toBe(field.resetKey);
       expect(CONFIG_RESET_PATHS).toHaveProperty(field.resetKey);
     }
   });

@@ -2,7 +2,8 @@ import { DEFAULT_CONFIG } from "./config.js";
 import type { ResolvedConfig } from "./types.js";
 import type { ConfigScope, MemoryProfile } from "./config-writer.js";
 import type { ConfigEditingField, FieldId } from "./config-editing-types.js";
-export { CONFIG_FIELD_PATHS } from "./config-field-paths.js";
+import { CONFIG_FIELD_RESET_KEYS } from "./config-field-paths.js";
+export { CONFIG_FIELD_PATHS, CONFIG_FIELD_RESET_KEYS } from "./config-field-paths.js";
 
 function memoryProfileLabel(config: ResolvedConfig): MemoryProfile {
   if (!config.banks.project.enabled) return "global-only";
@@ -38,7 +39,6 @@ type BaseConfigEditingField = Omit<
 
 type FieldTab = BaseConfigEditingField["tab"];
 type FieldKind = BaseConfigEditingField["kind"];
-type FieldResetKey = BaseConfigEditingField["resetKey"];
 
 type FieldArgs = {
   id: FieldId;
@@ -48,14 +48,18 @@ type FieldArgs = {
   value: string;
   defaultValue: string;
   changed?: boolean;
-  resetKey: FieldResetKey;
+  resetKey?: BaseConfigEditingField["resetKey"];
   kind: FieldKind;
   choices?: string[];
   advanced?: boolean;
 };
 
 function field(args: FieldArgs): BaseConfigEditingField {
-  return { ...args, changed: args.changed ?? changed(args.value, args.defaultValue) };
+  return {
+    ...args,
+    resetKey: args.resetKey ?? CONFIG_FIELD_RESET_KEYS[args.id],
+    changed: args.changed ?? changed(args.value, args.defaultValue),
+  };
 }
 
 function booleanField(
