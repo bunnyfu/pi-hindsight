@@ -13,6 +13,7 @@ import {
 } from "../extensions/import-sessions.js";
 import { readImportCheckpoint } from "../extensions/import-checkpoint.js";
 import { readImportManifest } from "../extensions/import-manifest.js";
+import { enqueueRetainJob, readRetainQueue, resolveQueuePath } from "../extensions/queue.js";
 import { stableSessionId } from "../extensions/session.js";
 import { setNextSessionRetainMode } from "../extensions/session-memory-meta.js";
 
@@ -181,6 +182,56 @@ describe("Pi session import", () => {
         session_timestamp: "s-t",
       }),
     });
+  });
+
+  it("flushes existing retain backlog before completing import delivery", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-"));
+    mkdirSync(join(dir, ".git"));
+    const sessionFile = join(dir, "session.jsonl");
+    writeFileSync(
+      sessionFile,
+      [
+        JSON.stringify({ type: "session", id: "session-backlog", cwd: dir }),
+        JSON.stringify({
+          type: "message",
+          id: "root",
+          parentId: null,
+          message: { role: "user", content: "import after backlog" },
+        }),
+      ].join("\n"),
+    );
+    const config = DEFAULT_CONFIG;
+    const queuePath = resolveQueuePath(dir, config.retain.queuePath);
+    await enqueueRetainJob(queuePath, {
+      id: "existing",
+      bankId: "bank",
+      createdAt: "now",
+      documentId: "existing-doc",
+      updateMode: "replace",
+      item: { content: "existing", context: "existing" },
+      retries: 0,
+    });
+    const calls: unknown[][] = [];
+
+    const result = await importPiSession({
+      sessionFile,
+      bankId: "bank",
+      config,
+      client: {
+        retain: async (...args: unknown[]) => {
+          calls.push(args);
+        },
+        recall: async () => [],
+        reflect: async () => ({}),
+      },
+    });
+
+    expect(calls.map((call) => (call[2] as { documentId: string }).documentId)).toEqual([
+      "existing-doc",
+      "pi-import:session-backlog:leaf:root",
+    ]);
+    expect(await readRetainQueue(queuePath)).toEqual([]);
+    expect(result.documents[0]?.status).toBe("completed");
   });
 
   it("imports all leaves only when includeBranches is all-leaves", async () => {

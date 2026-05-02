@@ -8,8 +8,7 @@ import { isInjectedHindsightMemory } from "./messages.js";
 import { expandObservationScopes } from "./observation-scopes.js";
 import type { ImportBranch } from "./import-branches.js";
 import type { ParsedSession } from "./import-parser.js";
-import { retainDurably } from "./retain-durable.js";
-import { flushRetain, readQueuedRetains } from "./retain-queue.js";
+import { deliverImportRetain } from "./import-delivery.js";
 
 export interface ImportRetainArgs {
   sessionFile: string;
@@ -139,39 +138,32 @@ export function previewImportBranch(args: Omit<ImportRetainArgs, "client">): Imp
 export async function retainImportBranch(args: ImportRetainArgs): Promise<ImportRetainResult> {
   const built = buildImportBranch(args);
   const parentSessionId = resolvedParentSessionId(args.parsed, args.cwd);
-  const queued = await readQueuedRetains(args.cwd, args.config).catch(() => []);
-  const queuedDocument = queued.find((job) => job.documentId === built.document.documentId);
-  const retainResult = queuedDocument
-    ? await flushRetain(args.cwd, args.config, args.client)
-    : await retainDurably({
-        cwd: args.cwd,
-        config: args.config,
-        client: args.client,
-        bankId: args.bankId,
-        content: built.content,
-        context: built.context,
-        documentId: built.document.documentId,
-        updateMode: built.document.updateMode,
-        tags: built.document.tags,
-        source: "import",
-        metadata: {
-          pi_session_file: args.sessionFile,
-          imported: "true",
-          cwd: args.cwd,
-          session_id: args.sessionId,
-          ...(parentSessionId ? { parent_session_id: parentSessionId } : {}),
-          ...(args.parsed.parentSessionFile
-            ? { parent_session_file: args.parsed.parentSessionFile }
-            : {}),
-          branch_leaf_id: built.document.leafId,
-          include_branches: args.config.import.includeBranches,
-          ...(args.parsed.sessionTimestamp
-            ? { session_timestamp: args.parsed.sessionTimestamp }
-            : {}),
-        },
-        ...(built.observationScopes.length ? { observationScopes: built.observationScopes } : {}),
-      });
-  if (retainResult.sent === 0) {
+  const retainResult = await deliverImportRetain({
+    cwd: args.cwd,
+    config: args.config,
+    client: args.client,
+    bankId: args.bankId,
+    content: built.content,
+    context: built.context,
+    documentId: built.document.documentId,
+    updateMode: built.document.updateMode,
+    tags: built.document.tags,
+    metadata: {
+      pi_session_file: args.sessionFile,
+      imported: "true",
+      cwd: args.cwd,
+      session_id: args.sessionId,
+      ...(parentSessionId ? { parent_session_id: parentSessionId } : {}),
+      ...(args.parsed.parentSessionFile
+        ? { parent_session_file: args.parsed.parentSessionFile }
+        : {}),
+      branch_leaf_id: built.document.leafId,
+      include_branches: args.config.import.includeBranches,
+      ...(args.parsed.sessionTimestamp ? { session_timestamp: args.parsed.sessionTimestamp } : {}),
+    },
+    ...(built.observationScopes.length ? { observationScopes: built.observationScopes } : {}),
+  });
+  if (!retainResult.delivered) {
     throw new Error("Hindsight import retain was queued but not sent; import interrupted");
   }
   return { document: built.document, manifestEntry: built.manifestEntry };

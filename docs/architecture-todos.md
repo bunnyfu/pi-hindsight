@@ -19,5 +19,4 @@ These are deferred deepening opportunities identified after the mission/global-m
 
 ## Historical import queue seam
 
-- Move historical import retain delivery through durable queue semantics or an import-specific queue seam.
-- Preserve deterministic import document IDs and visible checkpoint/manifest behavior.
+- Import delivery now has an import-specific queue seam. Future work: add richer status for queued-but-not-delivered imports so commands can show retry state without treating every queued import as a generic failure.
