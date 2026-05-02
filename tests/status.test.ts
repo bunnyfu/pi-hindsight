@@ -77,6 +77,21 @@ describe("formatHindsightStatus", () => {
     ).toBe("🤯 recall-failed");
   });
 
+  it("uses idle text instead of implying verified connectivity", () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      status: {
+        style: "text" as const,
+        detail: "activity" as const,
+        maxLength: 20,
+        showActivity: true,
+      },
+    };
+    expect(
+      formatHindsightStatus(config, { cwd: "/repo", projectBankId: "bank", activity: "idle" }),
+    ).toBe("mem:idle");
+  });
+
   it("can hide status", () => {
     const config = {
       ...DEFAULT_CONFIG,

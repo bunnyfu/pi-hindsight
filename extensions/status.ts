@@ -57,7 +57,7 @@ export function formatHindsightActivity(
     case "retain-failed":
       return "retain-failed";
     default:
-      return "ready";
+      return "idle";
   }
 }
 
@@ -86,7 +86,7 @@ export function formatHindsightStatus(
   const bank = shortBank(state.projectBankId, Math.max(8, maxLength));
   const activity = showActivity
     ? formatHindsightActivity(state.activity, state.memoryCount, state.queueRemaining)
-    : "ready";
+    : "idle";
 
   let body: string;
   if (detail === "minimal") body = "";
