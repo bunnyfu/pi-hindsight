@@ -23,6 +23,17 @@ function importStartMessage(scope: string, options: ReturnType<typeof importOpti
   return `Starting Hindsight ${scope} ${mode}; branches=${branches}; write=${options.dryRun ? "no" : "yes"}`;
 }
 
+async function confirmImportWrite(
+  ctx: { ui: { select: (prompt: string, options: string[]) => Promise<string | undefined> } },
+  preview: string,
+): Promise<boolean> {
+  const action = await ctx.ui.select(
+    `${preview}\n\nThis will enqueue/write historical session content to Hindsight. Continue?`,
+    ["Import", "Cancel"],
+  );
+  return action === "Import";
+}
+
 export function registerImportCommands(pi: ExtensionAPI, operations: Operations): void {
   pi.registerCommand("hindsight:import", {
     description: "Import the current Pi session JSONL into Hindsight.",
@@ -38,6 +49,18 @@ export function registerImportCommands(pi: ExtensionAPI, operations: Operations)
       }
       const options = importOptions(args);
       ctx.ui.notify(importStartMessage("current session", options), "info");
+      if (!options.dryRun) {
+        const preview = await operations.importSession({
+          sessionFile: current,
+          cwd: ctx.cwd,
+          ...options,
+          dryRun: true,
+        });
+        if (!(await confirmImportWrite(ctx, renderImportSessionMessage(preview)))) {
+          ctx.ui.notify("Hindsight import cancelled.", "warning");
+          return;
+        }
+      }
       const result = await operations.importSession({
         sessionFile: current,
         cwd: ctx.cwd,
@@ -58,6 +81,18 @@ export function registerImportCommands(pi: ExtensionAPI, operations: Operations)
       }
       const options = importOptions(args);
       ctx.ui.notify(importStartMessage("current session", options), "info");
+      if (!options.dryRun) {
+        const preview = await operations.importSession({
+          sessionFile: current,
+          cwd: ctx.cwd,
+          ...options,
+          dryRun: true,
+        });
+        if (!(await confirmImportWrite(ctx, renderImportSessionMessage(preview, "current")))) {
+          ctx.ui.notify("Hindsight import cancelled.", "warning");
+          return;
+        }
+      }
       const result = await operations.importSession({
         sessionFile: current,
         cwd: ctx.cwd,
@@ -78,6 +113,18 @@ export function registerImportCommands(pi: ExtensionAPI, operations: Operations)
       }
       const options = importOptions(args);
       ctx.ui.notify(importStartMessage("file", options), "info");
+      if (!options.dryRun) {
+        const preview = await operations.importSession({
+          sessionFile: file,
+          cwd: ctx.cwd,
+          ...options,
+          dryRun: true,
+        });
+        if (!(await confirmImportWrite(ctx, renderImportSessionMessage(preview, { file })))) {
+          ctx.ui.notify("Hindsight import cancelled.", "warning");
+          return;
+        }
+      }
       const result = await operations.importSession({
         sessionFile: file,
         cwd: ctx.cwd,
@@ -94,6 +141,18 @@ export function registerImportCommands(pi: ExtensionAPI, operations: Operations)
       const current = sessionFile(ctx);
       const options = importOptions(args);
       ctx.ui.notify(importStartMessage("project sessions", options), "info");
+      if (!options.dryRun) {
+        const preview = await operations.importProjectSessions({
+          cwd: ctx.cwd,
+          ...(current ? { currentSessionFile: current } : {}),
+          ...options,
+          dryRun: true,
+        });
+        if (!(await confirmImportWrite(ctx, renderProjectImportMessage(preview)))) {
+          ctx.ui.notify("Hindsight import cancelled.", "warning");
+          return;
+        }
+      }
       const result = await operations.importProjectSessions({
         cwd: ctx.cwd,
         ...(current ? { currentSessionFile: current } : {}),

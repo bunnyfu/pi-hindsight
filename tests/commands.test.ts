@@ -357,6 +357,96 @@ describe("hindsight commands", () => {
     );
   });
 
+  it("asks before writing project imports and cancels safely", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-commands-"));
+    mkdirSync(join(cwd, ".git"));
+    const sessionFile = join(cwd, "session.jsonl");
+    writeFileSync(
+      sessionFile,
+      [
+        JSON.stringify({ type: "session", id: "session-project-import", cwd }),
+        JSON.stringify({ type: "message", id: "1", message: { role: "user", content: "hi" } }),
+      ].join("\n"),
+    );
+    const retain = vi.fn(async () => undefined);
+    const commands = new Map<string, { handler: (args: unknown, ctx: any) => Promise<void> }>();
+    registerCommands(
+      {
+        registerCommand: (
+          name: string,
+          command: { handler: (args: unknown, ctx: any) => Promise<void> },
+        ) => {
+          commands.set(name, command);
+        },
+      } as any,
+      {
+        getClient: () => ({ retain, recall: async () => [], reflect: async () => ({}) }),
+        getConfig: () => DEFAULT_CONFIG,
+        getProjectBankId: () => "bank",
+      },
+    );
+    const ctx = {
+      cwd,
+      ui: { notify: vi.fn(), setStatus: vi.fn(), select: vi.fn(async () => "Cancel") },
+      sessionManager: { getSessionFile: () => sessionFile },
+    };
+
+    await commands.get("hindsight:import-project-sessions")?.handler([], ctx);
+
+    expect(ctx.ui.select).toHaveBeenCalledWith(expect.stringContaining("Project import preview:"), [
+      "Import",
+      "Cancel",
+    ]);
+    const selectCalls = ctx.ui.select.mock.calls as unknown[][];
+    expect(selectCalls[0]?.[0]).toContain("write=no");
+    expect(retain).not.toHaveBeenCalled();
+    expect(ctx.ui.notify).toHaveBeenCalledWith("Hindsight import cancelled.", "warning");
+  });
+
+  it("writes project imports after confirmation", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-commands-"));
+    mkdirSync(join(cwd, ".git"));
+    const sessionFile = join(cwd, "session.jsonl");
+    writeFileSync(
+      sessionFile,
+      [
+        JSON.stringify({ type: "session", id: "session-project-import", cwd }),
+        JSON.stringify({ type: "message", id: "1", message: { role: "user", content: "hi" } }),
+      ].join("\n"),
+    );
+    const retain = vi.fn(async () => undefined);
+    const commands = new Map<string, { handler: (args: unknown, ctx: any) => Promise<void> }>();
+    registerCommands(
+      {
+        registerCommand: (
+          name: string,
+          command: { handler: (args: unknown, ctx: any) => Promise<void> },
+        ) => {
+          commands.set(name, command);
+        },
+      } as any,
+      {
+        getClient: () => ({ retain, recall: async () => [], reflect: async () => ({}) }),
+        getConfig: () => DEFAULT_CONFIG,
+        getProjectBankId: () => "bank",
+      },
+    );
+    const ctx = {
+      cwd,
+      ui: { notify: vi.fn(), setStatus: vi.fn(), select: vi.fn(async () => "Import") },
+      sessionManager: { getSessionFile: () => sessionFile },
+    };
+
+    await commands.get("hindsight:import-project-sessions")?.handler([], ctx);
+
+    expect(ctx.ui.select).toHaveBeenCalled();
+    expect(retain).toHaveBeenCalledTimes(1);
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining("Imported project sessions:"),
+      "info",
+    );
+  });
+
   it("shows project import start notification before preview result", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-commands-"));
     mkdirSync(join(cwd, ".git"));
