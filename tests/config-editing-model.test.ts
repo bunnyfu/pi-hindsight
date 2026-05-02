@@ -113,6 +113,20 @@ describe("config editing model", () => {
     expect(advancedBanks?.fields.map((field) => field.id)).toContain("projectRetainMission");
   });
 
+  it("shows built-in mission text in mission field details", () => {
+    const fields = buildConfigEditingFields(DEFAULT_CONFIG, "bank", layers());
+
+    expect(fields.find((field) => field.id === "projectMission")?.description).toContain(
+      "Extract durable project memory",
+    );
+    expect(fields.find((field) => field.id === "globalMission")?.description).toContain(
+      "Extract durable cross-project memory",
+    );
+    expect(fields.find((field) => field.id === "projectRetainMission")?.description).toContain(
+      "Built-in default: Extract durable project memory",
+    );
+  });
+
   it("shows mission summaries in status facts", () => {
     expect(
       buildStatusFacts(

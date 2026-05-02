@@ -111,6 +111,23 @@ function shortDocumentId(documentId: string): string {
   return documentId;
 }
 
+function wrapWords(text: string, width: number): string[] {
+  if (width <= 0) return [""];
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    if (!current) current = word;
+    else if (`${current} ${word}`.length <= width) current = `${current} ${word}`;
+    else {
+      lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length ? lines : [""];
+}
+
 export function buildRetainReceiptStatusFacts(receipts: RetainReceipt[]): Array<[string, string]> {
   if (receipts.length === 0) return [["Retain receipts", "none"]];
   return receipts
@@ -236,6 +253,24 @@ export function createSetupComponent(
         lines.push(
           boxed(fitColumns(`${marker}${dirty} ${label}`, value, innerWidth), width, theme),
         );
+      }
+
+      const detailField = selectedField();
+      if (detailField) {
+        lines.push(boxed("", width, theme));
+        lines.push(boxed(theme.fg("accent", theme.bold("Details")), width, theme));
+        const details = [
+          detailField.description,
+          `Default: ${detailField.defaultValue}`,
+          ...(detailField.projectValue ? [`Project: ${detailField.projectValue}`] : []),
+          ...(detailField.globalValue ? [`Global: ${detailField.globalValue}`] : []),
+          ...(detailField.envValue ? [`Env: ${detailField.envValue}`] : []),
+        ];
+        for (const detail of details) {
+          for (const line of wrapWords(detail, innerWidth - 3)) {
+            lines.push(boxed(`   ${theme.fg("dim", line)}`, width, theme));
+          }
+        }
       }
 
       while (lines.length < MIN_BODY_LINES) lines.push(boxed("", width, theme));

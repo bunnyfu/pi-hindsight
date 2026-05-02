@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { buildRetainReceiptStatusFacts } from "../extensions/setup-tui.js";
+import { DEFAULT_CONFIG } from "../extensions/config.js";
+import { buildConfigEditingTabs } from "../extensions/config-editing-model.js";
+import { buildRetainReceiptStatusFacts, createSetupComponent } from "../extensions/setup-tui.js";
+
+const theme = {
+  fg: (_name: string, text: string) => text,
+  bg: (_name: string, text: string) => text,
+  bold: (text: string) => text,
+};
 
 const receipt = {
   createdAt: "2026-05-02T00:00:00.000Z",
@@ -21,5 +29,23 @@ describe("setup TUI receipt facts", () => {
 
   it("shows empty receipt state", () => {
     expect(buildRetainReceiptStatusFacts([])).toEqual([["Retain receipts", "none"]]);
+  });
+
+  it("renders selected field detail text", () => {
+    const tabs = buildConfigEditingTabs(
+      DEFAULT_CONFIG,
+      "bank",
+      { project: {}, global: {}, env: {} },
+      [],
+      { showAdvanced: false },
+    );
+    const component = createSetupComponent(
+      tabs,
+      theme,
+      { tabIndex: 2, selectedByTab: { Banks: 2 }, showAdvanced: false },
+      () => undefined,
+    );
+
+    expect(component.render(100).join("\n")).toContain("Extract durable project memory");
   });
 });

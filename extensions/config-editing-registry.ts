@@ -2,6 +2,11 @@ import { DEFAULT_CONFIG } from "./config.js";
 import type { ResolvedConfig } from "./types.js";
 import type { ConfigScope, ConfigSource, MemoryProfile } from "./config-writer.js";
 import type { ConfigEditingField, FieldId } from "./config-editing-types.js";
+import {
+  defaultGlobalBankMissions,
+  defaultProjectBankMissions,
+  type BankMissionDefaults,
+} from "./bank-operations.js";
 import { CONFIG_FIELD_PATHS, CONFIG_FIELD_RESET_KEYS } from "./config-field-paths.js";
 export { CONFIG_FIELD_PATHS, CONFIG_FIELD_RESET_KEYS } from "./config-field-paths.js";
 
@@ -129,6 +134,10 @@ function displayLayerValue(value: unknown): string | undefined {
   return JSON.stringify(value);
 }
 
+function builtinMissionDetail(defaults: BankMissionDefaults): string {
+  return `Built-in defaults — retain: ${defaults.retainMission} reflect: ${defaults.reflectMission} observations: ${defaults.observationsMission}`;
+}
+
 function sourceFor(
   layers: { project: Record<string, unknown>; global: Record<string, unknown> },
   path: string[],
@@ -147,6 +156,8 @@ export function buildBaseConfigEditingFields(
   const defaults = DEFAULT_CONFIG;
   const profile = memoryProfileLabel(config);
   const defaultProfile = memoryProfileLabel(defaults);
+  const projectMissionDefaults = defaultProjectBankMissions();
+  const globalMissionDefaults = defaultGlobalBankMissions();
   const globalBankId = config.banks.global.bankId ?? "not set";
   const defaultGlobalBankId = defaults.banks.global.bankId ?? "not set";
   return [
@@ -224,8 +235,7 @@ export function buildBaseConfigEditingFields(
       id: "projectMission",
       tab: "Banks",
       label: "Project mission",
-      description:
-        "Optional shorthand for project retain, reflect, and observation missions. Blank uses built-in defaults.",
+      description: `Optional shorthand for project retain, reflect, and observation missions. Blank uses built-in defaults. ${builtinMissionDetail(projectMissionDefaults)}`,
       value: config.banks.project.mission ?? "built-in default",
       defaultValue: "built-in default",
       changed: Boolean(config.banks.project.mission),
@@ -235,7 +245,7 @@ export function buildBaseConfigEditingFields(
       id: "projectRetainMission",
       tab: "Banks",
       label: "Project retain mission",
-      description: "Advanced. Overrides what project retain extracts.",
+      description: `Advanced. Overrides what project retain extracts. Built-in default: ${projectMissionDefaults.retainMission}`,
       value: config.banks.project.retainMission ?? "inherit project mission/default",
       defaultValue: "inherit project mission/default",
       changed: Boolean(config.banks.project.retainMission),
@@ -246,7 +256,7 @@ export function buildBaseConfigEditingFields(
       id: "projectReflectMission",
       tab: "Banks",
       label: "Project reflect mission",
-      description: "Advanced. Overrides how project reflect uses memories.",
+      description: `Advanced. Overrides how project reflect uses memories. Built-in default: ${projectMissionDefaults.reflectMission}`,
       value: config.banks.project.reflectMission ?? "inherit project mission/default",
       defaultValue: "inherit project mission/default",
       changed: Boolean(config.banks.project.reflectMission),
@@ -257,7 +267,7 @@ export function buildBaseConfigEditingFields(
       id: "projectObservationsMission",
       tab: "Banks",
       label: "Project observations mission",
-      description: "Advanced. Overrides what project observation consolidation synthesizes.",
+      description: `Advanced. Overrides what project observation consolidation synthesizes. Built-in default: ${projectMissionDefaults.observationsMission}`,
       value: config.banks.project.observationsMission ?? "inherit project mission/default",
       defaultValue: "inherit project mission/default",
       changed: Boolean(config.banks.project.observationsMission),
@@ -286,8 +296,7 @@ export function buildBaseConfigEditingFields(
       id: "globalMission",
       tab: "Banks",
       label: "Global mission",
-      description:
-        "Optional shorthand for global retain, reflect, and observation missions. Blank uses built-in defaults.",
+      description: `Optional shorthand for global retain, reflect, and observation missions. Blank uses built-in defaults. ${builtinMissionDetail(globalMissionDefaults)}`,
       value: config.banks.global.mission ?? "built-in default",
       defaultValue: "built-in default",
       changed: Boolean(config.banks.global.mission),
@@ -297,7 +306,7 @@ export function buildBaseConfigEditingFields(
       id: "globalRetainMission",
       tab: "Banks",
       label: "Global retain mission",
-      description: "Advanced. Overrides what global retain extracts.",
+      description: `Advanced. Overrides what global retain extracts. Built-in default: ${globalMissionDefaults.retainMission}`,
       value: config.banks.global.retainMission ?? "inherit global mission/default",
       defaultValue: "inherit global mission/default",
       changed: Boolean(config.banks.global.retainMission),
@@ -308,7 +317,7 @@ export function buildBaseConfigEditingFields(
       id: "globalReflectMission",
       tab: "Banks",
       label: "Global reflect mission",
-      description: "Advanced. Overrides how global reflect uses memories.",
+      description: `Advanced. Overrides how global reflect uses memories. Built-in default: ${globalMissionDefaults.reflectMission}`,
       value: config.banks.global.reflectMission ?? "inherit global mission/default",
       defaultValue: "inherit global mission/default",
       changed: Boolean(config.banks.global.reflectMission),
@@ -319,7 +328,7 @@ export function buildBaseConfigEditingFields(
       id: "globalObservationsMission",
       tab: "Banks",
       label: "Global observations mission",
-      description: "Advanced. Overrides what global observation consolidation synthesizes.",
+      description: `Advanced. Overrides what global observation consolidation synthesizes. Built-in default: ${globalMissionDefaults.observationsMission}`,
       value: config.banks.global.observationsMission ?? "inherit global mission/default",
       defaultValue: "inherit global mission/default",
       changed: Boolean(config.banks.global.observationsMission),

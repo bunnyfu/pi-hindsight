@@ -18,10 +18,26 @@ const DEFAULT_GLOBAL_RETAIN_MISSION =
 const DEFAULT_GLOBAL_OBSERVATIONS_MISSION =
   "Identify durable cross-project user preferences, recurring workflows, coding habits, and stable assistant behavior patterns. Ignore repo-specific implementation details unless they generalize across projects.";
 
-interface BankMissionDefaults {
+export interface BankMissionDefaults {
   reflectMission: string;
   retainMission: string;
   observationsMission: string;
+}
+
+export function defaultProjectBankMissions(): BankMissionDefaults {
+  return {
+    reflectMission: DEFAULT_PROJECT_REFLECT_MISSION,
+    retainMission: DEFAULT_PROJECT_RETAIN_MISSION,
+    observationsMission: DEFAULT_PROJECT_OBSERVATIONS_MISSION,
+  };
+}
+
+export function defaultGlobalBankMissions(): BankMissionDefaults {
+  return {
+    reflectMission: DEFAULT_GLOBAL_REFLECT_MISSION,
+    retainMission: DEFAULT_GLOBAL_RETAIN_MISSION,
+    observationsMission: DEFAULT_GLOBAL_OBSERVATIONS_MISSION,
+  };
 }
 
 export interface BankMissionConfig extends BankMissionSettings {
@@ -43,11 +59,7 @@ export async function ensureProjectBank(
   config: BankMissionConfig = {},
 ): Promise<void> {
   if (!client.createBank) return;
-  const missions = resolveBankMissions(config, {
-    reflectMission: DEFAULT_PROJECT_REFLECT_MISSION,
-    retainMission: DEFAULT_PROJECT_RETAIN_MISSION,
-    observationsMission: DEFAULT_PROJECT_OBSERVATIONS_MISSION,
-  });
+  const missions = resolveBankMissions(config, defaultProjectBankMissions());
   await client.createBank(bankId, {
     name: bankId,
     ...missions,
@@ -62,11 +74,7 @@ export async function ensureGlobalBank(
   config: BankMissionConfig = {},
 ): Promise<void> {
   if (!client.createBank) return;
-  const missions = resolveBankMissions(config, {
-    reflectMission: DEFAULT_GLOBAL_REFLECT_MISSION,
-    retainMission: DEFAULT_GLOBAL_RETAIN_MISSION,
-    observationsMission: DEFAULT_GLOBAL_OBSERVATIONS_MISSION,
-  });
+  const missions = resolveBankMissions(config, defaultGlobalBankMissions());
   await client.createBank(bankId, {
     name: bankId,
     ...missions,
