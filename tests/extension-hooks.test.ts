@@ -32,6 +32,7 @@ const mocked = vi.hoisted(() => ({
     reflect: vi.fn(async (..._args: unknown[]) => ({})),
     createBank: vi.fn(async (..._args: unknown[]) => undefined),
     getBankProfile: vi.fn(async (..._args: unknown[]) => ({})),
+    deleteDocument: vi.fn(async (..._args: unknown[]) => ({ success: true })),
   },
   ensureGlobalBank: vi.fn(async () => undefined),
   ensureProjectBank: vi.fn(async () => undefined),
@@ -264,6 +265,114 @@ describe("extension hooks", () => {
     expect(mocked.client.recall).toHaveBeenCalled();
     expect(recall.messages[0].content).toContain("<hindsight-memory>");
     expect((await readSessionMemoryMeta(cwd, sessionFile)).nextRetainMode).toBe("off");
+  });
+
+  it("retains global memory through configured global bank", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-tools-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ banks: { global: { enabled: true, bankId: "global-luxus" } } }),
+    );
+    const tools: Record<string, any> = {};
+    const pi = {
+      on: vi.fn(),
+      registerTool: vi.fn((tool: any) => {
+        tools[tool.name] = tool;
+      }),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    const result = await tools.hindsight_retain_global.execute(
+      "tool-call",
+      { content: "Kai prefers terse replies", context: "Global user preference" },
+      undefined,
+      undefined,
+      ctx,
+    );
+
+    expect(mocked.client.retain).toHaveBeenCalledWith(
+      "global-luxus",
+      "Kai prefers terse replies",
+      expect.objectContaining({ documentId: expect.stringMatching(/^pi-explicit:/) }),
+    );
+    expect(result.details).toMatchObject({ bankId: "global-luxus" });
+  });
+
+  it("dry-runs memory routing without retaining", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-tools-"));
+    mkdirSync(join(cwd, ".git"));
+    const tools: Record<string, any> = {};
+    const pi = {
+      on: vi.fn(),
+      registerTool: vi.fn((tool: any) => {
+        tools[tool.name] = tool;
+      }),
+      registerCommand: vi.fn(),
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    mocked.client.retain.mockClear();
+    const result = await tools.hindsight_route_memory.execute(
+      "tool-call",
+      { content: "Kai prefers terse replies across projects" },
+      undefined,
+      undefined,
+      { cwd, ui: { setStatus: vi.fn(), notify: vi.fn() }, sessionManager: {} },
+    );
+
+    expect(result.details).toMatchObject({ route: "global", mode: "explicit-only", writes: [] });
+    expect(mocked.client.retain).not.toHaveBeenCalled();
+  });
+
+  it("deletes an exact Hindsight document only with confirmation", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-tools-"));
+    mkdirSync(join(cwd, ".git"));
+    const tools: Record<string, any> = {};
+    const pi = {
+      on: vi.fn(),
+      registerTool: vi.fn((tool: any) => {
+        tools[tool.name] = tool;
+      }),
+      registerCommand: vi.fn(),
+    };
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { default: hindsightExtension } = await import("../extensions/index.js");
+    hindsightExtension(pi as any);
+    await expect(
+      tools.hindsight_delete_document.execute(
+        "tool-call",
+        { bank: "pi-global", documentId: "pi-explicit:abc", confirm: false },
+        undefined,
+        undefined,
+        ctx,
+      ),
+    ).rejects.toThrow(/confirm=true/);
+
+    const result = await tools.hindsight_delete_document.execute(
+      "tool-call",
+      { bank: "pi-global", documentId: "pi-explicit:abc", confirm: true },
+      undefined,
+      undefined,
+      ctx,
+    );
+
+    expect(mocked.client.deleteDocument).toHaveBeenCalledWith("pi-global", "pi-explicit:abc");
+    expect(result.details).toMatchObject({ bankId: "pi-global", documentId: "pi-explicit:abc" });
   });
 
   it("writes opt-in last recall snapshot to sidecar", async () => {
@@ -608,7 +717,10 @@ describe("extension hooks", () => {
     expect(mocked.client.retain).toHaveBeenCalledWith(
       expect.stringMatching(/^pi-project-/),
       "Pi Hindsight append capability probe. Safe to ignore.",
-      expect.objectContaining({ updateMode: "append" }),
+      expect.objectContaining({
+        updateMode: "append",
+        documentId: expect.stringMatching(/^pi-hindsight-capability:append:/),
+      }),
     );
     expect(ctx.ui.notify).toHaveBeenCalledWith(
       expect.stringContaining("Hindsight global bank ensure failed: global down"),
@@ -687,7 +799,10 @@ describe("extension hooks", () => {
     expect(mocked.client.retain).toHaveBeenCalledWith(
       expect.any(String),
       "Explicit memory",
-      expect.objectContaining({ updateMode: "append" }),
+      expect.objectContaining({
+        updateMode: "replace",
+        documentId: expect.stringMatching(/^pi-explicit:/),
+      }),
     );
     expect((await readSessionMemoryMeta(cwd, sessionFile)).nextRetainMode).toBe("off");
   });

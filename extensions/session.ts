@@ -16,6 +16,20 @@ export function importDocumentId(sessionId: string, leafId: string): string {
   return `pi-import:${sessionId}:leaf:${leafId}`;
 }
 
+export function explicitMemoryDocumentId(args: {
+  cwd: string;
+  sessionFile?: string;
+  bankId: string;
+  content: string;
+  context: string;
+}): string {
+  const digest = createHash("sha256")
+    .update(JSON.stringify({ bankId: args.bankId, content: args.content, context: args.context }))
+    .digest("hex")
+    .slice(0, 16);
+  return `pi-explicit:${stableSessionId(args.sessionFile, args.cwd)}:${digest}`;
+}
+
 export function contextLabel(cwd: string, sessionFile: string | undefined): string {
   const suffix = sessionFile ? `, session ${basename(sessionFile)}` : ", ephemeral session";
   return `Pi coding session for repo "${basename(cwd)}"${suffix}`;

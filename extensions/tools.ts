@@ -6,6 +6,20 @@ import { createMemoryOperations } from "./memory-operations.js";
 export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
   const operations = createMemoryOperations(deps);
 
+  function retainToolResponse(result: Awaited<ReturnType<typeof operations.retainExplicit>>) {
+    const deadLetterStatus = result.deadLettered
+      ? ` ${result.deadLettered} job${result.deadLettered === 1 ? "" : "s"} moved to dead-letter queue; run /hindsight to inspect.`
+      : "";
+    const status =
+      result.remaining > 0
+        ? `Queued for ${result.bankId}; ${result.remaining} job${result.remaining === 1 ? "" : "s"} pending.${deadLetterStatus}`
+        : `Retained in ${result.bankId} as ${result.documentId}.${deadLetterStatus}`;
+    return {
+      content: [{ type: "text" as const, text: status }],
+      details: result,
+    };
+  }
+
   pi.registerTool({
     name: "hindsight_recall",
     label: "Hindsight Recall",
@@ -68,15 +82,92 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
         ...(params.tags ? { tags: params.tags } : {}),
         ...(params.entities ? { entities: params.entities } : {}),
       });
-      const deadLetterStatus = result.deadLettered
-        ? ` ${result.deadLettered} job${result.deadLettered === 1 ? "" : "s"} moved to dead-letter queue; run /hindsight to inspect.`
-        : "";
-      const status =
-        result.remaining > 0
-          ? `Queued for ${result.bankId}; ${result.remaining} job${result.remaining === 1 ? "" : "s"} pending.${deadLetterStatus}`
-          : `Retained in ${result.bankId}.${deadLetterStatus}`;
+      return retainToolResponse(result);
+    },
+  });
+
+  pi.registerTool({
+    name: "hindsight_retain_global",
+    label: "Hindsight Retain Global",
+    description:
+      "Retain explicit durable global memory in the configured global bank. Use for stable user identity, preferences, and cross-project workflows only.",
+    parameters: Type.Object({
+      content: Type.String({ description: "Raw memory content to retain." }),
+      context: Type.String({ description: "Why this memory is durable global user context." }),
+      tags: Type.Optional(Type.Array(Type.String())),
+      entities: Type.Optional(
+        Type.Array(
+          Type.Object({
+            text: Type.String(),
+            type: Type.Optional(Type.String()),
+          }),
+        ),
+      ),
+    }),
+    async execute(_id, params, _signal, _onUpdate, ctx) {
+      const sessionFile = ctx.sessionManager.getSessionFile?.();
+      const result = await operations.retainExplicit({
+        cwd: ctx.cwd,
+        content: params.content,
+        context: params.context,
+        bank: "global",
+        ...(sessionFile ? { sessionFile } : {}),
+        ...(params.tags ? { tags: params.tags } : {}),
+        ...(params.entities ? { entities: params.entities } : {}),
+      });
+      return retainToolResponse(result);
+    },
+  });
+
+  pi.registerTool({
+    name: "hindsight_route_memory",
+    label: "Hindsight Route Memory",
+    description:
+      "Dry-run memory routing against current project/global policy. Does not retain anything.",
+    parameters: Type.Object({
+      content: Type.String({ description: "Candidate memory content to classify." }),
+      context: Type.Optional(Type.String({ description: "Optional context for routing." })),
+    }),
+    async execute(_id, params) {
+      const result = operations.routeMemory({
+        content: params.content,
+        ...(params.context ? { context: params.context } : {}),
+      });
       return {
-        content: [{ type: "text", text: status }],
+        content: [
+          {
+            type: "text",
+            text: `Route ${result.route} confidence=${result.confidence}; ${result.reason}`,
+          },
+        ],
+        details: result,
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "hindsight_delete_document",
+    label: "Hindsight Delete Document",
+    description:
+      "Delete a specific Hindsight document and all memories extracted from it. Destructive; requires exact bank and document ID.",
+    parameters: Type.Object({
+      bank: Type.String({ description: "Bank ID containing the document." }),
+      documentId: Type.String({ description: "Exact Hindsight document ID to delete." }),
+      confirm: Type.Boolean({ description: "Must be true to confirm destructive deletion." }),
+    }),
+    async execute(_id, params) {
+      if (!params.confirm) throw new Error("Set confirm=true to delete this Hindsight document.");
+      const result = await operations.deleteDocument({
+        bank: params.bank,
+        documentId: params.documentId,
+      });
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Deleted document ${result.documentId} from ${result.bankId}.`,
+          },
+        ],
         details: result,
       };
     },

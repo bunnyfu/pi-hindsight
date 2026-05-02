@@ -30,6 +30,34 @@ describe("resolveConfig", () => {
     expect(config.banks.project.mission).toBe("Project mission");
   });
 
+  it("normalizes granular bank missions", () => {
+    const cwd = tmp();
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({
+        banks: {
+          project: {
+            retainMission: "Project retain",
+            reflectMission: "Project reflect",
+            observationsMission: "Project observations",
+          },
+          global: {
+            mission: "Global shorthand",
+            retainMission: "Global retain",
+          },
+        },
+      }),
+    );
+
+    const config = resolveConfig(cwd);
+    expect(config.banks.project.retainMission).toBe("Project retain");
+    expect(config.banks.project.reflectMission).toBe("Project reflect");
+    expect(config.banks.project.observationsMission).toBe("Project observations");
+    expect(config.banks.global.mission).toBe("Global shorthand");
+    expect(config.banks.global.retainMission).toBe("Global retain");
+  });
+
   it("resolves env SecretRef API keys and lets direct env override win", () => {
     const cwd = tmp();
     mkdirSync(join(cwd, ".pi"));
@@ -92,7 +120,7 @@ describe("resolveConfig", () => {
       join(cwd, ".pi", "hindsight.json"),
       JSON.stringify({ hindsight: { apiKey: "env:literal-secret" } }),
     );
-    expect(resolveConfig(cwd).hindsight.apiKey).toBe("env:literal-secret");
+    expect(resolveConfig(cwd, {}).hindsight.apiKey).toBe("env:literal-secret");
   });
 
   it("reads boolean overrides from injected env", () => {
@@ -189,6 +217,7 @@ describe("resolveConfig", () => {
           queryTimestamp: 42,
         },
         observations: { enabled: true, scopes: [["repo:{repoKey}"], []] },
+        globalRetain: { mode: "nonsense" },
         retain: {
           queuePath: "",
           flushIntervalMs: -1,
@@ -231,6 +260,7 @@ describe("resolveConfig", () => {
     expect(config.recall.timeoutMs).toBe(10_000);
     expect(config.recall.injectionPosition).toBe("append");
     expect(config.recall.queryTimestamp).toBeUndefined();
+    expect(config.globalRetain.mode).toBe("explicit-only");
     expect(config.retain.content.toolResult).toEqual(["error"]);
     expect(config.retain.toolFilter.toolCall.exclude).toContain("hindsight_retain");
     expect(config.retain.toolFilter.toolResult.exclude).toContain("hindsight_recall");

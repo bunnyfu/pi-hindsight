@@ -5,7 +5,9 @@ import { configureMemory, initMemoryConfig } from "./config-operations.js";
 import { importMemoryProjectSessions, importMemorySession } from "./import-operations.js";
 
 import { recallScopeTags } from "./banking.js";
-import { stableSessionId } from "./session.js";
+import { resolveOperationBank } from "./bank-selection.js";
+import { routeMemoryCandidate } from "./memory-router.js";
+import { explicitMemoryDocumentId } from "./session.js";
 import { createMemoryIdentity, explicitRetainTags } from "./memory-identity.js";
 import { expandObservationScopes } from "./observation-scopes.js";
 import { retainDurably } from "./retain-durable.js";
@@ -59,7 +61,11 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
       if (!getEffectiveSessionMemoryMode(meta).recall)
         throw new Error("Hindsight recall is disabled for this session");
       const config = deps.getConfig();
-      const bankId = bank || deps.getProjectBankId();
+      const bankId = resolveOperationBank({
+        requestedBank: bank,
+        config,
+        projectBankId: deps.getProjectBankId(),
+      });
       const result = await deps.getClient().recall(bankId, query, {
         budget: config.recall.budget,
         maxTokens: config.recall.maxTokens,
@@ -85,7 +91,11 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
       if (!getEffectiveSessionMemoryMode(meta).retain)
         throw new Error("Hindsight retain is disabled for this session");
       const config = deps.getConfig();
-      const bankId = args.bank || deps.getProjectBankId();
+      const bankId = resolveOperationBank({
+        requestedBank: args.bank,
+        config,
+        projectBankId: deps.getProjectBankId(),
+      });
       const tags = explicitRetainTags(args.cwd, args.sessionFile, [
         ...(args.tags ?? []),
         ...meta.tags,
@@ -106,8 +116,14 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
         content: args.content,
         context: args.context,
         tags,
-        updateMode: "append",
-        documentId: `pi-explicit:${stableSessionId(args.sessionFile, args.cwd)}`,
+        updateMode: "replace",
+        documentId: explicitMemoryDocumentId({
+          cwd: args.cwd,
+          ...(args.sessionFile ? { sessionFile: args.sessionFile } : {}),
+          bankId,
+          content: args.content,
+          context: args.context,
+        }),
         metadata: {
           cwd: args.cwd,
           ...(args.sessionFile ? { pi_session_file: args.sessionFile } : {}),
@@ -117,7 +133,28 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
         ...(args.entities?.length ? { entities: args.entities } : {}),
         ...(capabilities ? { capabilities } : {}),
       });
-      return { bankId, tags, ...result, queued: result.enqueued };
+      return { ...result, tags, queued: result.enqueued };
+    },
+
+    async deleteDocument(args: { bank: string; documentId: string }) {
+      const bankId = resolveOperationBank({
+        requestedBank: args.bank,
+        config: deps.getConfig(),
+        projectBankId: deps.getProjectBankId(),
+      });
+      const client = deps.getClient();
+      if (!client.deleteDocument)
+        throw new Error("Hindsight delete document is unavailable in this client");
+      const result = await client.deleteDocument(bankId, args.documentId);
+      return { bankId, documentId: args.documentId, result };
+    },
+
+    routeMemory(args: { content: string; context?: string }) {
+      return routeMemoryCandidate({
+        content: args.content,
+        ...(args.context ? { context: args.context } : {}),
+        config: deps.getConfig(),
+      });
     },
 
     async configure(cwd: string, args: ConfigureMemoryArgs) {
@@ -153,7 +190,11 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
       responseSchema?: Record<string, unknown>,
     ) {
       const config = deps.getConfig();
-      const bankId = bank || deps.getProjectBankId();
+      const bankId = resolveOperationBank({
+        requestedBank: bank,
+        config,
+        projectBankId: deps.getProjectBankId(),
+      });
       const result = await deps.getClient().reflect(bankId, query, {
         ...(context ? { context } : {}),
         budget: config.recall.budget,

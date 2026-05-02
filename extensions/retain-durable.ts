@@ -33,6 +33,10 @@ export interface RetainDurablyResult {
   sent: number;
   remaining: number;
   deadLettered: number;
+  bankId: string;
+  documentId: string;
+  queueJobId: string;
+  updateMode: UpdateMode;
 }
 
 export function buildDurableRetainJob(args: Omit<RetainDurablyArgs, "client">): RetainJob {
@@ -47,14 +51,18 @@ export function buildDurableRetainJob(args: Omit<RetainDurablyArgs, "client">): 
 }
 
 export async function retainDurably(args: RetainDurablyArgs): Promise<RetainDurablyResult> {
-  const enqueueResult = await enqueueRetainWithStats(
-    args.cwd,
-    args.config,
-    buildDurableRetainJob(args),
-  );
+  const job = buildDurableRetainJob(args);
+  const receipt = {
+    bankId: job.bankId,
+    documentId: job.documentId,
+    queueJobId: job.id,
+    updateMode: job.updateMode,
+  };
+  const enqueueResult = await enqueueRetainWithStats(args.cwd, args.config, job);
   if (enqueueResult.previousLength > 0) {
     const summary = await summarizeRetain(args.cwd, args.config);
     return {
+      ...receipt,
       enqueued: true,
       sent: 0,
       remaining: summary.active.valid + summary.active.malformed,
@@ -62,5 +70,5 @@ export async function retainDurably(args: RetainDurablyArgs): Promise<RetainDura
     };
   }
   const result = await flushRetain(args.cwd, args.config, args.client, { maxJobs: 1 });
-  return { enqueued: true, ...result };
+  return { ...receipt, enqueued: true, ...result };
 }

@@ -1,0 +1,72 @@
+import { describe, expect, it, vi } from "vitest";
+import { DEFAULT_CONFIG } from "../extensions/config.js";
+import { collectStatusHealthFacts } from "../extensions/status-health.js";
+import type { HindsightLikeClient } from "../extensions/types.js";
+
+describe("status health", () => {
+  it("reports server, bank reachability, and bank stats", async () => {
+    const client: HindsightLikeClient = {
+      retain: vi.fn(),
+      retainBatch: vi.fn(),
+      recall: vi.fn(),
+      reflect: vi.fn(),
+      health: vi.fn(async () => ({ ok: true })),
+      getBankProfile: vi.fn(async (bankId: string) => ({
+        bank_id: bankId,
+        name: `${bankId} name`,
+      })),
+      getBankStats: vi.fn(async () => ({
+        total_nodes: 3,
+        total_documents: 2,
+        total_observations: 1,
+        pending_consolidation: 4,
+        failed_consolidation: 0,
+      })),
+    };
+
+    const facts = await collectStatusHealthFacts({
+      client,
+      config: {
+        ...DEFAULT_CONFIG,
+        banks: {
+          ...DEFAULT_CONFIG.banks,
+          global: { enabled: true, bankId: "global-bank" },
+        },
+      },
+      projectBankId: "project-bank",
+    });
+
+    expect(facts).toEqual(
+      expect.arrayContaining([
+        ["Server", "reachable"],
+        ["Project bank", "reachable · project-bank name"],
+        ["Global bank", "reachable · global-bank name"],
+        ["Project bank stats", "memories 3 · docs 2 · observations 1 · pending 4 · failed 0"],
+      ]),
+    );
+  });
+
+  it("reports unreachable server and bank without throwing", async () => {
+    const client: HindsightLikeClient = {
+      retain: vi.fn(),
+      retainBatch: vi.fn(),
+      recall: vi.fn(),
+      reflect: vi.fn(),
+      health: vi.fn(async () => {
+        throw new Error("down");
+      }),
+      getBankProfile: vi.fn(async () => {
+        throw new Error("missing bank");
+      }),
+    };
+
+    const facts = await collectStatusHealthFacts({
+      client,
+      config: DEFAULT_CONFIG,
+      projectBankId: "bank",
+    });
+
+    expect(facts.find(([key]) => key === "Server")?.[1]).toContain("unreachable");
+    expect(facts.find(([key]) => key === "Project bank")?.[1]).toContain("unreachable");
+  });
+});

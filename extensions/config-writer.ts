@@ -19,6 +19,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function mergeBankPatch(
+  patch: Record<string, unknown>,
+  bank: "project" | "global",
+  values: Record<string, unknown>,
+): void {
+  const banksPatch = isRecord(patch.banks) ? patch.banks : {};
+  patch.banks = {
+    ...banksPatch,
+    [bank]: {
+      ...(isRecord(banksPatch[bank]) ? banksPatch[bank] : {}),
+      ...values,
+    },
+  };
+}
+
 export function projectConfigPath(cwd: string): string {
   return join(cwd, ".pi", "hindsight.json");
 }
@@ -58,8 +73,18 @@ export interface ProjectConfigPatchInput {
   baseUrl?: string;
   timeoutMs?: number;
   apiKeyEnvVar?: string;
+  directApiKey?: string;
   projectBankId?: string;
+  projectMission?: string;
+  projectRetainMission?: string;
+  projectReflectMission?: string;
+  projectObservationsMission?: string;
   globalBankId?: string;
+  globalMission?: string;
+  globalRetainMission?: string;
+  globalReflectMission?: string;
+  globalObservationsMission?: string;
+  globalRetainMode?: "explicit-only" | "router";
   enableGlobalBank?: boolean;
   memoryProfile?: MemoryProfile;
   recallEnabled?: boolean;
@@ -95,11 +120,12 @@ export function buildProjectConfigPatch(input: ProjectConfigPatchInput): Record<
   if (input.apiKeyEnvVar && !validEnvVarName(input.apiKeyEnvVar)) {
     throw new Error("apiKeyEnvVar must be an environment variable name");
   }
-  if (input.baseUrl || input.timeoutMs !== undefined || input.apiKeyEnvVar) {
+  if (input.baseUrl || input.timeoutMs !== undefined || input.apiKeyEnvVar || input.directApiKey) {
     patch.hindsight = {
       ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
       ...(input.timeoutMs !== undefined ? { timeoutMs: input.timeoutMs } : {}),
       ...(input.apiKeyEnvVar ? { apiKey: { source: "env", name: input.apiKeyEnvVar } } : {}),
+      ...(input.directApiKey ? { apiKey: input.directApiKey } : {}),
     };
   }
   if (input.memoryProfile) {
@@ -124,6 +150,18 @@ export function buildProjectConfigPatch(input: ProjectConfigPatchInput): Record<
       project: { enabled: true, derive: "manual", bankId: input.projectBankId },
     };
   }
+  if (input.projectMission !== undefined) {
+    mergeBankPatch(patch, "project", { mission: input.projectMission });
+  }
+  if (input.projectRetainMission !== undefined) {
+    mergeBankPatch(patch, "project", { retainMission: input.projectRetainMission });
+  }
+  if (input.projectReflectMission !== undefined) {
+    mergeBankPatch(patch, "project", { reflectMission: input.projectReflectMission });
+  }
+  if (input.projectObservationsMission !== undefined) {
+    mergeBankPatch(patch, "project", { observationsMission: input.projectObservationsMission });
+  }
   if (!input.memoryProfile && (input.globalBankId || input.enableGlobalBank !== undefined)) {
     patch.banks = {
       ...(isRecord(patch.banks) ? patch.banks : {}),
@@ -132,6 +170,21 @@ export function buildProjectConfigPatch(input: ProjectConfigPatchInput): Record<
         ...(input.globalBankId ? { bankId: input.globalBankId, enabled: true } : {}),
       },
     };
+  }
+  if (input.globalMission !== undefined) {
+    mergeBankPatch(patch, "global", { mission: input.globalMission });
+  }
+  if (input.globalRetainMission !== undefined) {
+    mergeBankPatch(patch, "global", { retainMission: input.globalRetainMission });
+  }
+  if (input.globalReflectMission !== undefined) {
+    mergeBankPatch(patch, "global", { reflectMission: input.globalReflectMission });
+  }
+  if (input.globalObservationsMission !== undefined) {
+    mergeBankPatch(patch, "global", { observationsMission: input.globalObservationsMission });
+  }
+  if (input.globalRetainMode) {
+    patch.globalRetain = { mode: input.globalRetainMode };
   }
   if (
     input.recallEnabled !== undefined ||

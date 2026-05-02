@@ -36,6 +36,9 @@ const DEFAULT_CONFIG: ResolvedConfig = {
     enabled: true,
     scopes: [["harness:pi"], ["repo:{repoKey}"]],
   },
+  globalRetain: {
+    mode: "explicit-only",
+  },
   retain: {
     enabled: true,
     async: true,
@@ -46,10 +49,22 @@ const DEFAULT_CONFIG: ResolvedConfig = {
       toolResult: ["error"],
     },
     toolFilter: {
-      toolCall: { exclude: ["hindsight_retain", "hindsight_recall", "hindsight_reflect"] },
+      toolCall: {
+        exclude: [
+          "hindsight_retain",
+          "hindsight_retain_global",
+          "hindsight_delete_document",
+          "hindsight_route_memory",
+          "hindsight_recall",
+          "hindsight_reflect",
+        ],
+      },
       toolResult: {
         exclude: [
           "hindsight_retain",
+          "hindsight_retain_global",
+          "hindsight_delete_document",
+          "hindsight_route_memory",
           "hindsight_recall",
           "hindsight_reflect",
           "read",
@@ -304,6 +319,22 @@ function hasConfiguredRecallField(rawConfig: unknown, field: string): boolean {
   return isRecord(rawConfig) && isRecord(rawConfig.recall) && field in rawConfig.recall;
 }
 
+function missionFields(bankConfig: unknown) {
+  if (!isRecord(bankConfig)) return {};
+  return {
+    ...(typeof bankConfig.mission === "string" ? { mission: bankConfig.mission } : {}),
+    ...(typeof bankConfig.retainMission === "string"
+      ? { retainMission: bankConfig.retainMission }
+      : {}),
+    ...(typeof bankConfig.reflectMission === "string"
+      ? { reflectMission: bankConfig.reflectMission }
+      : {}),
+    ...(typeof bankConfig.observationsMission === "string"
+      ? { observationsMission: bankConfig.observationsMission }
+      : {}),
+  };
+}
+
 export function normalizeConfig(
   config: ResolvedConfig,
   rawConfig?: unknown,
@@ -341,21 +372,24 @@ export function normalizeConfig(
           ["repo", "cwd", "manual"],
           DEFAULT_CONFIG.banks.project.derive,
         ),
-        ...(typeof config.banks?.project?.mission === "string"
-          ? { mission: config.banks.project.mission }
-          : {}),
+        ...missionFields(config.banks?.project),
       },
       global: {
         enabled: bool(config.banks?.global?.enabled, DEFAULT_CONFIG.banks.global.enabled),
         ...(globalBankId ? { bankId: globalBankId } : {}),
-        ...(typeof config.banks?.global?.mission === "string"
-          ? { mission: config.banks.global.mission }
-          : {}),
+        ...missionFields(config.banks?.global),
       },
     },
     observations: {
       enabled: bool(config.observations?.enabled, DEFAULT_CONFIG.observations.enabled),
       scopes: stringMatrix(config.observations?.scopes, DEFAULT_CONFIG.observations.scopes),
+    },
+    globalRetain: {
+      mode: enumValue(
+        config.globalRetain?.mode,
+        ["explicit-only", "router"],
+        DEFAULT_CONFIG.globalRetain.mode,
+      ),
     },
     recall: {
       enabled: bool(config.recall?.enabled, DEFAULT_CONFIG.recall.enabled),

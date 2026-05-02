@@ -20,14 +20,21 @@ import {
 } from "./config-editing-model.js";
 import { createMemoryOperations, type MemoryOperationsDeps } from "./memory-operations.js";
 import { type ConfigScope, type ProjectConfigPatchInput } from "./config-writer.js";
+import { collectStatusHealthFacts } from "./status-health.js";
 
 type Deps = MemoryOperationsDeps;
 
-type SetupActionId = FieldId | `reset:${FieldId}` | "choose-deployment" | "done";
+type SetupActionId =
+  | FieldId
+  | `reset:${FieldId}`
+  | "choose-deployment"
+  | "toggle-advanced"
+  | "done";
 
 type SetupUiState = {
   tabIndex: number;
   selectedByTab: Partial<Record<TabId, number>>;
+  showAdvanced?: boolean;
 };
 
 type ThemeLike = {
@@ -218,7 +225,7 @@ export function createSetupComponent(
         boxed(
           theme.fg(
             "dim",
-            " h/l or </> tabs · j/k move · enter edit · r reset · d deployment · q close ",
+            ` h/l or </> tabs · j/k move · enter edit · r reset · a advanced ${state.showAdvanced ? "on" : "off"} · d deployment · q close `,
           ),
           width,
           theme,
@@ -258,6 +265,10 @@ export function createSetupComponent(
         if (field?.changed) done(`reset:${field.id}`);
         return;
       }
+      if (data === "a") {
+        done("toggle-advanced");
+        return;
+      }
       if (matchesKey(data, Key.enter)) {
         done(selectedField()?.id ?? null);
       }
@@ -270,9 +281,23 @@ async function showSetupTui(
   ctx: ExtensionCommandContext,
   config: ResolvedConfig,
   projectBankId: string,
+  deps: Deps,
   state: SetupUiState,
 ): Promise<SetupActionId | null> {
-  const tabs = buildConfigEditingTabs(config, projectBankId, readConfigLayers(ctx.cwd));
+  const statusFacts = await collectStatusHealthFacts({
+    client: deps.getClient(),
+    config,
+    projectBankId,
+  });
+  const tabs = buildConfigEditingTabs(
+    config,
+    projectBankId,
+    readConfigLayers(ctx.cwd),
+    statusFacts,
+    {
+      showAdvanced: Boolean(state.showAdvanced),
+    },
+  );
   return ctx.ui.custom<SetupActionId | null>((tui, theme, _keybindings, done) => {
     const component = createSetupComponent(tabs, theme as ThemeLike, state, done);
     return {
@@ -445,11 +470,14 @@ export async function runHindsightSetupTui(
   while (true) {
     const config = deps.getConfig();
     const projectBankId = deps.getProjectBankId();
-    const action = await showSetupTui(ctx, config, projectBankId, state);
+    const action = await showSetupTui(ctx, config, projectBankId, deps, state);
     if (!action || action === "done") return;
     try {
       if (action === "choose-deployment") await handleDeployment(ctx, deps, config);
-      else if (action.startsWith("reset:")) {
+      else if (action === "toggle-advanced") {
+        state.showAdvanced = !state.showAdvanced;
+        state.selectedByTab = {};
+      } else if (action.startsWith("reset:")) {
         const fieldId = action.slice("reset:".length) as FieldId;
         const field = buildConfigEditingFields(
           config,

@@ -2,11 +2,21 @@ export type FieldId =
   | "enabled"
   | "baseUrl"
   | "apiKeyEnv"
+  | "apiKeyDirect"
   | "timeoutMs"
   | "memoryProfile"
   | "projectBankId"
+  | "projectMission"
+  | "projectRetainMission"
+  | "projectReflectMission"
+  | "projectObservationsMission"
   | "globalBankEnabled"
   | "globalBankId"
+  | "globalMission"
+  | "globalRetainMission"
+  | "globalReflectMission"
+  | "globalObservationsMission"
+  | "globalRetainMode"
   | "recallEnabled"
   | "recallBudget"
   | "recallMaxTokens"
@@ -30,11 +40,21 @@ export const CONFIG_FIELD_PATHS: Record<FieldId, string[]> = {
   enabled: ["enabled"],
   baseUrl: ["hindsight", "baseUrl"],
   apiKeyEnv: ["hindsight", "apiKey"],
+  apiKeyDirect: ["hindsight", "apiKey"],
   timeoutMs: ["hindsight", "timeoutMs"],
   memoryProfile: ["banks", "project", "enabled"],
   projectBankId: ["banks", "project", "bankId"],
+  projectMission: ["banks", "project", "mission"],
+  projectRetainMission: ["banks", "project", "retainMission"],
+  projectReflectMission: ["banks", "project", "reflectMission"],
+  projectObservationsMission: ["banks", "project", "observationsMission"],
   globalBankEnabled: ["banks", "global", "enabled"],
   globalBankId: ["banks", "global", "bankId"],
+  globalMission: ["banks", "global", "mission"],
+  globalRetainMission: ["banks", "global", "retainMission"],
+  globalReflectMission: ["banks", "global", "reflectMission"],
+  globalObservationsMission: ["banks", "global", "observationsMission"],
+  globalRetainMode: ["globalRetain", "mode"],
   recallEnabled: ["recall", "enabled"],
   recallBudget: ["recall", "budget"],
   recallMaxTokens: ["recall", "maxTokens"],
@@ -71,8 +91,29 @@ export const CONFIG_RESET_PATHS = {
     ["banks", "project", "bankId"],
     ["banks", "project", "derive"],
   ],
+  "banks.project.missions": [
+    ["banks", "project", "mission"],
+    ["banks", "project", "retainMission"],
+    ["banks", "project", "reflectMission"],
+    ["banks", "project", "observationsMission"],
+  ],
+  "banks.project.mission": [["banks", "project", "mission"]],
+  "banks.project.retainMission": [["banks", "project", "retainMission"]],
+  "banks.project.reflectMission": [["banks", "project", "reflectMission"]],
+  "banks.project.observationsMission": [["banks", "project", "observationsMission"]],
   "banks.global.enabled": [["banks", "global", "enabled"]],
   "banks.global.bankId": [["banks", "global", "bankId"]],
+  "banks.global.missions": [
+    ["banks", "global", "mission"],
+    ["banks", "global", "retainMission"],
+    ["banks", "global", "reflectMission"],
+    ["banks", "global", "observationsMission"],
+  ],
+  "banks.global.mission": [["banks", "global", "mission"]],
+  "banks.global.retainMission": [["banks", "global", "retainMission"]],
+  "banks.global.reflectMission": [["banks", "global", "reflectMission"]],
+  "banks.global.observationsMission": [["banks", "global", "observationsMission"]],
+  "globalRetain.mode": [["globalRetain", "mode"]],
   "recall.enabled": [["recall", "enabled"]],
   "recall.budget": [["recall", "budget"]],
   "recall.maxTokens": [["recall", "maxTokens"]],

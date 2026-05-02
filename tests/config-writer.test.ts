@@ -21,6 +21,53 @@ describe("config writer", () => {
     });
   });
 
+  it("builds bank mission patches without clobbering sibling bank settings", () => {
+    expect(
+      buildProjectConfigPatch({
+        projectBankId: "bank",
+        projectMission: "Project mission",
+        globalBankId: "pi-global",
+        globalMission: "Global mission",
+      }),
+    ).toEqual({
+      banks: {
+        project: {
+          enabled: true,
+          derive: "manual",
+          bankId: "bank",
+          mission: "Project mission",
+        },
+        global: { enabled: true, bankId: "pi-global", mission: "Global mission" },
+      },
+    });
+  });
+
+  it("builds granular mission override patches", () => {
+    expect(
+      buildProjectConfigPatch({
+        projectRetainMission: "Project retain",
+        projectReflectMission: "Project reflect",
+        projectObservationsMission: "Project observations",
+        globalRetainMission: "Global retain",
+        globalReflectMission: "Global reflect",
+        globalObservationsMission: "Global observations",
+      }),
+    ).toEqual({
+      banks: {
+        project: {
+          retainMission: "Project retain",
+          reflectMission: "Project reflect",
+          observationsMission: "Project observations",
+        },
+        global: {
+          retainMission: "Global retain",
+          reflectMission: "Global reflect",
+          observationsMission: "Global observations",
+        },
+      },
+    });
+  });
+
   it("builds memory profile patches", () => {
     expect(buildProjectConfigPatch({ memoryProfile: "project-only" })).toEqual({
       banks: { project: { enabled: true }, global: { enabled: false } },
@@ -72,6 +119,18 @@ describe("config writer", () => {
       },
       status: { style: "emoji", detail: "activity", maxLength: 30, showActivity: false },
       notifications: { recall: true, retain: true },
+    });
+  });
+
+  it("builds global retain mode patch", () => {
+    expect(buildProjectConfigPatch({ globalRetainMode: "router" })).toEqual({
+      globalRetain: { mode: "router" },
+    });
+  });
+
+  it("can write direct API keys while keeping env refs preferred", () => {
+    expect(buildProjectConfigPatch({ directApiKey: "raw-secret" })).toEqual({
+      hindsight: { apiKey: "raw-secret" },
     });
   });
 

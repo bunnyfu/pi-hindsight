@@ -66,7 +66,7 @@ describe("durable explicit retain", () => {
     expect(queued).toHaveLength(1);
     expect(queued[0]).toMatchObject({
       bankId: "project-bank",
-      updateMode: "append",
+      updateMode: "replace",
       retries: 1,
       item: {
         context: "unit test explicit retain",
@@ -229,12 +229,12 @@ describe("durable explicit retain", () => {
       {
         context: "unit test explicit retain",
         async: true,
-        updateMode: "append",
+        updateMode: "replace",
       },
     ]);
   });
 
-  it("refuses explicit append retain when known unsupported", async () => {
+  it("uses replace for explicit retains so receipts can be deleted precisely", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
     const config = testConfig();
     const operations = createMemoryOperations({
@@ -244,38 +244,14 @@ describe("durable explicit retain", () => {
       getCapabilities: () => ({ appendUpdateMode: false, checkedAt: "now" }),
     });
 
-    await expect(
-      operations.retainExplicit({
-        cwd,
-        content: "Decision: no overwrite.",
-        context: "unit test explicit retain",
-      }),
-    ).rejects.toThrow(/append update mode is unsupported/);
-    expect(await readRetainQueue(resolveQueuePath(cwd, config.retain.queuePath))).toHaveLength(0);
-  });
-
-  it("keeps append target when append support probe was inconclusive", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
-    const config = testConfig();
-    const operations = createMemoryOperations({
-      getClient: () =>
-        client(async () => {
-          throw new Error("down");
-        }),
-      getConfig: () => config,
-      getProjectBankId: () => "project-bank",
-      getCapabilities: () => ({ appendUpdateMode: true, checkedAt: "now", error: "unknown" }),
-    });
-
-    await operations.retainExplicit({
+    const result = await operations.retainExplicit({
       cwd,
-      content: "Decision: keep append target.",
+      content: "Decision: precise delete target.",
       context: "unit test explicit retain",
     });
 
-    const queued = await readRetainQueue(resolveQueuePath(cwd, config.retain.queuePath));
-    expect(queued[0]?.updateMode).toBe("append");
-    expect(queued[0]?.documentId).toMatch(/^pi-explicit:/);
+    expect(result.updateMode).toBe("replace");
+    expect(result.documentId).toMatch(/^pi-explicit:/);
   });
 
   it("blocks explicit recall and retain when session governance disables them", async () => {

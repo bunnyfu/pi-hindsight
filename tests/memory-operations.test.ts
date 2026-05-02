@@ -79,18 +79,18 @@ describe("memory operations", () => {
   });
 
   it("passes query timestamps, explicit entities, and reflect response schemas", async () => {
-    const calls: Array<{ method: string; options?: unknown }> = [];
+    const calls: Array<{ method: string; bank?: string; options?: unknown }> = [];
     const operations = createMemoryOperations({
       getClient: () => ({
-        retain: async (_bank, _content, options) => {
-          calls.push({ method: "retain", options });
+        retain: async (bank, _content, options) => {
+          calls.push({ method: "retain", bank, options });
         },
-        recall: async (_bank, _query, options) => {
-          calls.push({ method: "recall", options });
+        recall: async (bank, _query, options) => {
+          calls.push({ method: "recall", bank, options });
           return [];
         },
-        reflect: async (_bank, _query, options) => {
-          calls.push({ method: "reflect", options });
+        reflect: async (bank, _query, options) => {
+          calls.push({ method: "reflect", bank, options });
           return {};
         },
       }),
@@ -124,5 +124,55 @@ describe("memory operations", () => {
     expect(calls.find((call) => call.method === "reflect")?.options).toMatchObject({
       responseSchema: { type: "object", properties: { answer: { type: "string" } } },
     });
+  });
+
+  it("resolves project/global bank aliases for explicit operations", async () => {
+    const calls: Array<{ method: string; bank: string }> = [];
+    const config = {
+      ...DEFAULT_CONFIG,
+      banks: { ...DEFAULT_CONFIG.banks, global: { enabled: true, bankId: "global-luxus" } },
+      retain: { ...DEFAULT_CONFIG.retain, async: false },
+    };
+    const operations = createMemoryOperations({
+      getClient: () => ({
+        retain: async (bank) => {
+          calls.push({ method: "retain", bank });
+        },
+        recall: async (bank) => {
+          calls.push({ method: "recall", bank });
+          return [];
+        },
+        reflect: async (bank) => {
+          calls.push({ method: "reflect", bank });
+          return {};
+        },
+        deleteDocument: async (bank) => {
+          calls.push({ method: "delete", bank });
+          return {};
+        },
+      }),
+      getConfig: () => config,
+      getProjectBankId: () => "project-bank",
+    });
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-ops-"));
+
+    await operations.recall(cwd, "query", "global");
+    await operations.retainExplicit({
+      cwd,
+      content: "content",
+      context: "context",
+      bank: "global",
+    });
+    await operations.reflect(cwd, "query", undefined, "project");
+    await operations.deleteDocument({ bank: "global", documentId: "doc" });
+
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        { method: "recall", bank: "global-luxus" },
+        { method: "retain", bank: "global-luxus" },
+        { method: "reflect", bank: "project-bank" },
+        { method: "delete", bank: "global-luxus" },
+      ]),
+    );
   });
 });

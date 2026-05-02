@@ -8,6 +8,15 @@ export type StatusStyle = "off" | "text" | "emoji" | "nerdfont";
 export type StatusDetail = "minimal" | "project" | "activity" | "verbose";
 export type RecallRole = "user" | "assistant" | "tool" | "system";
 export type RecallInjectionPosition = "prepend" | "append";
+export type GlobalRetainMode = "explicit-only" | "router";
+
+export interface BankMissionSettings {
+  /** Human-friendly shorthand. Used for any mission field not set explicitly. */
+  mission?: string;
+  retainMission?: string;
+  reflectMission?: string;
+  observationsMission?: string;
+}
 
 export interface HindsightEntityInput {
   text: string;
@@ -18,13 +27,12 @@ export interface ResolvedConfig {
   enabled: boolean;
   hindsight: { baseUrl: string; apiKey?: string; apiKeyRef?: string; timeoutMs: number };
   banks: {
-    project: {
+    project: BankMissionSettings & {
       enabled: boolean;
       bankId?: string;
       derive: "repo" | "cwd" | "manual";
-      mission?: string;
     };
-    global: { enabled: boolean; bankId?: string; mission?: string };
+    global: BankMissionSettings & { enabled: boolean; bankId?: string };
   };
   recall: {
     enabled: boolean;
@@ -51,6 +59,9 @@ export interface ResolvedConfig {
   observations: {
     enabled: boolean;
     scopes: string[][];
+  };
+  globalRetain: {
+    mode: GlobalRetainMode;
   };
   retain: {
     enabled: boolean;
@@ -214,4 +225,7 @@ export interface HindsightLikeClient {
     },
   ): Promise<unknown>;
   getBankProfile?(bankId: string): Promise<unknown>;
+  getBankStats?(bankId: string): Promise<unknown>;
+  health?(): Promise<unknown>;
+  deleteDocument?(bankId: string, documentId: string): Promise<unknown>;
 }

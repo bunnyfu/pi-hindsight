@@ -2,6 +2,23 @@ import { HindsightClient } from "@vectorize-io/hindsight-client";
 import { redactError } from "./sanitize.js";
 import type { HindsightLikeClient, ResolvedConfig } from "./types.js";
 
+async function fetchJson(
+  config: ResolvedConfig,
+  path: string,
+  init: RequestInit = {},
+): Promise<unknown> {
+  const headers = new Headers(init.headers);
+  headers.set("User-Agent", "pi-hindsight/0.1.0");
+  if (config.hindsight.apiKey) headers.set("Authorization", `Bearer ${config.hindsight.apiKey}`);
+  const response = await fetch(`${config.hindsight.baseUrl.replace(/\/$/, "")}${path}`, {
+    ...init,
+    headers,
+  });
+  const body = (await response.json().catch(() => undefined)) as unknown;
+  if (!response.ok) throw new Error(`Hindsight request failed with status ${response.status}`);
+  return body;
+}
+
 async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
@@ -99,6 +116,23 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
       withTimeout(raw.createBank(...args), timeoutMs, "hindsight createBank"),
     getBankProfile: (...args) =>
       withTimeout(raw.getBankProfile(...args), timeoutMs, "hindsight getBankProfile"),
+    getBankStats: (bankId) =>
+      withTimeout(
+        fetchJson(config, `/v1/default/banks/${encodeURIComponent(bankId)}/stats`),
+        timeoutMs,
+        "hindsight getBankStats",
+      ),
+    health: () => withTimeout(fetchJson(config, "/health"), timeoutMs, "hindsight health"),
+    deleteDocument: (bankId, documentId) =>
+      withTimeout(
+        fetchJson(
+          config,
+          `/v1/default/banks/${encodeURIComponent(bankId)}/documents/${encodeURIComponent(documentId)}`,
+          { method: "DELETE" },
+        ),
+        timeoutMs,
+        "hindsight deleteDocument",
+      ),
   };
 }
 
@@ -107,7 +141,8 @@ export async function checkHindsight(
   bankId: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    if (client.getBankProfile) await client.getBankProfile(bankId);
+    if (client.health) await client.health();
+    else if (client.getBankProfile) await client.getBankProfile(bankId);
     else await client.recall(bankId, "health check", { maxTokens: 1, budget: "low" });
     return { ok: true };
   } catch (error) {

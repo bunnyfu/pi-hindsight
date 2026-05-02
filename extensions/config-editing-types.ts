@@ -22,6 +22,7 @@ export type ConfigEditingField = {
   resetKey: ConfigResetKey;
   kind: ConfigEditingKind;
   choices?: string[];
+  advanced?: boolean;
 };
 
 export type ConfigLayers = {

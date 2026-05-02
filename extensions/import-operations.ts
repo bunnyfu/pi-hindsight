@@ -1,5 +1,6 @@
 import type { HindsightLikeClient, ResolvedConfig } from "./types.js";
 import { importPiSession, importProjectSessions } from "./import-sessions.js";
+import { resolveOperationBank } from "./bank-selection.js";
 
 export type ImportOperationDeps = {
   getClient(): HindsightLikeClient;
@@ -17,7 +18,11 @@ export async function importMemorySession(
   },
   deps: ImportOperationDeps,
 ) {
-  const bankId = args.bank || deps.getProjectBankId();
+  const bankId = resolveOperationBank({
+    requestedBank: args.bank,
+    config: deps.getConfig(),
+    projectBankId: deps.getProjectBankId(),
+  });
   const result = await importPiSession({
     sessionFile: args.sessionFile,
     ...(args.cwd ? { cwd: args.cwd } : {}),
@@ -41,7 +46,11 @@ export async function importMemoryProjectSessions(
   },
   deps: ImportOperationDeps,
 ) {
-  const bankId = args.bank || deps.getProjectBankId();
+  const bankId = resolveOperationBank({
+    requestedBank: args.bank,
+    config: deps.getConfig(),
+    projectBankId: deps.getProjectBankId(),
+  });
   const result = await importProjectSessions({
     cwd: args.cwd,
     ...(args.currentSessionFile ? { currentSessionFile: args.currentSessionFile } : {}),

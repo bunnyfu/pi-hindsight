@@ -24,6 +24,13 @@ export function apiKeyEnvName(config: ResolvedConfig): string {
     : "not set";
 }
 
+function apiKeySourceLabel(config: ResolvedConfig): string {
+  const envName = apiKeyEnvName(config);
+  if (envName !== "not set")
+    return config.hindsight.apiKey ? `${envName} (resolved)` : `${envName} (missing)`;
+  return config.hindsight.apiKey ? "set directly or HINDSIGHT_API_KEY env" : "not set";
+}
+
 type BaseConfigEditingField = Omit<
   ConfigEditingField,
   "projectValue" | "globalValue" | "envValue" | "source" | "editableScopes"
@@ -44,6 +51,7 @@ type FieldArgs = {
   resetKey: FieldResetKey;
   kind: FieldKind;
   choices?: string[];
+  advanced?: boolean;
 };
 
 function field(args: FieldArgs): BaseConfigEditingField {
@@ -123,12 +131,23 @@ export function buildBaseConfigEditingFields(
     textField({
       id: "apiKeyEnv",
       tab: "Connection",
-      label: "API key env var",
+      label: "API key source",
       description:
-        "Environment variable name that contains the Hindsight API key. Raw secrets are never written.",
-      value: apiKeyEnvName(config),
+        "Recommended: environment variable name that contains the API key. Editing writes a safe env SecretRef, not the raw secret.",
+      value: apiKeySourceLabel(config),
       defaultValue: "not set",
       resetKey: "hindsight.apiKey",
+    }),
+    textField({
+      id: "apiKeyDirect",
+      tab: "Connection",
+      label: "Direct API key (not recommended)",
+      description:
+        "Advanced. Writes raw API key into config. Prefer API key source/env var whenever possible.",
+      value: config.hindsight.apiKey && apiKeyEnvName(config) === "not set" ? "set" : "not set",
+      defaultValue: "not set",
+      resetKey: "hindsight.apiKey",
+      advanced: true,
     }),
     positiveIntField({
       id: "timeoutMs",
@@ -161,6 +180,50 @@ export function buildBaseConfigEditingFields(
       changed: Boolean(config.banks.project.bankId),
       resetKey: "banks.project.bankId",
     }),
+    textField({
+      id: "projectMission",
+      tab: "Banks",
+      label: "Project mission",
+      description:
+        "Optional shorthand for project retain, reflect, and observation missions. Blank uses built-in defaults.",
+      value: config.banks.project.mission ?? "built-in default",
+      defaultValue: "built-in default",
+      changed: Boolean(config.banks.project.mission),
+      resetKey: "banks.project.mission",
+    }),
+    textField({
+      id: "projectRetainMission",
+      tab: "Banks",
+      label: "Project retain mission",
+      description: "Advanced. Overrides what project retain extracts.",
+      value: config.banks.project.retainMission ?? "inherit project mission/default",
+      defaultValue: "inherit project mission/default",
+      changed: Boolean(config.banks.project.retainMission),
+      resetKey: "banks.project.retainMission",
+      advanced: true,
+    }),
+    textField({
+      id: "projectReflectMission",
+      tab: "Banks",
+      label: "Project reflect mission",
+      description: "Advanced. Overrides how project reflect uses memories.",
+      value: config.banks.project.reflectMission ?? "inherit project mission/default",
+      defaultValue: "inherit project mission/default",
+      changed: Boolean(config.banks.project.reflectMission),
+      resetKey: "banks.project.reflectMission",
+      advanced: true,
+    }),
+    textField({
+      id: "projectObservationsMission",
+      tab: "Banks",
+      label: "Project observations mission",
+      description: "Advanced. Overrides what project observation consolidation synthesizes.",
+      value: config.banks.project.observationsMission ?? "inherit project mission/default",
+      defaultValue: "inherit project mission/default",
+      changed: Boolean(config.banks.project.observationsMission),
+      resetKey: "banks.project.observationsMission",
+      advanced: true,
+    }),
     booleanField({
       id: "globalBankEnabled",
       tab: "Banks",
@@ -178,6 +241,50 @@ export function buildBaseConfigEditingFields(
       value: globalBankId,
       defaultValue: defaultGlobalBankId,
       resetKey: "banks.global.bankId",
+    }),
+    textField({
+      id: "globalMission",
+      tab: "Banks",
+      label: "Global mission",
+      description:
+        "Optional shorthand for global retain, reflect, and observation missions. Blank uses built-in defaults.",
+      value: config.banks.global.mission ?? "built-in default",
+      defaultValue: "built-in default",
+      changed: Boolean(config.banks.global.mission),
+      resetKey: "banks.global.mission",
+    }),
+    textField({
+      id: "globalRetainMission",
+      tab: "Banks",
+      label: "Global retain mission",
+      description: "Advanced. Overrides what global retain extracts.",
+      value: config.banks.global.retainMission ?? "inherit global mission/default",
+      defaultValue: "inherit global mission/default",
+      changed: Boolean(config.banks.global.retainMission),
+      resetKey: "banks.global.retainMission",
+      advanced: true,
+    }),
+    textField({
+      id: "globalReflectMission",
+      tab: "Banks",
+      label: "Global reflect mission",
+      description: "Advanced. Overrides how global reflect uses memories.",
+      value: config.banks.global.reflectMission ?? "inherit global mission/default",
+      defaultValue: "inherit global mission/default",
+      changed: Boolean(config.banks.global.reflectMission),
+      resetKey: "banks.global.reflectMission",
+      advanced: true,
+    }),
+    textField({
+      id: "globalObservationsMission",
+      tab: "Banks",
+      label: "Global observations mission",
+      description: "Advanced. Overrides what global observation consolidation synthesizes.",
+      value: config.banks.global.observationsMission ?? "inherit global mission/default",
+      defaultValue: "inherit global mission/default",
+      changed: Boolean(config.banks.global.observationsMission),
+      resetKey: "banks.global.observationsMission",
+      advanced: true,
     }),
     booleanField({
       id: "recallEnabled",
@@ -224,6 +331,7 @@ export function buildBaseConfigEditingFields(
       value: config.retain.async,
       defaultValue: defaults.retain.async,
       resetKey: "retain.async",
+      advanced: true,
     }),
     textField({
       id: "queuePath",
@@ -233,6 +341,19 @@ export function buildBaseConfigEditingFields(
       value: config.retain.queuePath,
       defaultValue: defaults.retain.queuePath,
       resetKey: "retain.queuePath",
+      advanced: true,
+    }),
+    selectField({
+      id: "globalRetainMode",
+      tab: "Retain",
+      label: "Global retain mode",
+      description:
+        "Advanced. explicit-only keeps global writes manual; router enables future high-confidence routing.",
+      value: config.globalRetain.mode,
+      defaultValue: defaults.globalRetain.mode,
+      resetKey: "globalRetain.mode",
+      choices: ["explicit-only", "router"],
+      advanced: true,
     }),
     selectField({
       id: "importBranches",
@@ -252,6 +373,7 @@ export function buildBaseConfigEditingFields(
       value: config.import.manifestPath,
       defaultValue: defaults.import.manifestPath,
       resetKey: "import.manifestPath",
+      advanced: true,
     }),
     textField({
       id: "importCheckpoint",
@@ -261,6 +383,7 @@ export function buildBaseConfigEditingFields(
       value: config.import.checkpointPath,
       defaultValue: defaults.import.checkpointPath,
       resetKey: "import.checkpointPath",
+      advanced: true,
     }),
     booleanField({
       id: "importReplaceExisting",
@@ -271,6 +394,7 @@ export function buildBaseConfigEditingFields(
       value: config.import.replaceExistingImportedDocs,
       defaultValue: defaults.import.replaceExistingImportedDocs,
       resetKey: "import.replaceExistingImportedDocs",
+      advanced: true,
     }),
     booleanField({
       id: "importResume",
@@ -280,6 +404,7 @@ export function buildBaseConfigEditingFields(
       value: config.import.resume,
       defaultValue: defaults.import.resume,
       resetKey: "import.resume",
+      advanced: true,
     }),
     selectField({
       id: "statusStyle",
@@ -350,6 +475,10 @@ export function buildBaseConfigEditingFields(
 }
 export const PROJECT_ONLY_FIELD_IDS = new Set<FieldId>([
   "projectBankId",
+  "projectMission",
+  "projectRetainMission",
+  "projectReflectMission",
+  "projectObservationsMission",
   "memoryProfile",
   "queuePath",
   "importBranches",
@@ -379,12 +508,19 @@ export function configEnvValues(env: NodeJS.ProcessEnv): Partial<Record<FieldId,
   };
 }
 
+function missionSummary(mission: string | undefined): string {
+  if (!mission) return "built-in default";
+  return mission.length > 80 ? `${mission.slice(0, 77)}...` : mission;
+}
+
 export function buildStatusFacts(
   config: ResolvedConfig,
   projectBankId: string,
+  extraFacts: Array<[string, string]> = [],
 ): Array<[string, string]> {
   const profile = memoryProfileLabel(config);
   return [
+    ...extraFacts,
     ["Extension", enabledDisabled(config.enabled)],
     ["Memory scope", profile],
     ["Active project bank", config.banks.project.enabled ? projectBankId : "disabled"],
@@ -392,6 +528,9 @@ export function buildStatusFacts(
       "Global bank",
       config.banks.global.enabled ? (config.banks.global.bankId ?? "missing id") : "disabled",
     ],
+    ["Project mission", missionSummary(config.banks.project.mission)],
+    ["Global mission", missionSummary(config.banks.global.mission)],
+    ["Global retain mode", config.globalRetain.mode],
     ["Recall", enabledDisabled(config.recall.enabled)],
     ["Retain", enabledDisabled(config.retain.enabled)],
     ["Retain queue", config.retain.queuePath],

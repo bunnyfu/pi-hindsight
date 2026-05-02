@@ -105,12 +105,17 @@ export function buildConfigEditingTabs(
   config: ResolvedConfig,
   projectBankId: string,
   layers: ConfigLayers,
+  statusFacts: Array<[string, string]> = [],
+  options: { showAdvanced?: boolean } = {},
 ): ConfigEditingTab[] {
   const fields = buildConfigEditingFields(config, projectBankId, layers);
   const ids: TabId[] = ["Status", "Connection", "Banks", "Recall", "Retain", "Import", "UI"];
   return ids.map((id) => ({
     id,
-    fields: id === "Status" ? [] : fields.filter((field) => field.tab === id),
-    ...(id === "Status" ? { facts: buildStatusFacts(config, projectBankId) } : {}),
+    fields:
+      id === "Status"
+        ? []
+        : fields.filter((field) => field.tab === id && (options.showAdvanced || !field.advanced)),
+    ...(id === "Status" ? { facts: buildStatusFacts(config, projectBankId, statusFacts) } : {}),
   }));
 }

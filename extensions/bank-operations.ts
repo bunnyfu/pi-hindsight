@@ -1,4 +1,4 @@
-import type { HindsightLikeClient } from "./types.js";
+import type { BankMissionSettings, HindsightLikeClient } from "./types.js";
 
 const DEFAULT_PROJECT_REFLECT_MISSION =
   "Help a Pi coding agent recall project-specific architecture, engineering decisions, conventions, tasks, bugs, fixes, constraints, and continuity.";
@@ -6,15 +6,35 @@ const DEFAULT_PROJECT_REFLECT_MISSION =
 const DEFAULT_PROJECT_RETAIN_MISSION =
   "Extract durable project memory from raw Pi coding sessions: architecture decisions, constraints, bugs, fixes, TODOs, repo conventions, and project-local user preferences. Ignore transient chatter, secrets, and resurfaced recalled memories unless they add a new correction or decision.";
 
+const DEFAULT_PROJECT_OBSERVATIONS_MISSION =
+  "Identify durable project patterns, recurring constraints, architectural preferences, and contradictions across Pi coding sessions. Focus on stable repo-relevant knowledge, not transient task state.";
+
 const DEFAULT_GLOBAL_REFLECT_MISSION =
   "Help a Pi coding agent recall durable cross-project user preferences, recurring workflows, coding habits, and stable assistant behavior guidance.";
 
 const DEFAULT_GLOBAL_RETAIN_MISSION =
   "Extract durable cross-project memory from raw Pi sessions: user preferences, recurring workflows, coding habits, and stable assistant behavior. Do not retain repo-specific code facts, file paths, project-local bugs, or transcript dumps unless they generalize across projects.";
 
-export interface BankMissionConfig {
-  mission?: string;
+const DEFAULT_GLOBAL_OBSERVATIONS_MISSION =
+  "Identify durable cross-project user preferences, recurring workflows, coding habits, and stable assistant behavior patterns. Ignore repo-specific implementation details unless they generalize across projects.";
+
+interface BankMissionDefaults {
+  reflectMission: string;
+  retainMission: string;
+  observationsMission: string;
+}
+
+export interface BankMissionConfig extends BankMissionSettings {
   enableObservations?: boolean;
+}
+
+function resolveBankMissions(config: BankMissionSettings, defaults: BankMissionDefaults) {
+  return {
+    reflectMission: config.reflectMission ?? config.mission ?? defaults.reflectMission,
+    retainMission: config.retainMission ?? config.mission ?? defaults.retainMission,
+    observationsMission:
+      config.observationsMission ?? config.mission ?? defaults.observationsMission,
+  };
 }
 
 export async function ensureProjectBank(
@@ -23,10 +43,14 @@ export async function ensureProjectBank(
   config: BankMissionConfig = {},
 ): Promise<void> {
   if (!client.createBank) return;
+  const missions = resolveBankMissions(config, {
+    reflectMission: DEFAULT_PROJECT_REFLECT_MISSION,
+    retainMission: DEFAULT_PROJECT_RETAIN_MISSION,
+    observationsMission: DEFAULT_PROJECT_OBSERVATIONS_MISSION,
+  });
   await client.createBank(bankId, {
     name: bankId,
-    reflectMission: config.mission ?? DEFAULT_PROJECT_REFLECT_MISSION,
-    retainMission: config.mission ?? DEFAULT_PROJECT_RETAIN_MISSION,
+    ...missions,
     retainExtractionMode: "concise",
     enableObservations: config.enableObservations ?? true,
   });
@@ -38,10 +62,14 @@ export async function ensureGlobalBank(
   config: BankMissionConfig = {},
 ): Promise<void> {
   if (!client.createBank) return;
+  const missions = resolveBankMissions(config, {
+    reflectMission: DEFAULT_GLOBAL_REFLECT_MISSION,
+    retainMission: DEFAULT_GLOBAL_RETAIN_MISSION,
+    observationsMission: DEFAULT_GLOBAL_OBSERVATIONS_MISSION,
+  });
   await client.createBank(bankId, {
     name: bankId,
-    reflectMission: config.mission ?? DEFAULT_GLOBAL_REFLECT_MISSION,
-    retainMission: config.mission ?? DEFAULT_GLOBAL_RETAIN_MISSION,
+    ...missions,
     retainExtractionMode: "concise",
     enableObservations: config.enableObservations ?? true,
   });

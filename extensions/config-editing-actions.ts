@@ -24,6 +24,8 @@ export function patchForConfigEditingField(
       return { baseUrl: value.trim() };
     case "apiKeyEnv":
       return { apiKeyEnvVar: value.trim() };
+    case "apiKeyDirect":
+      return { directApiKey: value.trim() };
     case "timeoutMs":
       return { timeoutMs: Number(value) };
     case "memoryProfile":
@@ -33,10 +35,28 @@ export function patchForConfigEditingField(
       };
     case "projectBankId":
       return { projectBankId: value.trim() };
+    case "projectMission":
+      return { projectMission: value.trim() };
+    case "projectRetainMission":
+      return { projectRetainMission: value.trim() };
+    case "projectReflectMission":
+      return { projectReflectMission: value.trim() };
+    case "projectObservationsMission":
+      return { projectObservationsMission: value.trim() };
     case "globalBankEnabled":
       return { enableGlobalBank: value === "Enable" };
     case "globalBankId":
       return { globalBankId: value.trim() };
+    case "globalMission":
+      return { globalMission: value.trim() };
+    case "globalRetainMission":
+      return { globalRetainMission: value.trim() };
+    case "globalReflectMission":
+      return { globalReflectMission: value.trim() };
+    case "globalObservationsMission":
+      return { globalObservationsMission: value.trim() };
+    case "globalRetainMode":
+      return { globalRetainMode: value as "explicit-only" | "router" };
     case "recallEnabled":
       return { recallEnabled: value === "Enable" };
     case "recallBudget":
@@ -84,10 +104,30 @@ export function inputDefaultForConfigEditingField(
   switch (fieldId) {
     case "apiKeyEnv":
       return apiKeyEnvName(config) === "not set" ? "HINDSIGHT_API_KEY" : apiKeyEnvName(config);
+    case "apiKeyDirect":
+      return "";
     case "projectBankId":
       return projectBankId;
+    case "projectMission":
+      return config.banks.project.mission ?? "";
+    case "projectRetainMission":
+      return config.banks.project.retainMission ?? "";
+    case "projectReflectMission":
+      return config.banks.project.reflectMission ?? "";
+    case "projectObservationsMission":
+      return config.banks.project.observationsMission ?? "";
     case "globalBankId":
       return config.banks.global.bankId ?? DEFAULT_GLOBAL_BANK_ID;
+    case "globalMission":
+      return config.banks.global.mission ?? "";
+    case "globalRetainMission":
+      return config.banks.global.retainMission ?? "";
+    case "globalReflectMission":
+      return config.banks.global.reflectMission ?? "";
+    case "globalObservationsMission":
+      return config.banks.global.observationsMission ?? "";
+    case "globalRetainMode":
+      return config.globalRetain.mode;
     case "timeoutMs":
       return String(config.hindsight.timeoutMs);
     case "recallMaxTokens":

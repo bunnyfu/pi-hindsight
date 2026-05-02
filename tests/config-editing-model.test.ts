@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "../extensions/config.js";
 import { CONFIG_FIELD_PATHS, CONFIG_RESET_PATHS } from "../extensions/config-field-paths.js";
-import { buildConfigEditingFields, type ConfigLayers } from "../extensions/config-editing-model.js";
+import {
+  buildConfigEditingFields,
+  buildConfigEditingTabs,
+  type ConfigLayers,
+} from "../extensions/config-editing-model.js";
+import { buildStatusFacts } from "../extensions/config-editing-registry.js";
 
 describe("config editing model", () => {
   function layers(overrides: Partial<ConfigLayers> = {}): ConfigLayers {
@@ -17,6 +22,9 @@ describe("config editing model", () => {
     const fields = buildConfigEditingFields(DEFAULT_CONFIG, "bank", layers());
 
     expect(fields.find((field) => field.id === "projectBankId")?.editableScopes).toEqual([
+      "project",
+    ]);
+    expect(fields.find((field) => field.id === "projectMission")?.editableScopes).toEqual([
       "project",
     ]);
     expect(fields.find((field) => field.id === "memoryProfile")?.editableScopes).toEqual([
@@ -55,6 +63,10 @@ describe("config editing model", () => {
       "project",
       "global",
     ]);
+    expect(fields.find((field) => field.id === "globalMission")?.editableScopes).toEqual([
+      "project",
+      "global",
+    ]);
   });
 
   it("builds patch intent for field edits", () => {
@@ -67,6 +79,55 @@ describe("config editing model", () => {
       choices: ["project-only", "project+global", "global-only"],
     });
     expect(queuePath).toMatchObject({ kind: "text" });
+    expect(fields.find((field) => field.id === "projectMission")).toMatchObject({
+      kind: "text",
+      value: "built-in default",
+      defaultValue: "built-in default",
+    });
+    expect(fields.find((field) => field.id === "apiKeyDirect")).toMatchObject({
+      kind: "text",
+      advanced: true,
+      value: "not set",
+    });
+    expect(fields.find((field) => field.id === "globalRetainMode")).toMatchObject({
+      kind: "select",
+      advanced: true,
+      value: "explicit-only",
+    });
+  });
+
+  it("hides advanced fields unless advanced mode is enabled", () => {
+    const basicBanks = buildConfigEditingTabs(DEFAULT_CONFIG, "bank", layers()).find(
+      (tab) => tab.id === "Banks",
+    );
+    const advancedBanks = buildConfigEditingTabs(DEFAULT_CONFIG, "bank", layers(), [], {
+      showAdvanced: true,
+    }).find((tab) => tab.id === "Banks");
+
+    expect(basicBanks?.fields.map((field) => field.id)).toContain("projectMission");
+    expect(basicBanks?.fields.map((field) => field.id)).not.toContain("projectRetainMission");
+    expect(advancedBanks?.fields.map((field) => field.id)).toContain("projectRetainMission");
+  });
+
+  it("shows mission summaries in status facts", () => {
+    expect(
+      buildStatusFacts(
+        {
+          ...DEFAULT_CONFIG,
+          banks: {
+            ...DEFAULT_CONFIG.banks,
+            project: { ...DEFAULT_CONFIG.banks.project, mission: "Project memory mission" },
+            global: { enabled: true, bankId: "global-luxus", mission: "Global memory mission" },
+          },
+        },
+        "project-bank",
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        ["Project mission", "Project memory mission"],
+        ["Global mission", "Global memory mission"],
+      ]),
+    );
   });
 
   it("keeps every field backed by path and reset metadata", () => {
