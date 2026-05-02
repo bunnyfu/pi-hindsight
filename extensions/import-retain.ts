@@ -32,13 +32,26 @@ export interface ImportDocumentPreview {
   updateMode: "append" | "replace";
   bankId: string;
   wouldWrite: boolean;
-  status: "pending" | "completed" | "failed" | "skipped";
+  status: "pending" | "queued" | "completed" | "failed" | "skipped";
   error?: string;
 }
 
 export interface ImportRetainResult {
   document: ImportDocumentPreview;
   manifestEntry: ImportManifestEntry;
+}
+
+export class ImportRetainQueuedError extends Error {
+  readonly code = "IMPORT_RETAIN_QUEUED";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "ImportRetainQueuedError";
+  }
+}
+
+export function isImportRetainQueuedError(error: unknown): error is ImportRetainQueuedError {
+  return error instanceof ImportRetainQueuedError;
 }
 
 interface ImportBranchBuildResult extends ImportRetainResult {
@@ -164,7 +177,9 @@ export async function retainImportBranch(args: ImportRetainArgs): Promise<Import
     ...(built.observationScopes.length ? { observationScopes: built.observationScopes } : {}),
   });
   if (!retainResult.delivered) {
-    throw new Error("Hindsight import retain was queued but not sent; import interrupted");
+    throw new ImportRetainQueuedError(
+      `Hindsight import retain queued as ${retainResult.queueJobId}; ${retainResult.remaining} retain job${retainResult.remaining === 1 ? "" : "s"} pending`,
+    );
   }
   return { document: built.document, manifestEntry: built.manifestEntry };
 }

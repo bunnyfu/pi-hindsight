@@ -7,7 +7,11 @@ import {
   type ImportCheckpoint,
 } from "./import-checkpoint.js";
 import { upsertImportManifestEntries } from "./import-manifest.js";
-import { previewImportBranch, retainImportBranch } from "./import-retain.js";
+import {
+  isImportRetainQueuedError,
+  previewImportBranch,
+  retainImportBranch,
+} from "./import-retain.js";
 import { redactError } from "./sanitize.js";
 import type { ImportPlan } from "./import-plan.js";
 
@@ -21,7 +25,7 @@ export interface ImportSessionDocumentResult {
   updateMode: "append" | "replace";
   bankId: string;
   wouldWrite: boolean;
-  status: "pending" | "completed" | "failed" | "skipped";
+  status: "pending" | "queued" | "completed" | "failed" | "skipped";
   error?: string;
 }
 
@@ -131,12 +135,13 @@ export async function executeImportPlan(args: {
     } catch (error) {
       const failedAt = new Date().toISOString();
       const message = redactError(error);
+      const status = isImportRetainQueuedError(error) ? "queued" : "failed";
       checkpoint.documents[preview.document.documentId] = {
         documentId: preview.document.documentId,
         leafId: preview.document.leafId,
         contentHash: preview.document.contentHash,
         messageCount: preview.document.messageCount,
-        status: "failed",
+        status,
         updatedAt: failedAt,
         error: message,
       };
@@ -144,7 +149,7 @@ export async function executeImportPlan(args: {
       await writeImportCheckpoint(checkpointPath, checkpoint);
       results.push({
         ...preview,
-        document: { ...preview.document, status: "failed" as const, error: message },
+        document: { ...preview.document, status, error: message },
       });
       throw error;
     }

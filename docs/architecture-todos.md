@@ -19,4 +19,4 @@ These are deferred deepening opportunities identified after the mission/global-m
 
 ## Historical import queue seam
 
-- Import delivery now has an import-specific queue seam. Future work: add richer status for queued-but-not-delivered imports so commands can show retry state without treating every queued import as a generic failure.
+- Import delivery now has an import-specific queue seam and records queued-but-not-delivered imports as `queued` in checkpoints/results.

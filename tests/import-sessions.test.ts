@@ -234,6 +234,47 @@ describe("Pi session import", () => {
     expect(result.documents[0]?.status).toBe("completed");
   });
 
+  it("marks interrupted import delivery as queued when retain queue keeps the job", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-"));
+    mkdirSync(join(dir, ".git"));
+    const sessionFile = join(dir, "session.jsonl");
+    writeFileSync(
+      sessionFile,
+      [
+        JSON.stringify({ type: "session", id: "session-queued", cwd: dir }),
+        JSON.stringify({
+          type: "message",
+          id: "root",
+          parentId: null,
+          message: { role: "user", content: "queued import" },
+        }),
+      ].join("\n"),
+    );
+
+    await expect(
+      importPiSession({
+        sessionFile,
+        bankId: "bank",
+        config: DEFAULT_CONFIG,
+        client: {
+          retain: async () => {
+            throw new Error("offline");
+          },
+          recall: async () => [],
+          reflect: async () => ({}),
+        },
+      }),
+    ).rejects.toThrow(/queued/);
+
+    const checkpoint = await readImportCheckpoint(
+      join(dir, ".pi/hindsight/import-checkpoint.json"),
+    );
+    expect(checkpoint?.documents["pi-import:session-queued:leaf:root"]?.status).toBe("queued");
+    expect(checkpoint?.documents["pi-import:session-queued:leaf:root"]?.error).toContain("queued");
+    const queue = await readRetainQueue(resolveQueuePath(dir, DEFAULT_CONFIG.retain.queuePath));
+    expect(queue.map((job) => job.documentId)).toEqual(["pi-import:session-queued:leaf:root"]);
+  });
+
   it("imports all leaves only when includeBranches is all-leaves", async () => {
     const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-"));
     mkdirSync(join(dir, ".git"));
@@ -456,13 +497,13 @@ describe("Pi session import", () => {
           reflect: async () => ({}),
         },
       }),
-    ).rejects.toThrow(/interrupted/);
+    ).rejects.toThrow(/queued/);
 
     const checkpoint = await readImportCheckpoint(
       join(dir, ".pi/hindsight/import-checkpoint.json"),
     );
     expect(checkpoint?.documents["pi-import:session-resume:leaf:a"]?.status).toBe("completed");
-    expect(checkpoint?.documents["pi-import:session-resume:leaf:b"]?.status).toBe("failed");
+    expect(checkpoint?.documents["pi-import:session-resume:leaf:b"]?.status).toBe("queued");
 
     const secondCalls: unknown[][] = [];
     const result = await importPiSession({
@@ -698,7 +739,7 @@ describe("Pi session import", () => {
           reflect: async () => ({}),
         },
       }),
-    ).rejects.toThrow(/interrupted/);
+    ).rejects.toThrow(/queued/);
 
     const secondCalls: unknown[][] = [];
     const result = await importProjectSessions({

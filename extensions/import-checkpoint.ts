@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
 import type { UpdateMode } from "./types.js";
 
-export type ImportDocumentStatus = "pending" | "completed" | "failed" | "skipped";
+export type ImportDocumentStatus = "pending" | "queued" | "completed" | "failed" | "skipped";
 
 export interface ImportCheckpointDocument {
   documentId: string;
@@ -69,6 +69,7 @@ function isImportCheckpointDocument(value: unknown): value is ImportCheckpointDo
     typeof value.contentHash === "string" &&
     typeof value.messageCount === "number" &&
     (value.status === "pending" ||
+      value.status === "queued" ||
       value.status === "completed" ||
       value.status === "failed" ||
       value.status === "skipped") &&
