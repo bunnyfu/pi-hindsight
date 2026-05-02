@@ -15,7 +15,7 @@ These are deferred deepening opportunities identified after the mission/global-m
 
 ## Document deletion UX
 
-- Recent explicit retain receipts are persisted and available through `hindsight_retain_receipts`. Future work: consider surfacing the same history inside `/hindsight` if users prefer TUI discovery over tool calls.
+- Recent explicit retain receipts are persisted, available through `hindsight_retain_receipts`, and surfaced in `/hindsight` status facts so users can find exact document IDs for deletion.
 
 ## Historical import queue seam
 

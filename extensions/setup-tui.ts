@@ -21,6 +21,7 @@ import {
 import { createMemoryOperations, type MemoryOperationsDeps } from "./memory-operations.js";
 import { type ConfigScope, type ProjectConfigPatchInput } from "./config-writer.js";
 import { collectStatusHealthFacts } from "./status-health.js";
+import { listRetainReceipts, type RetainReceipt } from "./retain-receipts.js";
 
 type Deps = MemoryOperationsDeps;
 
@@ -48,6 +49,8 @@ type ThemeLike = {
 
 const CANCEL = "Cancel";
 const MIN_BODY_LINES = 30;
+
+const RECEIPT_FACT_LIMIT = 3;
 
 const LOCAL_EMBED_GUIDANCE = [
   "Local hindsight-embed guidance:",
@@ -100,6 +103,22 @@ function padVisibleRight(content: string, width: number): string {
 function boxed(content: string, width: number, theme: ThemeLike): string {
   if (width < 2) return truncateToWidth(content, width);
   return `${theme.fg("borderAccent", "│")}${padVisibleRight(content, width - 2)}${theme.fg("borderAccent", "│")}`;
+}
+
+function shortDocumentId(documentId: string): string {
+  const parts = documentId.split(":");
+  if (parts[0] === "pi-explicit" && parts.length >= 3) return `${parts[0]}:${parts[2]}`;
+  return documentId;
+}
+
+export function buildRetainReceiptStatusFacts(receipts: RetainReceipt[]): Array<[string, string]> {
+  if (receipts.length === 0) return [["Retain receipts", "none"]];
+  return receipts
+    .slice(0, RECEIPT_FACT_LIMIT)
+    .map((receipt, index) => [
+      index === 0 ? "Recent retain" : `Recent retain ${index + 1}`,
+      `${receipt.bankId} ${shortDocumentId(receipt.documentId)}`,
+    ]);
 }
 
 export function createSetupComponent(
@@ -289,11 +308,14 @@ async function showSetupTui(
     config,
     projectBankId,
   });
+  const receiptFacts = buildRetainReceiptStatusFacts(
+    await listRetainReceipts(ctx.cwd, RECEIPT_FACT_LIMIT),
+  );
   const tabs = buildConfigEditingTabs(
     config,
     projectBankId,
     readConfigLayers(ctx.cwd),
-    statusFacts,
+    [...statusFacts, ...receiptFacts],
     {
       showAdvanced: Boolean(state.showAdvanced),
     },

@@ -418,7 +418,7 @@ Pi window notifications are configurable under `notifications`. Startup bank sel
 
 ## Debug and smoke tests
 
-Use `/hindsight` inside Pi to inspect what the extension believes. The TUI status view includes memory health, selected banks, retain queue path, import status, and key configuration state. Advanced one-off diagnostics remain available through tests and explicit tools rather than separate status/debug/doctor commands.
+Use `/hindsight` inside Pi to inspect what the extension believes. The TUI status view includes memory health, selected banks, recent explicit retain receipts, retain queue path, import status, and key configuration state. Advanced one-off diagnostics remain available through tests and explicit tools rather than separate status/debug/doctor commands.
 
 Run the local smoke test against a real Hindsight server:
 
