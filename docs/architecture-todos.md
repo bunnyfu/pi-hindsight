@@ -10,8 +10,7 @@ These are deferred deepening opportunities identified after the mission/global-m
 
 ## Config editing
 
-- Deepen the config field registry so a field owns its path, reset key, UI metadata, parse/patch behavior, and source display in one place.
-- Reduce the number of modules touched when adding one setting.
+- Config editing registry now owns field metadata plus layer/source display composition. Future work: move parse/patch behavior from config editing actions into the same registry so adding one setting usually touches one Module.
 
 ## Document deletion UX
 

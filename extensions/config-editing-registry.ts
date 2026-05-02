@@ -1,8 +1,8 @@
 import { DEFAULT_CONFIG } from "./config.js";
 import type { ResolvedConfig } from "./types.js";
-import type { ConfigScope, MemoryProfile } from "./config-writer.js";
+import type { ConfigScope, ConfigSource, MemoryProfile } from "./config-writer.js";
 import type { ConfigEditingField, FieldId } from "./config-editing-types.js";
-import { CONFIG_FIELD_RESET_KEYS } from "./config-field-paths.js";
+import { CONFIG_FIELD_PATHS, CONFIG_FIELD_RESET_KEYS } from "./config-field-paths.js";
 export { CONFIG_FIELD_PATHS, CONFIG_FIELD_RESET_KEYS } from "./config-field-paths.js";
 
 function memoryProfileLabel(config: ResolvedConfig): MemoryProfile {
@@ -102,6 +102,42 @@ function selectField(
   args: Omit<FieldArgs, "kind"> & { choices: string[] },
 ): BaseConfigEditingField {
   return field({ ...args, kind: "select" });
+}
+
+function valueAt(config: Record<string, unknown>, path: string[]): unknown {
+  let value: unknown = config;
+  for (const part of path) {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+    value = (value as Record<string, unknown>)[part];
+  }
+  return value;
+}
+
+function displayLayerValue(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === "boolean") return enabledDisabled(value);
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (value as { source?: unknown }).source === "env" &&
+    typeof (value as { name?: unknown }).name === "string"
+  ) {
+    return String((value as { name: string }).name);
+  }
+  return JSON.stringify(value);
+}
+
+function sourceFor(
+  layers: { project: Record<string, unknown>; global: Record<string, unknown> },
+  path: string[],
+  envValue?: string,
+): ConfigSource {
+  if (envValue !== undefined) return "env";
+  if (valueAt(layers.project, path) !== undefined) return "project";
+  if (valueAt(layers.global, path) !== undefined) return "global";
+  return "default";
 }
 
 export function buildBaseConfigEditingFields(
@@ -510,6 +546,41 @@ export function configEnvValues(env: NodeJS.ProcessEnv): Partial<Record<FieldId,
       ? { globalBankId: env.PI_HINDSIGHT_GLOBAL_BANK_ID, globalBankEnabled: "enabled" }
       : {}),
   };
+}
+
+function layerField(
+  base: BaseConfigEditingField,
+  layers: { project: Record<string, unknown>; global: Record<string, unknown> },
+  envValue: string | undefined,
+): ConfigEditingField {
+  const path = CONFIG_FIELD_PATHS[base.id];
+  const projectValue = displayLayerValue(valueAt(layers.project, path));
+  const globalValue = displayLayerValue(valueAt(layers.global, path));
+  const source = sourceFor(layers, path, envValue);
+  return {
+    ...base,
+    ...(projectValue !== undefined ? { projectValue } : {}),
+    ...(globalValue !== undefined ? { globalValue } : {}),
+    ...(envValue !== undefined ? { envValue } : {}),
+    source,
+    editableScopes: editableScopesForField(base.id),
+    changed: source !== "default",
+  };
+}
+
+export function buildConfigEditingFieldsFromRegistry(
+  config: ResolvedConfig,
+  projectBankId: string,
+  layers: {
+    project: Record<string, unknown>;
+    global: Record<string, unknown>;
+    env: NodeJS.ProcessEnv;
+  },
+): ConfigEditingField[] {
+  const envValues = configEnvValues(layers.env);
+  return buildBaseConfigEditingFields(config, projectBankId).map((base) =>
+    layerField(base, layers, envValues[base.id]),
+  );
 }
 
 function missionSummary(mission: string | undefined): string {
