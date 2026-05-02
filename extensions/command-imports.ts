@@ -16,6 +16,13 @@ function importOptions(args: unknown): {
   };
 }
 
+function importStartMessage(scope: string, options: ReturnType<typeof importOptions>): string {
+  const mode = options.dryRun ? "preview" : "import";
+  const branches =
+    options.includeBranches === "all-leaves" ? "all branch leaves" : "current branch";
+  return `Starting Hindsight ${scope} ${mode}; branches=${branches}; write=${options.dryRun ? "no" : "yes"}`;
+}
+
 export function registerImportCommands(pi: ExtensionAPI, operations: Operations): void {
   pi.registerCommand("hindsight:import", {
     description: "Import the current Pi session JSONL into Hindsight.",
@@ -29,10 +36,12 @@ export function registerImportCommands(pi: ExtensionAPI, operations: Operations)
         );
         return;
       }
+      const options = importOptions(args);
+      ctx.ui.notify(importStartMessage("current session", options), "info");
       const result = await operations.importSession({
         sessionFile: current,
         cwd: ctx.cwd,
-        ...importOptions(args),
+        ...options,
       });
       ctx.ui.notify(renderImportSessionMessage(result), "info");
     },
@@ -47,10 +56,12 @@ export function registerImportCommands(pi: ExtensionAPI, operations: Operations)
         ctx.ui.notify("No current session file available.", "warning");
         return;
       }
+      const options = importOptions(args);
+      ctx.ui.notify(importStartMessage("current session", options), "info");
       const result = await operations.importSession({
         sessionFile: current,
         cwd: ctx.cwd,
-        ...importOptions(args),
+        ...options,
       });
       ctx.ui.notify(renderImportSessionMessage(result, "current"), "info");
     },
@@ -65,10 +76,12 @@ export function registerImportCommands(pi: ExtensionAPI, operations: Operations)
         ctx.ui.notify("Usage: /hindsight:import-file <path> [--dry-run] [--all-leaves]", "warning");
         return;
       }
+      const options = importOptions(args);
+      ctx.ui.notify(importStartMessage("file", options), "info");
       const result = await operations.importSession({
         sessionFile: file,
         cwd: ctx.cwd,
-        ...importOptions(args),
+        ...options,
       });
       ctx.ui.notify(renderImportSessionMessage(result, { file }), "info");
     },
@@ -79,10 +92,12 @@ export function registerImportCommands(pi: ExtensionAPI, operations: Operations)
     getArgumentCompletions: (prefix) => completeFlags(prefix, ["--dry-run", "--all-leaves"]),
     handler: async (args, ctx) => {
       const current = sessionFile(ctx);
+      const options = importOptions(args);
+      ctx.ui.notify(importStartMessage("project sessions", options), "info");
       const result = await operations.importProjectSessions({
         cwd: ctx.cwd,
         ...(current ? { currentSessionFile: current } : {}),
-        ...importOptions(args),
+        ...options,
       });
       ctx.ui.notify(renderProjectImportMessage(result), "info");
     },

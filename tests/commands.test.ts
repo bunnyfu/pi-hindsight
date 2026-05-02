@@ -342,6 +342,10 @@ describe("hindsight commands", () => {
 
     expect(retain).not.toHaveBeenCalled();
     expect(ctx.ui.notify).toHaveBeenCalledWith(
+      "Starting Hindsight current session preview; branches=current branch; write=no",
+      "info",
+    );
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
       expect.stringContaining(
         "Import preview: current session; messages=1; documents=1; update=replace; status=pending; write=no",
       ),
@@ -349,6 +353,53 @@ describe("hindsight commands", () => {
     );
     expect(ctx.ui.notify).toHaveBeenCalledWith(
       expect.stringContaining("manifest unchanged="),
+      "info",
+    );
+  });
+
+  it("shows project import start notification before preview result", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-commands-"));
+    mkdirSync(join(cwd, ".git"));
+    const sessionFile = join(cwd, "session.jsonl");
+    writeFileSync(
+      sessionFile,
+      [
+        JSON.stringify({ type: "session", id: "session-project-import", cwd }),
+        JSON.stringify({ type: "message", id: "1", message: { role: "user", content: "hi" } }),
+      ].join("\n"),
+    );
+    const commands = new Map<string, { handler: (args: unknown, ctx: any) => Promise<void> }>();
+    registerCommands(
+      {
+        registerCommand: (
+          name: string,
+          command: { handler: (args: unknown, ctx: any) => Promise<void> },
+        ) => {
+          commands.set(name, command);
+        },
+      } as any,
+      {
+        getClient: () => client(),
+        getConfig: () => DEFAULT_CONFIG,
+        getProjectBankId: () => "bank",
+      },
+    );
+    const ctx = {
+      cwd,
+      ui: { notify: vi.fn(), setStatus: vi.fn() },
+      sessionManager: { getSessionFile: () => sessionFile },
+    };
+
+    await commands.get("hindsight:import-project-sessions")?.handler(["--dry-run"], ctx);
+
+    expect(ctx.ui.notify).toHaveBeenNthCalledWith(
+      1,
+      "Starting Hindsight project sessions preview; branches=current branch; write=no",
+      "info",
+    );
+    expect(ctx.ui.notify).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("Project import preview:"),
       "info",
     );
   });
