@@ -29,6 +29,69 @@ type BaseConfigEditingField = Omit<
   "projectValue" | "globalValue" | "envValue" | "source" | "editableScopes"
 >;
 
+type FieldTab = BaseConfigEditingField["tab"];
+type FieldKind = BaseConfigEditingField["kind"];
+type FieldResetKey = BaseConfigEditingField["resetKey"];
+
+type FieldArgs = {
+  id: FieldId;
+  tab: FieldTab;
+  label: string;
+  description: string;
+  value: string;
+  defaultValue: string;
+  changed?: boolean;
+  resetKey: FieldResetKey;
+  kind: FieldKind;
+  choices?: string[];
+};
+
+function field(args: FieldArgs): BaseConfigEditingField {
+  return { ...args, changed: args.changed ?? changed(args.value, args.defaultValue) };
+}
+
+function booleanField(
+  args: Omit<FieldArgs, "value" | "defaultValue" | "kind"> & {
+    value: boolean;
+    defaultValue: boolean;
+  },
+): BaseConfigEditingField {
+  return field({
+    ...args,
+    value: enabledDisabled(args.value),
+    defaultValue: enabledDisabled(args.defaultValue),
+    changed: args.value !== args.defaultValue,
+    kind: "boolean",
+  });
+}
+
+function textField(args: Omit<FieldArgs, "kind">): BaseConfigEditingField {
+  return field({ ...args, kind: "text" });
+}
+
+function positiveIntField(
+  args: Omit<FieldArgs, "value" | "defaultValue" | "kind"> & {
+    value: number;
+    defaultValue: number;
+    suffix?: string;
+  },
+): BaseConfigEditingField {
+  const { suffix = "", ...fieldArgs } = args;
+  return field({
+    ...fieldArgs,
+    value: `${args.value}${suffix}`,
+    defaultValue: `${args.defaultValue}${suffix}`,
+    changed: args.value !== args.defaultValue,
+    kind: "positive-int",
+  });
+}
+
+function selectField(
+  args: Omit<FieldArgs, "kind"> & { choices: string[] },
+): BaseConfigEditingField {
+  return field({ ...args, kind: "select" });
+}
+
 export function buildBaseConfigEditingFields(
   config: ResolvedConfig,
   projectBankId: string,
@@ -38,36 +101,26 @@ export function buildBaseConfigEditingFields(
   const defaultProfile = memoryProfileLabel(defaults);
   const globalBankId = config.banks.global.bankId ?? "not set";
   const defaultGlobalBankId = defaults.banks.global.bankId ?? "not set";
-  const fields: Array<
-    Omit<
-      ConfigEditingField,
-      "projectValue" | "globalValue" | "envValue" | "source" | "editableScopes"
-    >
-  > = [
-    {
+  return [
+    booleanField({
       id: "enabled",
       tab: "Connection",
       label: "Extension active",
       description: "Master switch. When off, automatic recall and retain are skipped.",
-      value: enabledDisabled(config.enabled),
-      defaultValue: enabledDisabled(defaults.enabled),
-      changed: config.enabled !== defaults.enabled,
+      value: config.enabled,
+      defaultValue: defaults.enabled,
       resetKey: "enabled",
-      kind: "boolean",
-    },
-    {
+    }),
+    textField({
       id: "baseUrl",
       tab: "Connection",
       label: "Hindsight API URL",
       description: "Server endpoint used for recall, retain, reflect, and bank setup.",
       value: config.hindsight.baseUrl,
       defaultValue: defaults.hindsight.baseUrl,
-      changed: changed(config.hindsight.baseUrl, defaults.hindsight.baseUrl),
       resetKey: "hindsight.baseUrl",
-
-      kind: "text",
-    },
-    {
+    }),
+    textField({
       id: "apiKeyEnv",
       tab: "Connection",
       label: "API key env var",
@@ -75,24 +128,19 @@ export function buildBaseConfigEditingFields(
         "Environment variable name that contains the Hindsight API key. Raw secrets are never written.",
       value: apiKeyEnvName(config),
       defaultValue: "not set",
-      changed: apiKeyEnvName(config) !== "not set",
       resetKey: "hindsight.apiKey",
-
-      kind: "text",
-    },
-    {
+    }),
+    positiveIntField({
       id: "timeoutMs",
       tab: "Connection",
       label: "Request timeout",
       description: "Maximum time to wait for Hindsight network calls.",
-      value: `${config.hindsight.timeoutMs} ms`,
-      defaultValue: `${defaults.hindsight.timeoutMs} ms`,
-      changed: config.hindsight.timeoutMs !== defaults.hindsight.timeoutMs,
+      value: config.hindsight.timeoutMs,
+      defaultValue: defaults.hindsight.timeoutMs,
+      suffix: " ms",
       resetKey: "hindsight.timeoutMs",
-
-      kind: "positive-int",
-    },
-    {
+    }),
+    selectField({
       id: "memoryProfile",
       tab: "Banks",
       label: "Memory scope",
@@ -100,13 +148,10 @@ export function buildBaseConfigEditingFields(
         "Project-only is safest. Project+global also recalls personal cross-project memory.",
       value: profile,
       defaultValue: defaultProfile,
-      changed: profile !== defaultProfile,
       resetKey: "banks.profile",
-
-      kind: "select",
       choices: ["project-only", "project+global", "global-only"],
-    },
-    {
+    }),
+    textField({
       id: "projectBankId",
       tab: "Banks",
       label: "Project bank ID",
@@ -115,255 +160,194 @@ export function buildBaseConfigEditingFields(
       defaultValue: "auto-derived",
       changed: Boolean(config.banks.project.bankId),
       resetKey: "banks.project.bankId",
-
-      kind: "text",
-    },
-    {
+    }),
+    booleanField({
       id: "globalBankEnabled",
       tab: "Banks",
       label: "Global memory enabled",
       description: "Allows cross-project recall from a shared bank.",
-      value: enabledDisabled(config.banks.global.enabled),
-      defaultValue: enabledDisabled(defaults.banks.global.enabled),
-      changed: config.banks.global.enabled !== defaults.banks.global.enabled,
+      value: config.banks.global.enabled,
+      defaultValue: defaults.banks.global.enabled,
       resetKey: "banks.global.enabled",
-
-      kind: "boolean",
-    },
-    {
+    }),
+    textField({
       id: "globalBankId",
       tab: "Banks",
       label: "Global bank ID",
       description: "Shared bank used only when global memory is enabled.",
       value: globalBankId,
       defaultValue: defaultGlobalBankId,
-      changed: globalBankId !== defaultGlobalBankId,
       resetKey: "banks.global.bankId",
-
-      kind: "text",
-    },
-    {
+    }),
+    booleanField({
       id: "recallEnabled",
       tab: "Recall",
       label: "Automatic recall",
       description: "Looks up memory before answer generation and injects it ephemerally.",
-      value: enabledDisabled(config.recall.enabled),
-      defaultValue: enabledDisabled(defaults.recall.enabled),
-      changed: config.recall.enabled !== defaults.recall.enabled,
+      value: config.recall.enabled,
+      defaultValue: defaults.recall.enabled,
       resetKey: "recall.enabled",
-
-      kind: "boolean",
-    },
-    {
+    }),
+    selectField({
       id: "recallBudget",
       tab: "Recall",
       label: "Recall depth",
       description: "Low, mid, or high retrieval effort.",
       value: config.recall.budget,
       defaultValue: defaults.recall.budget,
-      changed: config.recall.budget !== defaults.recall.budget,
       resetKey: "recall.budget",
-
-      kind: "select",
       choices: ["low", "mid", "high"],
-    },
-    {
+    }),
+    positiveIntField({
       id: "recallMaxTokens",
       tab: "Recall",
       label: "Recall token limit",
       description: "Maximum memory tokens injected into context.",
-      value: String(config.recall.maxTokens),
-      defaultValue: String(defaults.recall.maxTokens),
-      changed: config.recall.maxTokens !== defaults.recall.maxTokens,
+      value: config.recall.maxTokens,
+      defaultValue: defaults.recall.maxTokens,
       resetKey: "recall.maxTokens",
-
-      kind: "positive-int",
-    },
-    {
+    }),
+    booleanField({
       id: "retainEnabled",
       tab: "Retain",
       label: "Automatic retain",
       description: "Stores raw structured conversation deltas after turns.",
-      value: enabledDisabled(config.retain.enabled),
-      defaultValue: enabledDisabled(defaults.retain.enabled),
-      changed: config.retain.enabled !== defaults.retain.enabled,
+      value: config.retain.enabled,
+      defaultValue: defaults.retain.enabled,
       resetKey: "retain.enabled",
-
-      kind: "boolean",
-    },
-    {
+    }),
+    booleanField({
       id: "retainAsync",
       tab: "Retain",
       label: "Queued retain writes",
       description: "Writes retain jobs through durable queue instead of blocking UI.",
-      value: enabledDisabled(config.retain.async),
-      defaultValue: enabledDisabled(defaults.retain.async),
-      changed: config.retain.async !== defaults.retain.async,
+      value: config.retain.async,
+      defaultValue: defaults.retain.async,
       resetKey: "retain.async",
-
-      kind: "boolean",
-    },
-    {
+    }),
+    textField({
       id: "queuePath",
       tab: "Retain",
       label: "Retain queue file",
       description: "JSONL retry queue used when Hindsight is unavailable.",
       value: config.retain.queuePath,
       defaultValue: defaults.retain.queuePath,
-      changed: changed(config.retain.queuePath, defaults.retain.queuePath),
       resetKey: "retain.queuePath",
-
-      kind: "text",
-    },
-    {
+    }),
+    selectField({
       id: "importBranches",
       tab: "Import",
       label: "Historical import scope",
       description: "Import current branch only, or every leaf branch explicitly.",
       value: config.import.includeBranches,
       defaultValue: defaults.import.includeBranches,
-      changed: config.import.includeBranches !== defaults.import.includeBranches,
       resetKey: "import.includeBranches",
-
-      kind: "select",
       choices: ["current-only", "all-leaves"],
-    },
-    {
+    }),
+    textField({
       id: "importManifest",
       tab: "Import",
       label: "Import manifest file",
       description: "Tracks imported sessions so reimports stay deterministic.",
       value: config.import.manifestPath,
       defaultValue: defaults.import.manifestPath,
-      changed: changed(config.import.manifestPath, defaults.import.manifestPath),
       resetKey: "import.manifestPath",
-      kind: "text",
-    },
-    {
+    }),
+    textField({
       id: "importCheckpoint",
       tab: "Import",
       label: "Import checkpoint file",
       description: "Tracks import progress so interrupted imports can resume safely.",
       value: config.import.checkpointPath,
       defaultValue: defaults.import.checkpointPath,
-      changed: changed(config.import.checkpointPath, defaults.import.checkpointPath),
       resetKey: "import.checkpointPath",
-      kind: "text",
-    },
-    {
+    }),
+    booleanField({
       id: "importReplaceExisting",
       tab: "Import",
       label: "Replace existing import docs",
       description:
         "Uses deterministic replace mode for historical reimports instead of appending duplicates.",
-      value: enabledDisabled(config.import.replaceExistingImportedDocs),
-      defaultValue: enabledDisabled(defaults.import.replaceExistingImportedDocs),
-      changed:
-        config.import.replaceExistingImportedDocs !== defaults.import.replaceExistingImportedDocs,
+      value: config.import.replaceExistingImportedDocs,
+      defaultValue: defaults.import.replaceExistingImportedDocs,
       resetKey: "import.replaceExistingImportedDocs",
-      kind: "boolean",
-    },
-    {
+    }),
+    booleanField({
       id: "importResume",
       tab: "Import",
       label: "Resume interrupted imports",
       description: "Skips completed import documents when checkpoint content hashes match.",
-      value: enabledDisabled(config.import.resume),
-      defaultValue: enabledDisabled(defaults.import.resume),
-      changed: config.import.resume !== defaults.import.resume,
+      value: config.import.resume,
+      defaultValue: defaults.import.resume,
       resetKey: "import.resume",
-      kind: "boolean",
-    },
-    {
+    }),
+    selectField({
       id: "statusStyle",
       tab: "UI",
       label: "Footer status style",
       description: "Off, plain text, emoji, or nerdfont symbols.",
       value: config.status.style,
       defaultValue: defaults.status.style,
-      changed: config.status.style !== defaults.status.style,
       resetKey: "status.style",
-
-      kind: "select",
       choices: ["off", "text", "emoji", "nerdfont"],
-    },
-    {
+    }),
+    selectField({
       id: "statusDetail",
       tab: "UI",
       label: "Footer status detail",
       description: "How much Hindsight info appears in Pi footer.",
       value: config.status.detail,
       defaultValue: defaults.status.detail,
-      changed: config.status.detail !== defaults.status.detail,
       resetKey: "status.detail",
-
-      kind: "select",
       choices: ["minimal", "project", "activity", "verbose"],
-    },
-    {
+    }),
+    positiveIntField({
       id: "statusMaxLength",
       tab: "UI",
       label: "Footer max length",
       description: "Maximum characters used by Hindsight footer status.",
-      value: String(config.status.maxLength),
-      defaultValue: String(defaults.status.maxLength),
-      changed: config.status.maxLength !== defaults.status.maxLength,
+      value: config.status.maxLength,
+      defaultValue: defaults.status.maxLength,
       resetKey: "status.maxLength",
-
-      kind: "positive-int",
-    },
-    {
+    }),
+    booleanField({
       id: "statusActivity",
       tab: "UI",
       label: "Show live activity",
       description: "Displays recall/retain activity in the status line.",
-      value: enabledDisabled(config.status.showActivity),
-      defaultValue: enabledDisabled(defaults.status.showActivity),
-      changed: config.status.showActivity !== defaults.status.showActivity,
+      value: config.status.showActivity,
+      defaultValue: defaults.status.showActivity,
       resetKey: "status.showActivity",
-
-      kind: "boolean",
-    },
-    {
+    }),
+    booleanField({
       id: "notifyStartup",
       tab: "UI",
       label: "Startup notification",
       description: "Shows selected Hindsight bank when Pi session starts.",
-      value: enabledDisabled(config.notifications.startup),
-      defaultValue: enabledDisabled(defaults.notifications.startup),
-      changed: config.notifications.startup !== defaults.notifications.startup,
+      value: config.notifications.startup,
+      defaultValue: defaults.notifications.startup,
       resetKey: "notifications.startup",
-
-      kind: "boolean",
-    },
-    {
+    }),
+    booleanField({
       id: "notifyRecall",
       tab: "UI",
       label: "Recall notifications",
       description: "Shows a toast when automatic recall runs.",
-      value: enabledDisabled(config.notifications.recall),
-      defaultValue: enabledDisabled(defaults.notifications.recall),
-      changed: config.notifications.recall !== defaults.notifications.recall,
+      value: config.notifications.recall,
+      defaultValue: defaults.notifications.recall,
       resetKey: "notifications.recall",
-
-      kind: "boolean",
-    },
-    {
+    }),
+    booleanField({
       id: "notifyRetain",
       tab: "UI",
       label: "Retain notifications",
       description: "Shows a toast when automatic retain queues memory.",
-      value: enabledDisabled(config.notifications.retain),
-      defaultValue: enabledDisabled(defaults.notifications.retain),
-      changed: config.notifications.retain !== defaults.notifications.retain,
+      value: config.notifications.retain,
+      defaultValue: defaults.notifications.retain,
       resetKey: "notifications.retain",
-
-      kind: "boolean",
-    },
+    }),
   ];
-  return fields;
 }
-
 export const PROJECT_ONLY_FIELD_IDS = new Set<FieldId>([
   "projectBankId",
   "memoryProfile",
