@@ -13,6 +13,7 @@ import {
 
 export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
   const operations = createMemoryOperations(deps);
+  const useCwd = (cwd: string) => deps.reloadConfig?.(cwd);
 
   pi.registerTool({
     name: "hindsight_recall",
@@ -28,6 +29,7 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
       ),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
+      useCwd(ctx.cwd);
       const sessionFile = ctx.sessionManager.getSessionFile?.();
       const { bankId, result } = await operations.recall(
         ctx.cwd,
@@ -66,6 +68,7 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
       ),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
+      useCwd(ctx.cwd);
       const sessionFile = ctx.sessionManager.getSessionFile?.();
       const result = await operations.retainExplicit({
         cwd: ctx.cwd,
@@ -99,6 +102,7 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
       ),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
+      useCwd(ctx.cwd);
       const sessionFile = ctx.sessionManager.getSessionFile?.();
       const result = await operations.retainExplicit({
         cwd: ctx.cwd,
@@ -123,6 +127,7 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
       ),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
+      useCwd(ctx.cwd);
       const result = await operations.listRetainReceipts(ctx.cwd, params.limit);
       return retainReceiptListToolResponse(result);
     },
@@ -137,7 +142,8 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
       content: Type.String({ description: "Candidate memory content to classify." }),
       context: Type.Optional(Type.String({ description: "Optional context for routing." })),
     }),
-    async execute(_id, params) {
+    async execute(_id, params, _signal, _onUpdate, ctx) {
+      useCwd(ctx.cwd);
       const result = operations.routeMemory({
         content: params.content,
         ...(params.context ? { context: params.context } : {}),
@@ -156,7 +162,8 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
       documentId: Type.String({ description: "Exact Hindsight document ID to delete." }),
       confirm: Type.Boolean({ description: "Must be true to confirm destructive deletion." }),
     }),
-    async execute(_id, params) {
+    async execute(_id, params, _signal, _onUpdate, ctx) {
+      useCwd(ctx.cwd);
       if (!params.confirm) throw new Error("Set confirm=true to delete this Hindsight document.");
       const result = await operations.deleteDocument({
         bank: params.bank,
@@ -194,6 +201,7 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
       ),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
+      useCwd(ctx.cwd);
       const result = await operations.configure(ctx.cwd, params);
       return configureToolResponse(result);
     },
@@ -217,6 +225,7 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
       ),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
+      useCwd(ctx.cwd);
       const sessionFile = params.sessionFile || ctx.sessionManager.getSessionFile?.();
       if (!sessionFile) throw new Error("No session file available. Pass sessionFile explicitly.");
       const result = await operations.importSession({
@@ -244,6 +253,7 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
       responseSchema: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
+      useCwd(ctx.cwd);
       const { bankId, result } = await operations.reflect(
         ctx.cwd,
         params.query,

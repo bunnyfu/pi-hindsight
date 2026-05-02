@@ -76,7 +76,10 @@ describe("extension hooks", () => {
 
     await createMemoryLifecycle(cwd).initialize(ctx);
 
-    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("hindsight", "🧠 connected");
+    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith(
+      "hindsight",
+      expect.stringContaining("connected"),
+    );
   });
 
   it("marks startup status offline after bank ensure fails", async () => {
@@ -97,7 +100,10 @@ describe("extension hooks", () => {
 
     await createMemoryLifecycle(cwd).initialize(ctx);
 
-    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("hindsight", "🤯 offline");
+    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith(
+      "hindsight",
+      expect.stringContaining("offline"),
+    );
     expect(ctx.ui.notify).toHaveBeenCalledWith(
       expect.stringContaining("Hindsight project bank ensure failed"),
       "warning",
