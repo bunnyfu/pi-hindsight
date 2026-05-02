@@ -2,23 +2,16 @@ import { Type } from "typebox";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import type { MemoryOperationsDeps } from "./memory-operations.js";
 import { createMemoryOperations } from "./memory-operations.js";
+import {
+  configureToolResponse,
+  deleteDocumentToolResponse,
+  importToolResponse,
+  retainToolResponse,
+  routeMemoryToolResponse,
+} from "./tool-presenters.js";
 
 export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
   const operations = createMemoryOperations(deps);
-
-  function retainToolResponse(result: Awaited<ReturnType<typeof operations.retainExplicit>>) {
-    const deadLetterStatus = result.deadLettered
-      ? ` ${result.deadLettered} job${result.deadLettered === 1 ? "" : "s"} moved to dead-letter queue; run /hindsight to inspect.`
-      : "";
-    const status =
-      result.remaining > 0
-        ? `Queued for ${result.bankId}; ${result.remaining} job${result.remaining === 1 ? "" : "s"} pending.${deadLetterStatus}`
-        : `Retained in ${result.bankId} as ${result.documentId}.${deadLetterStatus}`;
-    return {
-      content: [{ type: "text" as const, text: status }],
-      details: result,
-    };
-  }
 
   pi.registerTool({
     name: "hindsight_recall",
@@ -133,15 +126,7 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
         content: params.content,
         ...(params.context ? { context: params.context } : {}),
       });
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Route ${result.route} confidence=${result.confidence}; ${result.reason}`,
-          },
-        ],
-        details: result,
-      };
+      return routeMemoryToolResponse(result);
     },
   });
 
@@ -161,15 +146,7 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
         bank: params.bank,
         documentId: params.documentId,
       });
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Deleted document ${result.documentId} from ${result.bankId}.`,
-          },
-        ],
-        details: result,
-      };
+      return deleteDocumentToolResponse(result);
     },
   });
 
@@ -202,15 +179,7 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
     }),
     async execute(_id, params, _signal, _onUpdate, ctx) {
       const result = await operations.configure(ctx.cwd, params);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Wrote ${result.path}\nProject bank: ${result.projectBankId}\nRun /hindsight to verify.`,
-          },
-        ],
-        details: { path: result.path, projectBankId: result.projectBankId },
-      };
+      return configureToolResponse(result);
     },
   });
 
@@ -243,17 +212,7 @@ export function registerTools(pi: ExtensionAPI, deps: MemoryOperationsDeps) {
           ? { includeBranches: params.allLeaves ? "all-leaves" : "current-only" }
           : {}),
       });
-      return {
-        content: [
-          {
-            type: "text",
-            text: result.dryRun
-              ? `Import preview: ${result.messageCount} messages would write ${result.documents.length} document${result.documents.length === 1 ? "" : "s"} to ${result.bankId}. First document: ${result.documentId}. Manifest unchanged: ${result.manifestPath}.`
-              : `Imported ${result.messageCount} messages into ${result.bankId} as ${result.documentId}. Manifest: ${result.manifestPath}.`,
-          },
-        ],
-        details: result,
-      };
+      return importToolResponse(result);
     },
   });
 
