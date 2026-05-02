@@ -1,42 +1,73 @@
 import type { ResolvedConfig } from "./types.js";
 
 export type MemoryRoute = "project" | "global" | "both" | "skip";
+export type MemoryRouteSignal = "global" | "project" | "skip";
 
-export interface MemoryRouteDecision {
-  route: MemoryRoute;
-  confidence: number;
-  reason: string;
-  mode: ResolvedConfig["globalRetain"]["mode"];
-  writes: string[];
-}
-
-const GLOBAL_PATTERNS = [
-  /\b(prefer|prefers|preference|likes|wants|always|never)\b/i,
-  /\b(name|nick|nickname|identity|male|female|pronouns?)\b/i,
-  /\b(workflow|habit|communication style|response style|across projects|global)\b/i,
-];
-
-const PROJECT_PATTERNS = [
-  /\b(repo|project|file|path|module|test|bug|fix|architecture|config|implementation)\b/i,
-  /\b(PR|issue|commit|branch|importer|extension|TUI|API)\b/,
-];
-
-const SKIP_PATTERNS = [/\/var\/folders\//i, /\btemporary\b/i, /\bscreenshot\b/i];
-
-function matchesAny(content: string, patterns: RegExp[]): boolean {
-  return patterns.some((pattern) => pattern.test(content));
-}
-
-export function routeMemoryCandidate(args: {
+export interface MemoryRouteInput {
   content: string;
   context?: string;
   config: ResolvedConfig;
-}): MemoryRouteDecision {
-  const text = `${args.content}\n${args.context ?? ""}`;
-  const global = matchesAny(text, GLOBAL_PATTERNS);
-  const project = matchesAny(text, PROJECT_PATTERNS);
-  const skip = matchesAny(text, SKIP_PATTERNS);
+}
 
+export interface MemoryRouteClassification {
+  route: MemoryRoute;
+  confidence: number;
+  signals: MemoryRouteSignal[];
+  matchedSignals: string[];
+}
+
+export interface MemoryRouterAdapter {
+  classify(args: {
+    content: string;
+    context?: string;
+    projectMission?: string;
+    globalMission?: string;
+  }): MemoryRouteClassification;
+}
+
+export interface MemoryRouteDecision extends MemoryRouteClassification {
+  reason: string;
+  mode: ResolvedConfig["globalRetain"]["mode"];
+  writes: string[];
+  projectMission: string;
+  globalMission: string;
+}
+
+const GLOBAL_PATTERNS: Array<[RegExp, string]> = [
+  [/\b(prefer|prefers|preference|likes|wants|always|never)\b/i, "preference"],
+  [/\b(name|nick|nickname|identity|male|female|pronouns?)\b/i, "identity"],
+  [
+    /\b(workflow|habit|communication style|response style|across projects|global)\b/i,
+    "cross-project workflow/style",
+  ],
+];
+
+const PROJECT_PATTERNS: Array<[RegExp, string]> = [
+  [
+    /\b(repo|project|file|path|module|test|bug|fix|architecture|config|implementation)\b/i,
+    "project implementation",
+  ],
+  [/\b(PR|issue|commit|branch|importer|extension|TUI|API)\b/, "project delivery"],
+];
+
+const SKIP_PATTERNS: Array<[RegExp, string]> = [
+  [/\/var\/folders\//i, "temporary file path"],
+  [/\btemporary\b/i, "temporary detail"],
+  [/\bscreenshot\b/i, "screenshot artifact"],
+];
+
+function matchSignals(text: string, patterns: Array<[RegExp, string]>): string[] {
+  return patterns.flatMap(([pattern, label]) => (pattern.test(text) ? [label] : []));
+}
+
+function classifyFromSignals(args: {
+  globalMatches: string[];
+  projectMatches: string[];
+  skipMatches: string[];
+}): MemoryRouteClassification {
+  const skip = args.skipMatches.length > 0;
+  const global = args.globalMatches.length > 0;
+  const project = args.projectMatches.length > 0;
   const route: MemoryRoute = skip
     ? "skip"
     : global && project
@@ -55,18 +86,71 @@ export function routeMemoryCandidate(args: {
         : global && project
           ? 0.65
           : 0.4;
+  const signals: MemoryRouteSignal[] = [
+    ...(skip ? (["skip"] as const) : []),
+    ...(global ? (["global"] as const) : []),
+    ...(project ? (["project"] as const) : []),
+  ];
+  return {
+    route,
+    confidence,
+    signals,
+    matchedSignals: [...args.skipMatches, ...args.globalMatches, ...args.projectMatches],
+  };
+}
+
+export function createHeuristicMemoryRouter(): MemoryRouterAdapter {
+  return {
+    classify(args) {
+      const text = `${args.content}\n${args.context ?? ""}`;
+      return classifyFromSignals({
+        globalMatches: matchSignals(text, GLOBAL_PATTERNS),
+        projectMatches: matchSignals(text, PROJECT_PATTERNS),
+        skipMatches: matchSignals(text, SKIP_PATTERNS),
+      });
+    },
+  };
+}
+
+function missionSummary(mission: string | undefined, fallback: string): string {
+  if (!mission) return fallback;
+  return mission.length > 120 ? `${mission.slice(0, 117)}...` : mission;
+}
+
+export function routeMemoryCandidate(
+  args: MemoryRouteInput,
+  adapter: MemoryRouterAdapter = createHeuristicMemoryRouter(),
+): MemoryRouteDecision {
+  const projectMission = missionSummary(
+    args.config.banks.project.mission,
+    "built-in project mission",
+  );
+  const globalMission = missionSummary(args.config.banks.global.mission, "built-in global mission");
+  const classification = adapter.classify({
+    content: args.content,
+    ...(args.context ? { context: args.context } : {}),
+    projectMission,
+    globalMission,
+  });
   const writes =
     args.config.globalRetain.mode === "router"
-      ? route === "both"
+      ? classification.route === "both"
         ? ["project", "global"]
-        : route === "skip"
+        : classification.route === "skip"
           ? []
-          : [route]
+          : [classification.route]
       : [];
   const reason =
     args.config.globalRetain.mode === "explicit-only"
-      ? `dry-run only: globalRetain.mode=explicit-only; suggested=${route}`
-      : `router mode: suggested=${route}`;
+      ? `dry-run only: globalRetain.mode=explicit-only; suggested=${classification.route}; signals=${classification.matchedSignals.join(", ") || "none"}`
+      : `router mode: suggested=${classification.route}; signals=${classification.matchedSignals.join(", ") || "none"}`;
 
-  return { route, confidence, reason, mode: args.config.globalRetain.mode, writes };
+  return {
+    ...classification,
+    reason,
+    mode: args.config.globalRetain.mode,
+    writes,
+    projectMission,
+    globalMission,
+  };
 }
