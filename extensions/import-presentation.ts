@@ -1,5 +1,16 @@
 export type ImportDocumentSummaryResult = {
-  documents: { updateMode: string; status: string }[];
+  documents: {
+    updateMode: string;
+    status: string;
+    rawMessageCount?: number;
+    messageCount?: number;
+    projectedMessageCount?: number;
+    rawBytes?: number;
+    projectedBytes?: number;
+    droppedToolResultCount?: number;
+    droppedToolResultBytes?: number;
+    topDroppedTools?: Array<{ name: string; count: number; bytes: number }>;
+  }[];
   malformedLineCount?: number;
 };
 
@@ -26,7 +37,31 @@ export function importDocumentSummary(result: ImportDocumentSummaryResult): stri
   const malformed = result.malformedLineCount
     ? `; malformedLines=${result.malformedLineCount}`
     : "";
-  return `documents=${result.documents.length}; update=${modes || "n/a"}; status=${statuses || "n/a"}${malformed}`;
+  const rawMessages = result.documents.reduce(
+    (count, document) => count + (document.rawMessageCount ?? document.messageCount ?? 0),
+    0,
+  );
+  const projectedMessages = result.documents.reduce(
+    (count, document) => count + (document.projectedMessageCount ?? document.messageCount ?? 0),
+    0,
+  );
+  const droppedToolResults = result.documents.reduce(
+    (count, document) => count + (document.droppedToolResultCount ?? 0),
+    0,
+  );
+  const rawBytes = result.documents.reduce(
+    (count, document) => count + (document.rawBytes ?? 0),
+    0,
+  );
+  const projectedBytes = result.documents.reduce(
+    (count, document) => count + (document.projectedBytes ?? 0),
+    0,
+  );
+  const quality =
+    rawMessages || droppedToolResults || rawBytes || projectedBytes
+      ? `; projected=${projectedMessages}/${rawMessages || projectedMessages} messages; droppedToolResults=${droppedToolResults}; bytes=${projectedBytes}/${rawBytes}`
+      : "";
+  return `documents=${result.documents.length}; update=${modes || "n/a"}; status=${statuses || "n/a"}${malformed}${quality}`;
 }
 
 export function renderImportSessionMessage(
