@@ -5,8 +5,14 @@ import {
   assertHealthResponse,
   assertReflectResponse,
   createHindsightRestTransport,
+  createMentalModelRequestBody,
   encodeBankPath,
+  mentalModelCollectionPath,
+  mentalModelHistoryPath,
+  mentalModelItemPath,
+  mentalModelRefreshPath,
   reflectRequestBody,
+  updateMentalModelRequestBody,
 } from "./client-rest.js";
 import { withTimeout } from "./timeout.js";
 
@@ -100,6 +106,42 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
             body: JSON.stringify(manifest),
           },
         ),
+      ),
+    listMentalModels: (bankId, options) =>
+      withTimeout("hindsight listMentalModels", timeoutMs, (signal) =>
+        rest.request(mentalModelCollectionPath(bankId, options), { signal }),
+      ),
+    getMentalModel: (bankId, mentalModelId, options) =>
+      withTimeout("hindsight getMentalModel", timeoutMs, (signal) =>
+        rest.request(mentalModelItemPath(bankId, mentalModelId, options), { signal }),
+      ),
+    createMentalModel: (bankId, request) =>
+      withTimeout("hindsight createMentalModel", timeoutMs, (signal) =>
+        rest.request(mentalModelCollectionPath(bankId), {
+          method: "POST",
+          signal,
+          body: JSON.stringify(createMentalModelRequestBody(request)),
+        }),
+      ),
+    updateMentalModel: (bankId, mentalModelId, request) =>
+      withTimeout("hindsight updateMentalModel", timeoutMs, (signal) =>
+        rest.request(mentalModelItemPath(bankId, mentalModelId), {
+          method: "PATCH",
+          signal,
+          body: JSON.stringify(updateMentalModelRequestBody(request)),
+        }),
+      ),
+    deleteMentalModel: (bankId, mentalModelId) =>
+      withTimeout("hindsight deleteMentalModel", timeoutMs, (signal) =>
+        rest.request(mentalModelItemPath(bankId, mentalModelId), { method: "DELETE", signal }),
+      ),
+    getMentalModelHistory: (bankId, mentalModelId) =>
+      withTimeout("hindsight getMentalModelHistory", timeoutMs, (signal) =>
+        rest.request(mentalModelHistoryPath(bankId, mentalModelId), { signal }),
+      ),
+    refreshMentalModel: (bankId, mentalModelId) =>
+      withTimeout("hindsight refreshMentalModel", timeoutMs, (signal) =>
+        rest.request(mentalModelRefreshPath(bankId, mentalModelId), { method: "POST", signal }),
       ),
   };
 }

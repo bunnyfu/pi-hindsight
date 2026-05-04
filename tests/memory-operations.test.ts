@@ -179,6 +179,18 @@ describe("memory operations", () => {
           calls.push({ method: "delete", bank });
           return {};
         },
+        listMentalModels: async (bank) => {
+          calls.push({ method: "listMentalModels", bank });
+          return { items: [] };
+        },
+        createMentalModel: async (bank) => {
+          calls.push({ method: "createMentalModel", bank });
+          return { operation_id: "op" };
+        },
+        refreshMentalModel: async (bank) => {
+          calls.push({ method: "refreshMentalModel", bank });
+          return { operation_id: "op", status: "queued" };
+        },
       }),
       getConfig: () => config,
       getProjectBankId: () => "project-bank",
@@ -194,6 +206,12 @@ describe("memory operations", () => {
     });
     await operations.reflect(cwd, "query", undefined, "project");
     await operations.deleteDocument({ bank: "global", documentId: "doc" });
+    await operations.listMentalModels({ bank: "global" });
+    await operations.createMentalModel({
+      bank: "project",
+      request: { name: "Project model", sourceQuery: "What matters?" },
+    });
+    await operations.refreshMentalModel({ bank: "global", mentalModelId: "model" });
 
     expect(calls).toEqual(
       expect.arrayContaining([
@@ -201,6 +219,9 @@ describe("memory operations", () => {
         { method: "retain", bank: "global-luxus" },
         { method: "reflect", bank: "project-bank" },
         { method: "delete", bank: "global-luxus" },
+        { method: "listMentalModels", bank: "global-luxus" },
+        { method: "createMentalModel", bank: "project-bank" },
+        { method: "refreshMentalModel", bank: "global-luxus" },
       ]),
     );
   });

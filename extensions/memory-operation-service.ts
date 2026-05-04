@@ -3,6 +3,7 @@ import { importMemoryProjectSessions, importMemorySession } from "./import-opera
 import { createBankTemplateOperations } from "./bank-template-operations.js";
 import { createConfigOperations } from "./memory-config-operations.js";
 import { createDocumentOperations } from "./memory-document-operations.js";
+import { createMentalModelOperations } from "./memory-mental-model-operations.js";
 import { createRecallOperations } from "./memory-recall-operations.js";
 import { createRetainOperations } from "./memory-retain-operations.js";
 import { createRoutingOperations } from "./memory-routing-operations.js";
@@ -44,6 +45,7 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
     ...createRoutingOperations(deps),
     ...createConfigOperations(deps),
     ...createBankTemplateOperations(deps),
+    ...createMentalModelOperations(deps),
     ...createImportOperations(deps),
     ...createSessionOperations(),
   };

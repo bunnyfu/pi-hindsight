@@ -4,6 +4,8 @@ export type RetainUserContent = "text";
 export type RetainAssistantContent = "text" | "toolCall" | "thinking";
 export type RetainToolResultContent = "error" | "summary" | "content";
 export type TagsMatch = "any" | "all" | "any_strict" | "all_strict";
+export type MentalModelDetail = "metadata" | "content" | "full";
+export type MentalModelTagsMatch = "any" | "all" | "exact";
 export type StatusStyle = "off" | "text" | "emoji" | "nerdfont";
 export type StatusDetail = "minimal" | "project" | "activity" | "verbose";
 export type RecallRole = "user" | "assistant" | "tool" | "system";
@@ -169,6 +171,48 @@ export interface HindsightCapabilities {
   probeDocumentId?: string;
 }
 
+export interface MentalModelTrigger {
+  mode?: "full" | "delta";
+  refresh_after_consolidation?: boolean;
+  fact_types?: Array<"world" | "experience" | "observation"> | null;
+  exclude_mental_models?: boolean;
+  exclude_mental_model_ids?: string[] | null;
+  tags_match?: TagsMatch | null;
+  tag_groups?: unknown[] | null;
+  include_chunks?: boolean | null;
+  recall_max_tokens?: number | null;
+  recall_chunks_max_tokens?: number | null;
+}
+
+export interface CreateMentalModelRequest {
+  id?: string | null;
+  name: string;
+  sourceQuery: string;
+  tags?: string[];
+  maxTokens?: number;
+  trigger?: MentalModelTrigger;
+}
+
+export interface UpdateMentalModelRequest {
+  name?: string | null;
+  sourceQuery?: string | null;
+  tags?: string[] | null;
+  maxTokens?: number | null;
+  trigger?: MentalModelTrigger | null;
+}
+
+export interface ListMentalModelsOptions {
+  tags?: string[];
+  tagsMatch?: MentalModelTagsMatch;
+  detail?: MentalModelDetail;
+  limit?: number;
+  offset?: number;
+}
+
+export interface GetMentalModelOptions {
+  detail?: MentalModelDetail;
+}
+
 export interface HindsightLikeClient {
   retain(
     bankId: string,
@@ -243,4 +287,19 @@ export interface HindsightLikeClient {
     manifest: Record<string, unknown>,
     options?: { dryRun?: boolean },
   ): Promise<unknown>;
+  listMentalModels?(bankId: string, options?: ListMentalModelsOptions): Promise<unknown>;
+  getMentalModel?(
+    bankId: string,
+    mentalModelId: string,
+    options?: GetMentalModelOptions,
+  ): Promise<unknown>;
+  createMentalModel?(bankId: string, request: CreateMentalModelRequest): Promise<unknown>;
+  updateMentalModel?(
+    bankId: string,
+    mentalModelId: string,
+    request: UpdateMentalModelRequest,
+  ): Promise<unknown>;
+  deleteMentalModel?(bankId: string, mentalModelId: string): Promise<unknown>;
+  getMentalModelHistory?(bankId: string, mentalModelId: string): Promise<unknown>;
+  refreshMentalModel?(bankId: string, mentalModelId: string): Promise<unknown>;
 }

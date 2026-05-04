@@ -1,4 +1,10 @@
-import type { ResolvedConfig } from "./types.js";
+import type {
+  CreateMentalModelRequest,
+  GetMentalModelOptions,
+  ListMentalModelsOptions,
+  ResolvedConfig,
+  UpdateMentalModelRequest,
+} from "./types.js";
 
 export interface HindsightRestTransport {
   request(path: string, init?: RequestInit): Promise<unknown>;
@@ -83,6 +89,70 @@ export function reflectRequestBody(
   };
 }
 
+function appendQuery(path: string, params: URLSearchParams): string {
+  const query = params.toString();
+  return query ? `${path}?${query}` : path;
+}
+
 export function encodeBankPath(bankId: string, suffix: string): string {
   return `/v1/default/banks/${encodeURIComponent(bankId)}${suffix}`;
+}
+
+export function mentalModelCollectionPath(
+  bankId: string,
+  options: ListMentalModelsOptions = {},
+): string {
+  const params = new URLSearchParams();
+  for (const tag of options.tags ?? []) params.append("tags", tag);
+  if (options.tagsMatch) params.set("tags_match", options.tagsMatch);
+  if (options.detail) params.set("detail", options.detail);
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  if (options.offset !== undefined) params.set("offset", String(options.offset));
+  return appendQuery(encodeBankPath(bankId, "/mental-models"), params);
+}
+
+export function mentalModelItemPath(
+  bankId: string,
+  mentalModelId: string,
+  options: GetMentalModelOptions = {},
+): string {
+  const params = new URLSearchParams();
+  if (options.detail) params.set("detail", options.detail);
+  return appendQuery(
+    `${encodeBankPath(bankId, "/mental-models")}/${encodeURIComponent(mentalModelId)}`,
+    params,
+  );
+}
+
+export function mentalModelHistoryPath(bankId: string, mentalModelId: string): string {
+  return `${mentalModelItemPath(bankId, mentalModelId)}/history`;
+}
+
+export function mentalModelRefreshPath(bankId: string, mentalModelId: string): string {
+  return `${mentalModelItemPath(bankId, mentalModelId)}/refresh`;
+}
+
+export function createMentalModelRequestBody(
+  request: CreateMentalModelRequest,
+): Record<string, unknown> {
+  return {
+    ...(request.id !== undefined ? { id: request.id } : {}),
+    name: request.name,
+    source_query: request.sourceQuery,
+    ...(request.tags ? { tags: request.tags } : {}),
+    ...(request.maxTokens !== undefined ? { max_tokens: request.maxTokens } : {}),
+    ...(request.trigger ? { trigger: request.trigger } : {}),
+  };
+}
+
+export function updateMentalModelRequestBody(
+  request: UpdateMentalModelRequest,
+): Record<string, unknown> {
+  return {
+    ...(request.name !== undefined ? { name: request.name } : {}),
+    ...(request.sourceQuery !== undefined ? { source_query: request.sourceQuery } : {}),
+    ...(request.tags !== undefined ? { tags: request.tags } : {}),
+    ...(request.maxTokens !== undefined ? { max_tokens: request.maxTokens } : {}),
+    ...(request.trigger !== undefined ? { trigger: request.trigger } : {}),
+  };
 }

@@ -110,7 +110,9 @@ Good mental model examples:
 - “What recurring workflow habits matter?”
 - “What does this project consider good design?”
 
-Mental models are not raw recall. They are reusable synthesized answers.
+Mental models are not raw recall. They are reusable synthesized answers. In Pi Hindsight they are explicit advanced resources: users should create, refresh, inspect, or delete them intentionally through operations/TUI/tool surfaces. The extension must not auto-create mental models from routine sessions or refresh them in the background unless a future issue designs that policy.
+
+Creating a mental model preserves a source query. Hindsight runs that query through reflect and stores the generated content. Refresh reruns the stored source query against newer memory.
 
 ```text
 Observations  = facts learned from repetition
