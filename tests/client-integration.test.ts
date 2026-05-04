@@ -63,6 +63,53 @@ describe("Hindsight client adapter integration", () => {
         sendJson(res, 200, { dry_run: true, config_applied: true });
         return;
       }
+      if (
+        req.method === "GET" &&
+        req.url ===
+          "/v1/default/banks/test-bank/mental-models?tags=source%3Api&tags_match=all&detail=metadata&limit=10&offset=2"
+      ) {
+        sendJson(res, 200, { items: [{ id: "model-1", name: "Model" }] });
+        return;
+      }
+      if (
+        req.method === "GET" &&
+        req.url === "/v1/default/banks/test-bank/mental-models/model-1?detail=full"
+      ) {
+        sendJson(res, 200, { id: "model-1", name: "Model", content: "full" });
+        return;
+      }
+      if (req.method === "POST" && req.url === "/v1/default/banks/test-bank/mental-models") {
+        sendJson(res, 202, { operation_id: "create-op", status: "queued" });
+        return;
+      }
+      if (
+        req.method === "PATCH" &&
+        req.url === "/v1/default/banks/test-bank/mental-models/model-1"
+      ) {
+        sendJson(res, 200, { id: "model-1", name: "Updated" });
+        return;
+      }
+      if (
+        req.method === "GET" &&
+        req.url === "/v1/default/banks/test-bank/mental-models/model-1/history"
+      ) {
+        sendJson(res, 200, { items: [{ id: "v1" }] });
+        return;
+      }
+      if (
+        req.method === "POST" &&
+        req.url === "/v1/default/banks/test-bank/mental-models/model-1/refresh"
+      ) {
+        sendJson(res, 202, { operation_id: "refresh-op", status: "queued" });
+        return;
+      }
+      if (
+        req.method === "DELETE" &&
+        req.url === "/v1/default/banks/test-bank/mental-models/model-1"
+      ) {
+        sendJson(res, 200, { deleted: true });
+        return;
+      }
       sendJson(res, 404, { detail: `unexpected ${req.method} ${req.url}` });
     });
 
@@ -117,10 +164,38 @@ describe("Hindsight client adapter integration", () => {
       { version: "1", bank: { retain_mission: "Retain useful facts." } },
       { dryRun: true },
     );
+    const models = await client.listMentalModels?.("test-bank", {
+      tags: ["source:pi"],
+      tagsMatch: "all",
+      detail: "metadata",
+      limit: 10,
+      offset: 2,
+    });
+    const model = await client.getMentalModel?.("test-bank", "model-1", { detail: "full" });
+    const createdModel = await client.createMentalModel?.("test-bank", {
+      name: "Model",
+      sourceQuery: "What should recur?",
+      tags: ["source:pi"],
+      maxTokens: 256,
+    });
+    const updatedModel = await client.updateMentalModel?.("test-bank", "model-1", {
+      sourceQuery: "Updated query",
+      tags: null,
+    });
+    const history = await client.getMentalModelHistory?.("test-bank", "model-1");
+    const refreshed = await client.refreshMentalModel?.("test-bank", "model-1");
+    const deleted = await client.deleteMentalModel?.("test-bank", "model-1");
 
     expect(recall).toEqual({ results: [{ text: "remembered fact" }] });
     expect(reflection).toEqual({ text: "reflection" });
     expect(templateDryRun).toEqual({ dry_run: true, config_applied: true });
+    expect(models).toEqual({ items: [{ id: "model-1", name: "Model" }] });
+    expect(model).toEqual({ id: "model-1", name: "Model", content: "full" });
+    expect(createdModel).toEqual({ operation_id: "create-op", status: "queued" });
+    expect(updatedModel).toEqual({ id: "model-1", name: "Updated" });
+    expect(history).toEqual({ items: [{ id: "v1" }] });
+    expect(refreshed).toEqual({ operation_id: "refresh-op", status: "queued" });
+    expect(deleted).toEqual({ deleted: true });
 
     expect(requests.map((request) => `${request.method} ${request.url}`)).toEqual([
       "GET /v1/default/banks/test-bank/profile",
@@ -130,6 +205,13 @@ describe("Hindsight client adapter integration", () => {
       "POST /v1/default/banks/test-bank/memories/recall",
       "POST /v1/default/banks/test-bank/reflect",
       "POST /v1/default/banks/test-bank/import?dry_run=true",
+      "GET /v1/default/banks/test-bank/mental-models?tags=source%3Api&tags_match=all&detail=metadata&limit=10&offset=2",
+      "GET /v1/default/banks/test-bank/mental-models/model-1?detail=full",
+      "POST /v1/default/banks/test-bank/mental-models",
+      "PATCH /v1/default/banks/test-bank/mental-models/model-1",
+      "GET /v1/default/banks/test-bank/mental-models/model-1/history",
+      "POST /v1/default/banks/test-bank/mental-models/model-1/refresh",
+      "DELETE /v1/default/banks/test-bank/mental-models/model-1",
     ]);
 
     expect(requests[2]?.body).toMatchObject({
@@ -177,5 +259,12 @@ describe("Hindsight client adapter integration", () => {
       version: "1",
       bank: { retain_mission: "Retain useful facts." },
     });
+    expect(requests[9]?.body).toEqual({
+      name: "Model",
+      source_query: "What should recur?",
+      tags: ["source:pi"],
+      max_tokens: 256,
+    });
+    expect(requests[10]?.body).toEqual({ source_query: "Updated query", tags: null });
   });
 });
