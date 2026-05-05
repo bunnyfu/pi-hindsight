@@ -308,6 +308,7 @@ export function exportBankTemplateToolResponse(
         type: "text",
         text: [
           `Exported bank template from ${result.bankId}.`,
+          ...(result.outputPath ? [`Saved manifest: ${result.outputPath}`] : []),
           summary,
           JSON.stringify(result.manifest, null, 2),
         ].join("\n"),

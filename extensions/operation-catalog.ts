@@ -428,12 +428,20 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
         bank: Type.Optional(
           Type.String({ description: "Optional bank id. Defaults to project bank." }),
         ),
+        outputFile: Type.Optional(
+          Type.String({
+            description:
+              "Optional path to save the exported manifest JSON. Relative paths resolve against cwd.",
+          }),
+        ),
       }),
       async execute(_id, params, _signal, _onUpdate, ctx) {
         useCwd(ctx.cwd);
-        const result = await operations.exportBankTemplate(
-          params.bank ? { bank: params.bank } : {},
-        );
+        const result = await operations.exportBankTemplate({
+          ...(params.bank ? { bank: params.bank } : {}),
+          cwd: ctx.cwd,
+          ...(params.outputFile ? { outputFile: params.outputFile } : {}),
+        });
         return exportBankTemplateToolResponse(result);
       },
     }),

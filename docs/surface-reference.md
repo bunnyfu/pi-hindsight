@@ -164,9 +164,10 @@ Fetch the Hindsight bank-template JSON Schema used to validate portable manifest
 
 Export a portable Hindsight bank template manifest for reuse in another project or bank.
 
-| Parameter | Type   | Required | Description                                 |
-| --------- | ------ | -------- | ------------------------------------------- |
-| `bank`    | string | no       | Optional bank id. Defaults to project bank. |
+| Parameter    | Type   | Required | Description                                                                           |
+| ------------ | ------ | -------- | ------------------------------------------------------------------------------------- |
+| `bank`       | string | no       | Optional bank id. Defaults to project bank.                                           |
+| `outputFile` | string | no       | Optional path to save the exported manifest JSON. Relative paths resolve against cwd. |
 
 ### `hindsight_import`
 

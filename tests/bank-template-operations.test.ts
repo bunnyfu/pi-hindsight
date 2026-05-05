@@ -1,3 +1,7 @@
+import { readFile } from "node:fs/promises";
+import { mkdtempSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { describe, expect, it, vi } from "vitest";
 import {
   createBankTemplateOperations,
@@ -90,6 +94,23 @@ describe("bank template operations", () => {
       },
     });
     expect(fixture.exportBankTemplate).toHaveBeenCalledWith("global-luxus");
+  });
+
+  it("saves exported bank templates as pretty JSON", async () => {
+    const fixture = deps();
+    const operations = createBankTemplateOperations(fixture.deps);
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-template-export-"));
+
+    const result = await operations.exportBankTemplate({
+      bank: "global",
+      cwd,
+      outputFile: "exports/template.json",
+    });
+
+    expect(result.outputPath).toBe(join(cwd, "exports/template.json"));
+    await expect(readFile(join(cwd, "exports/template.json"), "utf8")).resolves.toBe(
+      `${JSON.stringify(result.manifest, null, 2)}\n`,
+    );
   });
 
   it("formats dry-run and manifest summaries", () => {

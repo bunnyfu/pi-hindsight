@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import { resolveOperationBank } from "./bank-selection.js";
 import type { MemoryOperationsDeps } from "./memory-operation-types.js";
 import { isRecord } from "./client-rest.js";
@@ -63,7 +65,7 @@ export function createBankTemplateOperations(deps: MemoryOperationsDeps) {
       return { schema };
     },
 
-    async exportBankTemplate(args: { bank?: string }) {
+    async exportBankTemplate(args: { bank?: string; cwd?: string; outputFile?: string }) {
       const client = deps.getClient();
       if (!client.exportBankTemplate)
         throw new Error("Hindsight client does not support bank template export.");
@@ -73,7 +75,11 @@ export function createBankTemplateOperations(deps: MemoryOperationsDeps) {
         projectBankId: deps.getProjectBankId(),
       });
       const manifest = await client.exportBankTemplate(bankId);
-      return { bankId, manifest };
+      if (!args.outputFile) return { bankId, manifest };
+      const outputPath = resolve(args.cwd ?? process.cwd(), args.outputFile);
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writeFile(outputPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+      return { bankId, manifest, outputPath };
     },
 
     async importBankTemplate(args: {
