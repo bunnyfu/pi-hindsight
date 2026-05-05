@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createDirectiveToolResponse,
   deleteDirectiveToolResponse,
+  exportBankTemplateToolResponse,
   getBankTemplateSchemaToolResponse,
   getDirectiveToolResponse,
   listDirectivesToolResponse,
@@ -46,6 +47,18 @@ describe("tool presenters", () => {
         result: { deleted: true },
       }).content[0]?.text,
     ).toContain("Deleted directive directive-2 in bank.");
+  });
+
+  it("presents saved bank template export paths", () => {
+    const response = exportBankTemplateToolResponse({
+      bankId: "bank",
+      outputPath: "/tmp/template.json",
+      manifest: { version: "1", bank: { retain_mission: "Remember" } },
+    });
+
+    expect(response.content[0]?.text).toContain("Exported bank template from bank.");
+    expect(response.content[0]?.text).toContain("Saved manifest: /tmp/template.json");
+    expect(response.content[0]?.text).toContain("Bank overrides: 1");
   });
 
   it("presents bank template schema summary and raw JSON", () => {

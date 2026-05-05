@@ -10,19 +10,26 @@ const generatorPath = resolve("scripts/generate-changelog.mjs");
 
 const subprocessTimeoutMs = 10_000;
 
+function isolatedGitEnv(extra: Record<string, string> = {}) {
+  const { GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE, ...env } = process.env;
+  void GIT_DIR;
+  void GIT_WORK_TREE;
+  void GIT_INDEX_FILE;
+  return { ...env, ...extra };
+}
+
 async function git(cwd: string, args: string[]) {
-  await execFileAsync("git", args, { cwd, timeout: subprocessTimeoutMs });
+  await execFileAsync("git", args, { cwd, timeout: subprocessTimeoutMs, env: isolatedGitEnv() });
 }
 
 async function commit(cwd: string, message: string, date: string) {
   await execFileAsync("git", ["commit", "--allow-empty", "-m", message], {
     cwd,
     timeout: subprocessTimeoutMs,
-    env: {
-      ...process.env,
+    env: isolatedGitEnv({
       GIT_AUTHOR_DATE: `${date}T00:00:00Z`,
       GIT_COMMITTER_DATE: `${date}T00:00:00Z`,
-    },
+    }),
   });
 }
 
@@ -33,7 +40,7 @@ describe("generate-changelog", () => {
       await git(cwd, ["init"]);
       await git(cwd, ["config", "user.email", "test@example.com"]);
       await git(cwd, ["config", "user.name", "Test User"]);
-      await git(cwd, ["checkout", "-b", "main"]);
+      await git(cwd, ["checkout", "-B", "main"]);
       await writeFile(
         join(cwd, "package.json"),
         JSON.stringify({
@@ -50,9 +57,17 @@ describe("generate-changelog", () => {
       await git(cwd, ["checkout", "main"]);
       await git(cwd, ["merge", "--no-ff", "topic", "-m", "Merge pull request #1"]);
 
-      await execFileAsync("node", [generatorPath], { cwd, timeout: subprocessTimeoutMs });
+      await execFileAsync("node", [generatorPath], {
+        cwd,
+        timeout: subprocessTimeoutMs,
+        env: isolatedGitEnv(),
+      });
       const first = await readFile(join(cwd, "CHANGELOG.md"), "utf8");
-      await execFileAsync("node", [generatorPath], { cwd, timeout: subprocessTimeoutMs });
+      await execFileAsync("node", [generatorPath], {
+        cwd,
+        timeout: subprocessTimeoutMs,
+        env: isolatedGitEnv(),
+      });
       const second = await readFile(join(cwd, "CHANGELOG.md"), "utf8");
 
       expect(second).toBe(first);
