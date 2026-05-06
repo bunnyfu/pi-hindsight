@@ -31,8 +31,10 @@ function sanitizedMetadata(
 }
 
 export function buildRetainJob(args: RetainJobBuildArgs): RetainJob {
-  const content = args.config.retain.redactSecrets ? redactSecrets(args.content) : args.content;
-  const metadata = sanitizedMetadata(args.metadata, args.config.retain.redactSecrets);
+  const redact = args.config.retain.redactSecrets;
+  const content = redact ? redactSecrets(args.content) : args.content;
+  const context = redact ? redactSecrets(args.context) : args.context;
+  const metadata = sanitizedMetadata(args.metadata, redact);
   const target = resolveRetainDocumentTarget({
     config: args.config,
     ...(args.capabilities ? { capabilities: args.capabilities } : {}),
@@ -47,7 +49,7 @@ export function buildRetainJob(args: RetainJobBuildArgs): RetainJob {
     updateMode: target.updateMode,
     item: {
       content,
-      context: args.context,
+      context,
       timestamp: args.timestamp ?? new Date().toISOString(),
       async: args.async ?? args.config.retain.async,
       ...((args.entities?.length ?? args.config.retain.entities.length)
