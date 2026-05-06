@@ -108,9 +108,10 @@ Read resolved Hindsight bank config and override counts for a selected bank.
 
 Reset Hindsight bank config overrides for a selected bank.
 
-| Parameter | Type   | Required | Description                                 |
-| --------- | ------ | -------- | ------------------------------------------- |
-| `bank`    | string | no       | Optional bank id. Defaults to project bank. |
+| Parameter | Type   | Required | Description                                             |
+| --------- | ------ | -------- | ------------------------------------------------------- |
+| `bank`    | string | no       | Optional bank id. Defaults to project bank.             |
+| `confirm` | true   | yes      | Required destructive-action confirmation. Must be true. |
 
 ### `hindsight_list_directives`
 
@@ -165,10 +166,11 @@ Update a bank-owned Hindsight directive.
 
 Delete a bank-owned Hindsight directive.
 
-| Parameter     | Type   | Required | Description                                 |
-| ------------- | ------ | -------- | ------------------------------------------- |
-| `directiveId` | string | yes      | Directive ID.                               |
-| `bank`        | string | no       | Optional bank id. Defaults to project bank. |
+| Parameter     | Type   | Required | Description                                             |
+| ------------- | ------ | -------- | ------------------------------------------------------- |
+| `directiveId` | string | yes      | Directive ID.                                           |
+| `bank`        | string | no       | Optional bank id. Defaults to project bank.             |
+| `confirm`     | true   | yes      | Required destructive-action confirmation. Must be true. |
 
 ### `hindsight_get_bank_template_schema`
 
@@ -247,7 +249,7 @@ Ask Hindsight to synthesize an answer from memory. Use explicitly, not for defau
 | `enabled`                   | Connection | boolean      | enabled                              |                                           | no       | enabled                            | Master switch. When off, automatic recall and retain are skipped.                                                                                     |
 | `baseUrl`                   | Connection | text         | http://localhost:8888                |                                           | no       | hindsight.baseUrl                  | Server endpoint used for recall, retain, reflect, and bank setup.                                                                                     |
 | `apiKeyEnv`                 | Connection | text         | not set                              |                                           | no       | hindsight.apiKey                   | Recommended: environment variable name that contains the API key. Editing writes a safe env SecretRef, not the raw secret.                            |
-| `apiKeyDirect`              | Connection | text         | not set                              |                                           | yes      | hindsight.apiKey                   | Advanced. Writes raw API key into config. Prefer API key source/env var whenever possible.                                                            |
+| `apiKeyDirect`              | Connection | text         | not set                              |                                           | yes      | hindsight.apiKey                   | Advanced. Writes raw API key only to user/global config. Prefer API key source/env var whenever possible.                                             |
 | `timeoutMs`                 | Connection | positive-int | 30000 ms                             |                                           | no       | hindsight.timeoutMs                | Maximum time to wait for Hindsight network calls.                                                                                                     |
 | `memoryProfile`             | Banks      | select       | project-only                         | project-only, project+global, global-only | no       | banks.profile                      | Project-only is safest. Project+global also recalls personal cross-project memory.                                                                    |
 | `projectBankId`             | Banks      | text         | auto-derived                         |                                           | no       | banks.project.bankId               | Bank used for this repository. Default derives a stable ID from repo identity.                                                                        |

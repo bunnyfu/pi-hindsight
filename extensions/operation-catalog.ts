@@ -383,10 +383,16 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
         bank: Type.Optional(
           Type.String({ description: "Optional bank id. Defaults to project bank." }),
         ),
+        confirm: Type.Literal(true, {
+          description: "Required destructive-action confirmation. Must be true.",
+        }),
       }),
       async execute(_id, params, _signal, _onUpdate, ctx) {
         useCwd(ctx.cwd);
-        const result = await operations.resetBankConfig(params.bank ? { bank: params.bank } : {});
+        const result = await operations.resetBankConfig({
+          ...(params.bank ? { bank: params.bank } : {}),
+          confirm: params.confirm,
+        });
         return resetBankConfigToolResponse(result);
       },
     }),
@@ -521,12 +527,16 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
         bank: Type.Optional(
           Type.String({ description: "Optional bank id. Defaults to project bank." }),
         ),
+        confirm: Type.Literal(true, {
+          description: "Required destructive-action confirmation. Must be true.",
+        }),
       }),
       async execute(_id, params, _signal, _onUpdate, ctx) {
         useCwd(ctx.cwd);
         const result = await operations.deleteDirective({
           directiveId: params.directiveId,
           ...(params.bank ? { bank: params.bank } : {}),
+          confirm: params.confirm,
         });
         return deleteDirectiveToolResponse(result);
       },

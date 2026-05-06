@@ -111,6 +111,7 @@ describe("config editing model", () => {
       kind: "text",
       advanced: true,
       value: "not set",
+      editableScopes: ["global"],
     });
     expect(fields.find((field) => field.id === "globalRetainMode")).toMatchObject({
       kind: "select",
@@ -226,6 +227,28 @@ describe("config editing model", () => {
         ["User mission overrides", "legacy local config; prefer Hindsight bank config"],
       ]),
     );
+  });
+
+  it("masks raw direct API key layer values", () => {
+    const fields = buildConfigEditingFields(
+      { ...DEFAULT_CONFIG, hindsight: { ...DEFAULT_CONFIG.hindsight, apiKey: "sk-live-secret" } },
+      "bank",
+      layers({
+        project: { hindsight: { apiKey: "sk-project-secret" } },
+        global: { hindsight: { apiKey: "sk-global-secret" } },
+      }),
+    );
+
+    expect(fields.find((field) => field.id === "apiKeyEnv")).toMatchObject({
+      projectValue: "direct key set (masked)",
+      globalValue: "direct key set (masked)",
+    });
+    expect(fields.find((field) => field.id === "apiKeyDirect")).toMatchObject({
+      projectValue: "[REDACTED_API_KEY]",
+      globalValue: "[REDACTED_API_KEY]",
+    });
+    expect(JSON.stringify(fields)).not.toContain("sk-project-secret");
+    expect(JSON.stringify(fields)).not.toContain("sk-global-secret");
   });
 
   it("keeps every field backed by path and reset metadata", () => {

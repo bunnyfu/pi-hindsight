@@ -96,15 +96,19 @@ export function createRetainOperations(deps: MemoryOperationsDeps) {
         ...(capabilities ? { capabilities } : {}),
       });
       const response = { ...result, tags, queued: result.enqueued };
-      await appendRetainReceipt(args.cwd, {
-        bankId: result.bankId,
-        documentId: result.documentId,
-        queueJobId: result.queueJobId,
-        updateMode: result.updateMode,
-        source: "tool",
-        context: args.context,
-        tags,
-      });
+      await appendRetainReceipt(
+        args.cwd,
+        {
+          bankId: result.bankId,
+          documentId: result.documentId,
+          queueJobId: result.queueJobId,
+          updateMode: result.updateMode,
+          source: "tool",
+          context: args.context,
+          tags,
+        },
+        { redactSecrets: config.retain.redactSecrets },
+      );
       return response;
     },
 
