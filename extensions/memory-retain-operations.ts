@@ -9,6 +9,23 @@ import { appendRetainReceipt, listRetainReceipts } from "./retain-receipts.js";
 import { getEffectiveSessionMemoryMode, readSessionMemoryMeta } from "./session-memory-meta.js";
 import type { ResolvedConfig, UpdateMode } from "./types.js";
 
+const RESERVED_EXPLICIT_RETAIN_METADATA_KEYS = new Set([
+  "cwd",
+  "pi_session_file",
+  "source",
+  "retainSource",
+]);
+
+function callerMetadata(
+  metadata: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (!metadata) return undefined;
+  const entries = Object.entries(metadata).filter(
+    ([key]) => !RESERVED_EXPLICIT_RETAIN_METADATA_KEYS.has(key),
+  );
+  return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
 export function createRetainOperations(deps: MemoryOperationsDeps) {
   return {
     async retainExplicit(args: {
@@ -67,7 +84,7 @@ export function createRetainOperations(deps: MemoryOperationsDeps) {
             context: args.context,
           }),
         metadata: {
-          ...args.metadata,
+          ...callerMetadata(args.metadata),
           cwd: args.cwd,
           ...(args.sessionFile ? { pi_session_file: args.sessionFile } : {}),
         },

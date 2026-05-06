@@ -18,31 +18,43 @@ Recall raw memories from Hindsight for this project.
 | `bank`           | string                                      | no       | Optional bank id. Defaults to project bank.                                                   |
 | `queryTimestamp` | string                                      | no       | Optional ISO timestamp for time-scoped recall.                                                |
 | `tags`           | array<string>                               | no       | Additional tag filter.                                                                        |
-| `tagsMatch`      | string \| string \| string \| string        | no       |                                                                                               |
+| `tagsMatch`      | any \| all \| any_strict \| all_strict      | no       |                                                                                               |
 | `tagGroups`      | array<object \| object \| object \| object> | no       | Compound Hindsight tag_groups filter. AND-ed with the automatic Pi project/user scope filter. |
 
 ### `hindsight_retain`
 
 Retain explicit raw content in Hindsight. Use for durable facts or decisions.
 
-| Parameter  | Type          | Required | Description                                                        |
-| ---------- | ------------- | -------- | ------------------------------------------------------------------ |
-| `content`  | string        | yes      | Raw content to retain, not summary if source content is available. |
-| `context`  | string        | yes      | Source context for this memory.                                    |
-| `bank`     | string        | no       | Optional bank id. Defaults to project bank.                        |
-| `tags`     | array<string> | no       |                                                                    |
-| `entities` | array<object> | no       |                                                                    |
+| Parameter           | Type                 | Required | Description                                                                                                                                                            |
+| ------------------- | -------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `content`           | string               | yes      | Raw content to retain, not summary if source content is available.                                                                                                     |
+| `context`           | string               | yes      | Source context for this memory.                                                                                                                                        |
+| `bank`              | string               | no       | Optional bank id. Defaults to project bank.                                                                                                                            |
+| `tags`              | array<string>        | no       |                                                                                                                                                                        |
+| `entities`          | array<object>        | no       | Optional Hindsight entities to associate with this retained content.                                                                                                   |
+| `documentId`        | string               | no       | Optional Hindsight document ID. Defaults to the existing deterministic explicit retain document ID.                                                                    |
+| `timestamp`         | string               | no       | Optional Hindsight timestamp string, including ISO-ish strings or literal unset, passed through as provided.                                                           |
+| `metadata`          | object/map           | no       | Optional caller metadata string map. Reserved provenance keys such as cwd, pi_session_file, source, and retainSource are set by pi-hindsight and cannot be overridden. |
+| `updateMode`        | append \| replace    | no       | Optional Hindsight update mode for this explicit retain call.                                                                                                          |
+| `observationScopes` | array<array<string>> | no       | Optional Hindsight observation scopes as string groups. When provided, overrides configured default observation scopes for this retain call.                           |
+| `async`             | boolean              | no       | Optional Hindsight async extraction flag for this retain call. Defaults to configured retain.async.                                                                    |
 
 ### `hindsight_retain_global`
 
 Retain explicit durable user memory in the configured user bank. Use for stable user identity, preferences, and cross-project workflows only.
 
-| Parameter  | Type          | Required | Description                              |
-| ---------- | ------------- | -------- | ---------------------------------------- |
-| `content`  | string        | yes      | Raw memory content to retain.            |
-| `context`  | string        | yes      | Why this memory is durable user context. |
-| `tags`     | array<string> | no       |                                          |
-| `entities` | array<object> | no       |                                          |
+| Parameter           | Type                 | Required | Description                                                                                                                                                            |
+| ------------------- | -------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `content`           | string               | yes      | Raw memory content to retain.                                                                                                                                          |
+| `context`           | string               | yes      | Why this memory is durable user context.                                                                                                                               |
+| `tags`              | array<string>        | no       |                                                                                                                                                                        |
+| `entities`          | array<object>        | no       | Optional Hindsight entities to associate with this retained content.                                                                                                   |
+| `documentId`        | string               | no       | Optional Hindsight document ID. Defaults to the existing deterministic explicit retain document ID.                                                                    |
+| `timestamp`         | string               | no       | Optional Hindsight timestamp string, including ISO-ish strings or literal unset, passed through as provided.                                                           |
+| `metadata`          | object/map           | no       | Optional caller metadata string map. Reserved provenance keys such as cwd, pi_session_file, source, and retainSource are set by pi-hindsight and cannot be overridden. |
+| `updateMode`        | append \| replace    | no       | Optional Hindsight update mode for this explicit retain call.                                                                                                          |
+| `observationScopes` | array<array<string>> | no       | Optional Hindsight observation scopes as string groups. When provided, overrides configured default observation scopes for this retain call.                           |
+| `async`             | boolean              | no       | Optional Hindsight async extraction flag for this retain call. Defaults to configured retain.async.                                                                    |
 
 ### `hindsight_retain_receipts`
 
@@ -104,14 +116,14 @@ Reset Hindsight bank config overrides for a selected bank.
 
 List bank-owned Hindsight directives (hard reflect rules).
 
-| Parameter    | Type                       | Required | Description                                 |
-| ------------ | -------------------------- | -------- | ------------------------------------------- |
-| `bank`       | string                     | no       | Optional bank id. Defaults to project bank. |
-| `tags`       | array<string>              | no       | Optional tag filter.                        |
-| `tagsMatch`  | string \| string \| string | no       |                                             |
-| `activeOnly` | boolean                    | no       | Only return active directives.              |
-| `limit`      | number                     | no       | Maximum directives to return.               |
-| `offset`     | number                     | no       | Pagination offset.                          |
+| Parameter    | Type                | Required | Description                                 |
+| ------------ | ------------------- | -------- | ------------------------------------------- |
+| `bank`       | string              | no       | Optional bank id. Defaults to project bank. |
+| `tags`       | array<string>       | no       | Optional tag filter.                        |
+| `tagsMatch`  | any \| all \| exact | no       |                                             |
+| `activeOnly` | boolean             | no       | Only return active directives.              |
+| `limit`      | number              | no       | Maximum directives to return.               |
+| `offset`     | number              | no       | Pagination offset.                          |
 
 ### `hindsight_get_directive`
 
@@ -204,9 +216,9 @@ Ask Hindsight to synthesize an answer from memory. Use explicitly, not for defau
 | `query`          | string                                      | yes      |                                                                                               |
 | `context`        | string                                      | no       |                                                                                               |
 | `bank`           | string                                      | no       |                                                                                               |
-| `responseSchema` | object                                      | no       |                                                                                               |
+| `responseSchema` | object/map                                  | no       |                                                                                               |
 | `tags`           | array<string>                               | no       | Additional tag filter.                                                                        |
-| `tagsMatch`      | string \| string \| string \| string        | no       |                                                                                               |
+| `tagsMatch`      | any \| all \| any_strict \| all_strict      | no       |                                                                                               |
 | `tagGroups`      | array<object \| object \| object \| object> | no       | Compound Hindsight tag_groups filter. AND-ed with the automatic Pi project/user scope filter. |
 
 ## Commands

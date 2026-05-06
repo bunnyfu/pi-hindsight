@@ -85,6 +85,40 @@ describe("durable explicit retain", () => {
     expect(queued[0]?.item.tags).toEqual(expect.arrayContaining(["source:pi", "decision:test"]));
   });
 
+  it("redacts explicit retain metadata when secret redaction is enabled", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
+    const config = testConfig();
+    const operations = createMemoryOperations({
+      getClient: () =>
+        client(async () => {
+          throw new Error("down");
+        }),
+      getConfig: () => config,
+      getProjectBankId: () => "project-bank",
+    });
+
+    await operations.retainExplicit({
+      cwd,
+      content: "Durable fact",
+      context: "unit test explicit retain",
+      metadata: {
+        source_url: "https://example.test/callback?token=super-secret&ok=true",
+        api_key: "sk-abcdefghijklmnopqrstuvwxyz",
+      },
+    });
+
+    const queued = await readRetainQueue(resolveQueuePath(cwd, config.retain.queuePath));
+    expect(queued[0]?.item.metadata).toMatchObject({
+      source_url: "https://example.test/callback?token=[REDACTED]",
+      api_key: "[REDACTED_API_KEY]",
+      cwd,
+      source: "pi-hindsight",
+      retainSource: "tool",
+    });
+    expect(JSON.stringify(queued[0]?.item.metadata)).not.toContain("super-secret");
+    expect(JSON.stringify(queued[0]?.item.metadata)).not.toContain("abcdefghijklmnopqrstuvwxyz");
+  });
+
   it("passes configured observation scopes for explicit retain", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-retain-"));
     const config: ResolvedConfig = {

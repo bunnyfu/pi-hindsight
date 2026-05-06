@@ -96,7 +96,8 @@ Additional tools:
 Tool notes:
 
 - `hindsight_recall` accepts `queryTimestamp`.
-- `hindsight_retain` accepts `entities`.
+- `hindsight_retain` and `hindsight_retain_global` accept explicit Hindsight retain options: `entities`, `documentId`, `timestamp`, `metadata`, `updateMode`, `observationScopes`, and `async`.
+- Caller `metadata` is merged with pi-hindsight provenance, but reserved provenance keys such as `cwd`, `pi_session_file`, `source`, and `retainSource` are set by pi-hindsight and cannot be overridden.
 - `hindsight_reflect` accepts `responseSchema` for structured reflection output.
 - Omit `bank` or pass `project` for the selected project bank.
 - Pass `global` for the configured global bank.
