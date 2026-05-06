@@ -95,6 +95,7 @@ export interface ProjectConfigPatchInput {
   retainUpdateMode?: "append" | "replace";
   queuePath?: string;
   importMode?: "curated" | "raw" | "forensic";
+  importQualityProfile?: "compatible" | "strict";
   importIncludeBranches?: "current-only" | "all-leaves";
   importToolResults?: "errors-only" | "summary" | "content";
   importToolResultSummaryMaxChars?: number;
@@ -215,6 +216,7 @@ export function buildProjectConfigPatch(input: ProjectConfigPatchInput): Record<
   }
   if (
     input.importMode ||
+    input.importQualityProfile ||
     input.importIncludeBranches ||
     input.importToolResults ||
     input.importToolResultSummaryMaxChars !== undefined ||
@@ -225,6 +227,7 @@ export function buildProjectConfigPatch(input: ProjectConfigPatchInput): Record<
   ) {
     patch.import = {
       ...(input.importMode ? { mode: input.importMode } : {}),
+      ...(input.importQualityProfile ? { qualityProfile: input.importQualityProfile } : {}),
       ...(input.importIncludeBranches ? { includeBranches: input.importIncludeBranches } : {}),
       ...(input.importToolResults ? { toolResults: input.importToolResults } : {}),
       ...(input.importToolResultSummaryMaxChars !== undefined

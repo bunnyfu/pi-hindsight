@@ -102,6 +102,92 @@ describe("memory quality import fixtures", () => {
     });
   });
 
+  it("keeps compatible successful summaries by default and drops strict curated noise only when configured", async () => {
+    const fixture = writePiTranscriptFixture("quality-strict-profile", [
+      userMessage("u1", "Need useful command evidence but not watcher noise."),
+      toolResult("bash1", "bash", "compile passed in 1.2s"),
+      toolResult("proc1", "process", "Refreshing checks status every 30 seconds"),
+      toolResult("ui1", "ui", "spinner: waiting for CI"),
+      toolResult("err1", "bash", "npm test failed with exit code 1", { isError: true }),
+      toolResult("big1", "bash", "x".repeat(2_049)),
+      toolResult("dup1", "bash", "same stable command output"),
+      toolResult("dup2", "bash", "same stable command output"),
+      assistantMessage("a1", "Keep small useful outputs; drop strict noise."),
+    ]);
+
+    const client = captureRetainClient();
+    const compatible = await importPiSession({
+      sessionFile: fixture.sessionFile,
+      bankId: "bank",
+      config: { ...DEFAULT_CONFIG, import: { ...DEFAULT_CONFIG.import, toolResults: "summary" } },
+      client,
+    });
+
+    expect(DEFAULT_CONFIG.import.qualityProfile).toBe("compatible");
+    expect(compatible.documents[0]).toMatchObject({
+      importProfile: "turns-12-bytes-80000",
+      rawMessageCount: 9,
+      projectedMessageCount: 9,
+      droppedToolResultCount: 0,
+      classificationReasonCounts: {
+        "user-text": 1,
+        "message-kept": 6,
+        "tool-error-kept": 1,
+        "assistant-text": 1,
+      },
+    });
+
+    const strictClient = captureRetainClient();
+    const strict = await importPiSession({
+      sessionFile: fixture.sessionFile,
+      bankId: "bank",
+      config: {
+        ...DEFAULT_CONFIG,
+        import: {
+          ...DEFAULT_CONFIG.import,
+          toolResults: "summary",
+          qualityProfile: "strict",
+        },
+      },
+      client: strictClient,
+    });
+
+    expect(strict.documents[0]).toMatchObject({
+      importProfile: "turns-12-bytes-80000",
+      importQualityProfile: "strict",
+      rawMessageCount: 9,
+      projectedMessageCount: 5,
+      droppedToolResultCount: 4,
+      classificationReasonCounts: {
+        "user-text": 1,
+        "message-kept": 2,
+        "tool-error-kept": 1,
+        "process-noise": 1,
+        "ui-noise": 1,
+        "oversized-output": 1,
+        "repeated-output": 1,
+        "assistant-text": 1,
+      },
+    });
+    expect(strict.documents[0]?.topDroppedTools).toEqual(
+      expect.arrayContaining([
+        { name: "process", count: 1, bytes: expect.any(Number) },
+        { name: "ui", count: 1, bytes: expect.any(Number) },
+        { name: "bash", count: 2, bytes: expect.any(Number) },
+      ]),
+    );
+
+    const strictRetained = JSON.stringify(
+      parsedRetainedMessages(strictClient.retained[0]!.content),
+    );
+    expect(strictRetained).toContain("compile passed in 1.2s");
+    expect(strictRetained).toContain("npm test failed with exit code 1");
+    expect(strictRetained).toContain("same stable command output");
+    expect(strictRetained).not.toContain("Refreshing checks status");
+    expect(strictRetained).not.toContain("spinner: waiting for CI");
+    expect(strictRetained).not.toContain("x".repeat(2_049));
+  });
+
   it("still respects tool filters when successful tool summaries are enabled", async () => {
     const fixture = writePiTranscriptFixture("quality-tool-summary-filter", [
       userMessage("u1", "Read file then summarize decision."),

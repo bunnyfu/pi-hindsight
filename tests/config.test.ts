@@ -23,6 +23,7 @@ describe("resolveConfig", () => {
       join(cwd, ".pi", "hindsight.json"),
       JSON.stringify({
         recall: { maxTokens: 123 },
+        import: { qualityProfile: "strict" },
         banks: { project: { derive: "cwd", retainMission: "Project retain mission" } },
       }),
     );
@@ -31,6 +32,7 @@ describe("resolveConfig", () => {
       PI_HINDSIGHT_PROJECT_BANK_ID: "manual-bank",
     });
     expect(config.recall.maxTokens).toBe(123);
+    expect(config.import.qualityProfile).toBe("strict");
     expect(config.hindsight.baseUrl).toBe("http://h");
     expect(config.banks.project.bankId).toBe("manual-bank");
     expect(config.banks.project.derive).toBe("manual");
@@ -323,6 +325,7 @@ describe("resolveConfig", () => {
         },
         import: {
           includeBranches: "all-the-branches",
+          qualityProfile: "fast-and-loose",
           includeCompactionSummaries: false,
           includeBranchSummaries: false,
         },
@@ -370,6 +373,7 @@ describe("resolveConfig", () => {
     expect(config.retain.shutdownFlushMaxJobs).toBe(10);
     expect(config.retain.shutdownFlushTimeoutMs).toBe(2_000);
     expect(config.import.mode).toBe("curated");
+    expect(config.import.qualityProfile).toBe("compatible");
     expect(config.import.includeBranches).toBe("current-only");
     expect(config.import.checkpointPath).toBe(".pi/hindsight/import-checkpoint.json");
     expect(config.import.resume).toBe(true);

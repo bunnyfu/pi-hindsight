@@ -303,6 +303,11 @@ export function normalizeConfig(
         ["curated", "raw", "forensic"],
         DEFAULT_CONFIG.import.mode,
       ),
+      qualityProfile: enumValue(
+        config.import?.qualityProfile,
+        ["compatible", "strict"],
+        DEFAULT_CONFIG.import.qualityProfile,
+      ),
       turnsPerDocument: positiveInt(
         config.import?.turnsPerDocument,
         DEFAULT_CONFIG.import.turnsPerDocument,

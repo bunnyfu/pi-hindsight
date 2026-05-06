@@ -1,10 +1,13 @@
 import type { ResolvedConfig } from "./types.js";
 import { isInjectedHindsightMemory, projectMessage, projectMessages } from "./messages.js";
 import {
+  createStrictImportNoiseState,
   importToolAllowed,
   resolveImportToolNoisePolicy,
+  strictSuccessfulToolResultDropReason,
   summarizeToolResultContent,
   type ImportNoiseDropReason,
+  type StrictImportNoiseState,
 } from "./import-noise-policy.js";
 
 export type CuratedImportKeepReason =
@@ -90,8 +93,10 @@ function dropReasons(
   message: Record<string, unknown>,
   projectedMessages: Record<string, unknown>[],
   config: ResolvedConfig,
+  strictDropReason?: ImportNoiseDropReason,
 ): CuratedImportDropReason[] {
   if (isInjectedHindsightMemory(message)) return ["recalled-memory"];
+  if (strictDropReason) return [strictDropReason];
   if (!projectedMessages.length && message.role === "toolResult" && message.isError !== true) {
     if (!importToolAllowed(importToolName(message), config.retain.toolFilter.toolResult))
       return ["tool-filter-excluded"];
@@ -100,17 +105,26 @@ function dropReasons(
   return ["empty-projection"];
 }
 
+interface CuratedImportProjectionDecision {
+  projectedMessages: Record<string, unknown>[];
+  strictDropReason?: ImportNoiseDropReason;
+}
+
 function projectCuratedImportMessage(
   stableMessage: Record<string, unknown>,
   config: ResolvedConfig,
-): Record<string, unknown>[] {
+  strictState: StrictImportNoiseState,
+): CuratedImportProjectionDecision {
   if (stableMessage.role !== "toolResult" || stableMessage.isError === true) {
-    return projectMessages([stableMessage as never], config);
+    return { projectedMessages: projectMessages([stableMessage as never], config) };
   }
   const policy = resolveImportToolNoisePolicy(config);
-  if (policy.dropSuccessful) return [];
-  if (!importToolAllowed(importToolName(stableMessage), config.retain.toolFilter.toolResult))
-    return [];
+  if (!importToolAllowed(importToolName(stableMessage), config.retain.toolFilter.toolResult)) {
+    return { projectedMessages: [] };
+  }
+  const strictDropReason = strictSuccessfulToolResultDropReason(stableMessage, policy, strictState);
+  if (strictDropReason || policy.dropSuccessful)
+    return { projectedMessages: [], ...(strictDropReason ? { strictDropReason } : {}) };
   const projected = projectMessage(stableMessage as never, {
     ...config,
     retain: {
@@ -121,30 +135,34 @@ function projectCuratedImportMessage(
       },
     },
   });
-  return [
-    config.import.toolResults === "summary"
-      ? {
-          ...projected,
-          content: summarizeToolResultContent(stableMessage.content, policy.summaryMaxChars),
-        }
-      : projected,
-  ];
+  return {
+    projectedMessages: [
+      config.import.toolResults === "summary"
+        ? {
+            ...projected,
+            content: summarizeToolResultContent(stableMessage.content, policy.summaryMaxChars),
+          }
+        : projected,
+    ],
+  };
 }
 
 export function classifyCuratedImportMessage(
   message: Record<string, unknown>,
   config: ResolvedConfig,
+  strictState: StrictImportNoiseState = createStrictImportNoiseState(),
 ): CuratedImportClassification {
   const stableMessage = stableProjectionMessage(message);
+  const projectionDecision = projectCuratedImportMessage(stableMessage, config, strictState);
   const projectedMessages = mergeImportProvenance(
     stableMessage,
-    projectCuratedImportMessage(stableMessage, config),
+    projectionDecision.projectedMessages,
   );
   const decision = projectedMessages.length ? "keep" : "drop";
   const reasons =
     decision === "keep"
       ? [keepReason(stableMessage)]
-      : dropReasons(stableMessage, projectedMessages, config);
+      : dropReasons(stableMessage, projectedMessages, config, projectionDecision.strictDropReason);
   const rawBytes = importByteLength(stableMessage);
   const projectedBytes = importByteLength(projectedMessages);
   return {
@@ -178,8 +196,9 @@ export function buildCuratedImportProjection(
 ): CuratedImportProjection {
   const droppedTools = new Map<string, { count: number; bytes: number }>();
   const classificationReasonCounts: Partial<Record<CuratedImportReason, number>> = {};
+  const strictState = createStrictImportNoiseState();
   const classifications = messages.map((message) =>
-    classifyCuratedImportMessage(message.data, config),
+    classifyCuratedImportMessage(message.data, config, strictState),
   );
   const projected = classifications.flatMap((classification) => {
     incrementReasonCounts(classificationReasonCounts, classification.reasons);

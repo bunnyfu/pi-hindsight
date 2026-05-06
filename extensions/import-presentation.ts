@@ -17,6 +17,7 @@ export type ImportDocumentSummaryResult = {
     estimatedDocumentCount?: number;
     estimatedChunkCount?: number;
     importMode?: "curated" | "raw" | "forensic";
+    importQualityProfile?: "compatible" | "strict";
   }[];
   malformedLineCount?: number;
 };
@@ -120,6 +121,13 @@ export function importDocumentSummary(result: ImportDocumentSummaryResult): stri
   const importModes = [
     ...new Set(result.documents.map((document) => document.importMode).filter(Boolean)),
   ].join(",");
+  const importProfiles = [
+    ...new Set(
+      result.documents
+        .map((document) => document.importQualityProfile)
+        .filter((profile): profile is "strict" => profile === "strict"),
+    ),
+  ].join(",");
   const reasonCounts = formatReasonCounts(sumReasonCounts(result.documents));
   const topDroppedTools = formatTopDroppedTools(result.documents);
   const forensicWarning = importModes.includes("forensic")
@@ -128,7 +136,7 @@ export function importDocumentSummary(result: ImportDocumentSummaryResult): stri
   const qualityDetails = `${reasonCounts ? `; reasons=${reasonCounts}` : ""}${topDroppedTools ? `; topDroppedTools=${topDroppedTools}` : ""}`;
   const quality =
     rawMessages || droppedToolResults || rawBytes || projectedBytes
-      ? `; mode=${importModes || "unknown"}; projected=${projectedMessages}/${rawMessages || projectedMessages} messages; droppedToolResults=${droppedToolResults}; keptToolErrors=${keptErrors}; estimatedChunks=${estimatedChunks}; bytes=${projectedBytes}/${rawBytes}${qualityDetails}${forensicWarning}`
+      ? `; mode=${importModes || "unknown"}${importProfiles ? `; profile=${importProfiles}` : ""}; projected=${projectedMessages}/${rawMessages || projectedMessages} messages; droppedToolResults=${droppedToolResults}; keptToolErrors=${keptErrors}; estimatedChunks=${estimatedChunks}; bytes=${projectedBytes}/${rawBytes}${qualityDetails}${forensicWarning}`
       : "";
   return `documents=${result.documents.length}; update=${modes || "n/a"}; status=${statuses || "n/a"}${malformed}${quality}`;
 }

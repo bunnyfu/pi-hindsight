@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
-import type { ImportMode, UpdateMode } from "./types.js";
+import type { ImportMode, ImportQualityProfile, UpdateMode } from "./types.js";
 
 export interface ImportManifestEntry {
   documentId: string;
@@ -16,6 +16,7 @@ export interface ImportManifestEntry {
   includeBranches: "current-only" | "all-leaves";
   importMode?: ImportMode;
   toolResults?: "errors-only" | "summary" | "content";
+  importQualityProfile?: ImportQualityProfile;
   projectionVersion?: string;
   importProfile?: string;
   chunkIndex?: number;
@@ -67,6 +68,9 @@ function isImportManifestEntry(value: unknown): value is ImportManifestEntry {
       value.toolResults === "errors-only" ||
       value.toolResults === "summary" ||
       value.toolResults === "content") &&
+    (value.importQualityProfile === undefined ||
+      value.importQualityProfile === "compatible" ||
+      value.importQualityProfile === "strict") &&
     (value.updateMode === "append" || value.updateMode === "replace")
   );
 }

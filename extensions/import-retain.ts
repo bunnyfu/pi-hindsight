@@ -45,6 +45,7 @@ export interface ImportDocumentPreview {
   estimatedDocumentCount?: number;
   estimatedChunkCount?: number;
   importMode?: ResolvedConfig["import"]["mode"];
+  importQualityProfile?: ResolvedConfig["import"]["qualityProfile"];
   projectionVersion?: string;
   importProfile?: string;
   chunkIndex?: number;
@@ -158,6 +159,10 @@ function curatedImportProfile(config: ResolvedConfig): string {
   return `turns-${config.import.turnsPerDocument}-bytes-${config.import.maxDocumentBytes}`;
 }
 
+function shouldSurfaceImportQualityProfile(config: ResolvedConfig): boolean {
+  return config.import.mode === "curated" && config.import.qualityProfile !== "compatible";
+}
+
 function importChunkDocumentId(args: {
   sessionId: string;
   leafId: string;
@@ -255,6 +260,9 @@ function buildImportBranch(args: Omit<ImportRetainArgs, "client">): ImportBranch
             : mode === "forensic"
               ? "forensic-raw-v1"
               : "raw-v1",
+        ...(shouldSurfaceImportQualityProfile(args.config)
+          ? { importQualityProfile: args.config.import.qualityProfile }
+          : {}),
         ...(mode === "curated" ? { chunkIndex: chunk.index, messageRange } : {}),
         projectedMessageCount: projection.messages.length,
         messages:
@@ -293,6 +301,9 @@ function buildImportBranch(args: Omit<ImportRetainArgs, "client">): ImportBranch
       estimatedDocumentCount: chunks.length,
       estimatedChunkCount: projection.estimatedChunkCount,
       importMode: mode,
+      ...(shouldSurfaceImportQualityProfile(args.config)
+        ? { importQualityProfile: args.config.import.qualityProfile }
+        : {}),
       ...(projectionVersion ? { projectionVersion } : {}),
       ...(importProfile ? { importProfile } : {}),
       ...(mode === "curated" ? { chunkIndex: chunk.index, messageRange } : {}),
@@ -317,6 +328,9 @@ function buildImportBranch(args: Omit<ImportRetainArgs, "client">): ImportBranch
       includeBranches: args.config.import.includeBranches,
       importMode: mode,
       toolResults: args.config.import.toolResults,
+      ...(shouldSurfaceImportQualityProfile(args.config)
+        ? { importQualityProfile: args.config.import.qualityProfile }
+        : {}),
       ...(projectionVersion ? { projectionVersion } : {}),
       ...(importProfile ? { importProfile } : {}),
       ...(mode === "curated" ? { chunkIndex: chunk.index, messageRange } : {}),
@@ -369,6 +383,9 @@ export async function retainImportBranch(
         : {}),
       branch_leaf_id: built.document.leafId,
       import_mode: args.config.import.mode,
+      ...(shouldSurfaceImportQualityProfile(args.config)
+        ? { import_quality_profile: args.config.import.qualityProfile }
+        : {}),
       ...(built.document.projectionVersion
         ? { projection_version: built.document.projectionVersion }
         : {}),
