@@ -119,10 +119,15 @@ function valueAt(config: Record<string, unknown>, path: string[]): unknown {
   return value;
 }
 
-function displayLayerValue(value: unknown): string | undefined {
+function displayLayerValue(fieldId: FieldId, value: unknown): string | undefined {
   if (value === undefined) return undefined;
   if (typeof value === "boolean") return enabledDisabled(value);
-  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (typeof value === "string") {
+    if (fieldId === "apiKeyEnv") return "direct key set (masked)";
+    if (fieldId === "apiKeyDirect") return value ? "[REDACTED_API_KEY]" : "not set";
+    return value;
+  }
+  if (typeof value === "number") return String(value);
   if (
     typeof value === "object" &&
     value !== null &&
@@ -189,7 +194,7 @@ export function buildBaseConfigEditingFields(
       tab: "Connection",
       label: "Direct API key (not recommended)",
       description:
-        "Advanced. Writes raw API key into config. Prefer API key source/env var whenever possible.",
+        "Advanced. Writes raw API key only to user/global config. Prefer API key source/env var whenever possible.",
       value: config.hindsight.apiKey && apiKeyEnvName(config) === "not set" ? "set" : "not set",
       defaultValue: "not set",
       resetKey: "hindsight.apiKey",
@@ -512,6 +517,7 @@ export const PROJECT_ONLY_FIELD_IDS = new Set<FieldId>([
 ]);
 
 export function editableScopesForField(fieldId: FieldId): ConfigScope[] {
+  if (fieldId === "apiKeyDirect") return ["global"];
   return PROJECT_ONLY_FIELD_IDS.has(fieldId) ? ["project"] : ["project", "global"];
 }
 
@@ -536,8 +542,8 @@ function layerField(
   envValue: string | undefined,
 ): ConfigEditingField {
   const path = CONFIG_FIELD_PATHS[base.id];
-  const projectValue = displayLayerValue(valueAt(layers.project, path));
-  const globalValue = displayLayerValue(valueAt(layers.global, path));
+  const projectValue = displayLayerValue(base.id, valueAt(layers.project, path));
+  const globalValue = displayLayerValue(base.id, valueAt(layers.global, path));
   const source = sourceFor(layers, path, envValue);
   return {
     ...base,

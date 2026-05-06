@@ -2,9 +2,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { applyEdits, modify } from "jsonc-parser";
 
 import { validEnvVarName } from "./config.js";
 import { resetPathsForConfigKeys, type ConfigResetKey } from "./config-field-paths.js";
+import { parseJsonWithComments } from "./config-json.js";
 
 export type MemoryProfile = "project-only" | "project+global" | "global-only";
 
@@ -38,23 +40,37 @@ export function projectConfigPath(cwd: string): string {
   return join(cwd, ".pi", "hindsight.json");
 }
 
+function projectJsoncConfigPath(cwd: string): string {
+  return join(cwd, ".pi", "hindsight.jsonc");
+}
+
 export function globalConfigPath(home = process.env.HOME || homedir()): string {
   return join(home, ".pi", "agent", "hindsight.json");
 }
 
+function globalJsoncConfigPath(home = process.env.HOME || homedir()): string {
+  return join(home, ".pi", "agent", "hindsight.jsonc");
+}
+
+function activeConfigPath(jsonPath: string, jsoncPath: string): string {
+  if (existsSync(jsonPath)) return jsonPath;
+  if (existsSync(jsoncPath)) return jsoncPath;
+  return jsonPath;
+}
+
 function readConfig(path: string): Record<string, unknown> {
   if (!existsSync(path)) return {};
-  const parsed = JSON.parse(readFileSync(path, "utf8")) as unknown;
+  const parsed = parseJsonWithComments(readFileSync(path, "utf8"), path);
   if (!isRecord(parsed)) throw new Error(`${path} must contain a JSON object`);
   return parsed;
 }
 
 export function readProjectConfig(cwd: string): Record<string, unknown> {
-  return readConfig(projectConfigPath(cwd));
+  return readConfig(activeConfigPath(projectConfigPath(cwd), projectJsoncConfigPath(cwd)));
 }
 
 export function readGlobalConfig(home?: string): Record<string, unknown> {
-  return readConfig(globalConfigPath(home));
+  return readConfig(activeConfigPath(globalConfigPath(home), globalJsoncConfigPath(home)));
 }
 
 export function deepMergeConfig(
@@ -123,6 +139,11 @@ export function buildProjectConfigPatch(input: ProjectConfigPatchInput): Record<
   if (input.enabled !== undefined) patch.enabled = input.enabled;
   if (input.apiKeyEnvVar && !validEnvVarName(input.apiKeyEnvVar)) {
     throw new Error("apiKeyEnvVar must be an environment variable name");
+  }
+  if (input.directApiKey && input.scope !== "global") {
+    throw new Error(
+      "directApiKey can only be written to user config; use apiKeyEnvVar for project config",
+    );
   }
   if (input.baseUrl || input.timeoutMs !== undefined || input.apiKeyEnvVar || input.directApiKey) {
     patch.hindsight = {
@@ -288,8 +309,44 @@ async function writeConfig(
   for (const deletePathParts of deletePaths) deletePath(base, deletePathParts);
   const next = deepMergeConfig(base, patch);
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  if (existsSync(path) && path.endsWith(".jsonc")) {
+    await writeJsoncConfig(path, patch, deletePaths);
+  } else {
+    await writeFile(path, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  }
   return { path, config: next };
+}
+
+function flattenPatch(
+  value: unknown,
+  prefix: string[] = [],
+): Array<{ path: string[]; value: unknown }> {
+  if (!isRecord(value)) return [{ path: prefix, value }];
+  return Object.entries(value).flatMap(([key, child]) => flattenPatch(child, [...prefix, key]));
+}
+
+async function writeJsoncConfig(
+  path: string,
+  patch: Record<string, unknown>,
+  deletePaths: string[][],
+): Promise<void> {
+  let text = readFileSync(path, "utf8");
+  for (const pathParts of deletePaths) {
+    text = applyEdits(
+      text,
+      modify(text, pathParts, undefined, { formattingOptions: { insertSpaces: true, tabSize: 2 } }),
+    );
+  }
+  for (const item of flattenPatch(patch)) {
+    text = applyEdits(
+      text,
+      modify(text, item.path, item.value, {
+        formattingOptions: { insertSpaces: true, tabSize: 2 },
+        isArrayInsertion: false,
+      }),
+    );
+  }
+  await writeFile(path, text.endsWith("\n") ? text : `${text}\n`, "utf8");
 }
 
 export async function writeProjectConfig(
@@ -297,7 +354,8 @@ export async function writeProjectConfig(
   patch: Record<string, unknown>,
   deletePaths: string[][] = [],
 ): Promise<{ path: string; config: Record<string, unknown> }> {
-  return writeConfig(projectConfigPath(cwd), readProjectConfig(cwd), patch, deletePaths);
+  const path = activeConfigPath(projectConfigPath(cwd), projectJsoncConfigPath(cwd));
+  return writeConfig(path, readProjectConfig(cwd), patch, deletePaths);
 }
 
 export async function writeGlobalConfig(
@@ -305,5 +363,6 @@ export async function writeGlobalConfig(
   deletePaths: string[][] = [],
   home?: string,
 ): Promise<{ path: string; config: Record<string, unknown> }> {
-  return writeConfig(globalConfigPath(home), readGlobalConfig(home), patch, deletePaths);
+  const path = activeConfigPath(globalConfigPath(home), globalJsoncConfigPath(home));
+  return writeConfig(path, readGlobalConfig(home), patch, deletePaths);
 }

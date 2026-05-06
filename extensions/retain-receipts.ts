@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { redactSecrets } from "./sanitize.js";
 import type { UpdateMode } from "./types.js";
 
 export interface RetainReceipt {
@@ -19,6 +20,7 @@ export interface RetainReceiptHistory {
 }
 
 const MAX_RECEIPTS = 50;
+const MAX_RECEIPT_CONTEXT_CHARS = 1000;
 
 export function retainReceiptsPath(cwd: string): string {
   return resolve(cwd, ".pi/hindsight/retain-receipts.json");
@@ -58,6 +60,7 @@ function isRetainReceipt(value: unknown): value is RetainReceipt {
 export async function appendRetainReceipt(
   cwd: string,
   receipt: Omit<RetainReceipt, "createdAt"> & { createdAt?: string },
+  options: { redactSecrets?: boolean; maxContextChars?: number } = {},
 ): Promise<RetainReceiptHistory> {
   const path = retainReceiptsPath(cwd);
   const current = await readRetainReceipts(path);
@@ -68,9 +71,19 @@ export async function appendRetainReceipt(
     queueJobId: receipt.queueJobId,
     updateMode: receipt.updateMode,
     source: receipt.source,
-    context: receipt.context,
+    context: receiptContext(receipt.context, options),
     tags: receipt.tags,
   };
+
+  function receiptContext(
+    context: string,
+    options: { redactSecrets?: boolean; maxContextChars?: number },
+  ): string {
+    const redacted = options.redactSecrets === false ? context : redactSecrets(context);
+    const maxChars = options.maxContextChars ?? MAX_RECEIPT_CONTEXT_CHARS;
+    if (redacted.length <= maxChars) return redacted;
+    return `${redacted.slice(0, maxChars)}…[truncated]`;
+  }
   const receipts = [
     nextReceipt,
     ...current.receipts.filter(

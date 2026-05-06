@@ -228,6 +228,23 @@ describe("operation catalog", () => {
     );
   });
 
+  it("requires confirm true for destructive public tool schemas", () => {
+    const catalog = createOperationCatalog({
+      getClient: () => client(),
+      getConfig: () => DEFAULT_CONFIG,
+      getProjectBankId: () => "project-bank",
+    });
+
+    expect(
+      (requireTool(catalog, "hindsight_reset_bank_config").parameters as JsonSchema).properties
+        ?.confirm?.const,
+    ).toBe(true);
+    expect(
+      (requireTool(catalog, "hindsight_delete_directive").parameters as JsonSchema).properties
+        ?.confirm?.const,
+    ).toBe(true);
+  });
+
   it("passes nullable directive updates through the public tool surface", async () => {
     const updateDirective = vi.fn(async () => ({ id: "directive", content: "Updated" }));
     const catalog = createOperationCatalog({

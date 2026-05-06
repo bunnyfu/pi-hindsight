@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -9,6 +9,7 @@ import {
   globalConfigPath,
   projectConfigPath,
   readGlobalConfig,
+  readProjectConfig,
   writeGlobalConfig,
   writeProjectConfig,
 } from "../extensions/config-writer.js";
@@ -118,10 +119,11 @@ describe("config writer", () => {
     });
   });
 
-  it("can write direct API keys while keeping env refs preferred", () => {
-    expect(buildProjectConfigPatch({ directApiKey: "raw-secret" })).toEqual({
+  it("can write direct API keys only for user config while keeping env refs preferred", () => {
+    expect(buildProjectConfigPatch({ directApiKey: "raw-secret", scope: "global" })).toEqual({
       hindsight: { apiKey: "raw-secret" },
     });
+    expect(() => buildProjectConfigPatch({ directApiKey: "raw-secret" })).toThrow(/user config/);
   });
 
   it("rejects invalid api key env var names", () => {
@@ -162,6 +164,65 @@ describe("config writer", () => {
     );
     expect(result.path).toBe(globalConfigPath(home));
     expect(readGlobalConfig(home)).toMatchObject({ hindsight: { baseUrl: "http://global" } });
+  });
+
+  it("edits active project JSONC config instead of creating a shadowing JSON file", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-project-jsonc-"));
+    const jsoncPath = join(cwd, ".pi", "hindsight.jsonc");
+    mkdirSync(join(cwd, ".pi"), { recursive: true });
+    writeFileSync(
+      jsoncPath,
+      `{
+  // keep this comment
+  "hindsight": { "baseUrl": "http://old" },
+  "recall": { "budget": "low" }
+}\n`,
+      "utf8",
+    );
+
+    const result = await writeProjectConfig(
+      cwd,
+      buildProjectConfigPatch({ baseUrl: "http://new" }),
+    );
+
+    expect(result.path).toBe(jsoncPath);
+    expect(existsSync(projectConfigPath(cwd))).toBe(false);
+    const text = readFileSync(jsoncPath, "utf8");
+    expect(text).toContain("// keep this comment");
+    expect(readProjectConfig(cwd)).toMatchObject({
+      hindsight: { baseUrl: "http://new" },
+      recall: { budget: "low" },
+    });
+  });
+
+  it("edits active global JSONC config and preserves existing values", async () => {
+    const home = mkdtempSync(join(tmpdir(), "pi-hindsight-global-jsonc-"));
+    const jsoncPath = join(home, ".pi", "agent", "hindsight.jsonc");
+    mkdirSync(join(home, ".pi", "agent"), { recursive: true });
+    writeFileSync(
+      jsoncPath,
+      `{
+  // global comment
+  "hindsight": { "timeoutMs": 1000 },
+  "recall": { "budget": "high" }
+}\n`,
+      "utf8",
+    );
+
+    const result = await writeGlobalConfig(
+      buildProjectConfigPatch({ baseUrl: "http://global" }),
+      [],
+      home,
+    );
+
+    expect(result.path).toBe(jsoncPath);
+    expect(existsSync(globalConfigPath(home))).toBe(false);
+    const text = readFileSync(jsoncPath, "utf8");
+    expect(text).toContain("// global comment");
+    expect(readGlobalConfig(home)).toMatchObject({
+      hindsight: { baseUrl: "http://global", timeoutMs: 1000 },
+      recall: { budget: "high" },
+    });
   });
 
   it("deletes global config values when resetting global overrides", async () => {

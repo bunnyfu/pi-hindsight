@@ -231,7 +231,7 @@ describe("memory operations", () => {
     await expect(operations.getBankConfig({ bank: "project" })).rejects.toThrow(
       "Hindsight client does not support bank config read.",
     );
-    await expect(operations.resetBankConfig({ bank: "project" })).rejects.toThrow(
+    await expect(operations.resetBankConfig({ bank: "project", confirm: true })).rejects.toThrow(
       "Hindsight client does not support bank config reset.",
     );
     await expect(operations.getBankTemplateSchema()).rejects.toThrow(
@@ -256,8 +256,29 @@ describe("memory operations", () => {
         request: { content: "Updated" },
       }),
     ).rejects.toThrow("Hindsight client does not support directive update.");
+    await expect(
+      operations.deleteDirective({ bank: "project", directiveId: "d", confirm: true }),
+    ).rejects.toThrow("Hindsight client does not support directive delete.");
+  });
+
+  it("requires explicit confirmation for destructive config and directive operations", async () => {
+    const operations = createMemoryOperations({
+      getClient: () => ({
+        retain: async () => undefined,
+        recall: async () => [],
+        reflect: async () => ({}),
+        resetBankConfig: async () => ({}),
+        deleteDirective: async () => ({}),
+      }),
+      getConfig: () => DEFAULT_CONFIG,
+      getProjectBankId: () => "project-bank",
+    });
+
+    await expect(operations.resetBankConfig({ bank: "project" })).rejects.toThrow(
+      "confirm:true is required to reset bank config",
+    );
     await expect(operations.deleteDirective({ bank: "project", directiveId: "d" })).rejects.toThrow(
-      "Hindsight client does not support directive delete.",
+      "confirm:true is required to delete directive",
     );
   });
 
@@ -345,7 +366,7 @@ describe("memory operations", () => {
     await operations.reflect(cwd, "query", undefined, "project");
     await operations.deleteDocument({ bank: "global", documentId: "doc" });
     await operations.getBankConfig({ bank: "global" });
-    await operations.resetBankConfig({ bank: "global" });
+    await operations.resetBankConfig({ bank: "global", confirm: true });
     await operations.getBankTemplateSchema();
     await operations.listDirectives({ bank: "global" });
     await operations.getDirective({ bank: "global", directiveId: "directive" });
@@ -358,7 +379,7 @@ describe("memory operations", () => {
       directiveId: "directive",
       request: { content: "Updated" },
     });
-    await operations.deleteDirective({ bank: "global", directiveId: "directive" });
+    await operations.deleteDirective({ bank: "global", directiveId: "directive", confirm: true });
     await operations.listMentalModels({ bank: "global" });
     await operations.createMentalModel({
       bank: "project",

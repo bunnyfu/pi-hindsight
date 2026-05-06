@@ -56,7 +56,8 @@ export function createDirectiveOperations(deps: MemoryOperationsDeps) {
       return { bankId, directiveId: args.directiveId, result };
     },
 
-    async deleteDirective(args: { bank?: string; directiveId: string }) {
+    async deleteDirective(args: { bank?: string; directiveId: string; confirm?: boolean }) {
+      if (args.confirm !== true) throw new Error("confirm:true is required to delete directive");
       const client = deps.getClient();
       if (!client.deleteDirective) throw unavailable("delete");
       const bankId = operationBank(deps, args.bank);
