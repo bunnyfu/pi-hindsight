@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { importDocumentSummary } from "../extensions/import-presentation.js";
+import {
+  importDocumentSummary,
+  renderProjectImportMessage,
+} from "../extensions/import-presentation.js";
 
 describe("import presentation", () => {
   it("renders import quality metrics and forensic warning", () => {
@@ -65,6 +68,78 @@ describe("import presentation", () => {
 
     expect(importDocumentSummary({ documents })).toContain(
       "topDroppedTools=recurring-medium:6,one-off-0-1:1,one-off-1-1:1",
+    );
+  });
+
+  it("aggregates multi-session project import quality metrics in preview and import output", () => {
+    const imported = [
+      {
+        documents: [
+          {
+            updateMode: "replace",
+            status: "pending",
+            rawMessageCount: 4,
+            projectedMessageCount: 2,
+            rawBytes: 1_000,
+            projectedBytes: 200,
+            droppedToolResultCount: 2,
+            keptToolErrorCount: 1,
+            estimatedChunkCount: 1,
+            importMode: "curated" as const,
+            importQualityProfile: "strict" as const,
+            droppedTools: [
+              { name: "read", count: 1, bytes: 500 },
+              { name: "bash", count: 1, bytes: 200 },
+            ],
+            classificationReasonCounts: {
+              "tool-filter-excluded": 2,
+              "assistant-text": 1,
+            },
+          },
+        ],
+      },
+      {
+        documents: [
+          {
+            updateMode: "replace",
+            status: "pending",
+            rawMessageCount: 3,
+            projectedMessageCount: 2,
+            rawBytes: 500,
+            projectedBytes: 300,
+            droppedToolResultCount: 1,
+            keptToolErrorCount: 1,
+            estimatedChunkCount: 2,
+            importMode: "curated" as const,
+            importQualityProfile: "strict" as const,
+            droppedTools: [
+              { name: "read", count: 2, bytes: 100 },
+              { name: "grep", count: 1, bytes: 50 },
+            ],
+            classificationReasonCounts: {
+              "tool-filter-excluded": 1,
+              "tool-error-kept": 1,
+            },
+          },
+        ],
+      },
+    ];
+    const base = {
+      sessionFiles: ["/sessions/a.jsonl", "/sessions/b.jsonl"],
+      scanned: 3,
+      documentCount: 2,
+      messageCount: 7,
+      malformedLineCount: 1,
+      imported,
+    };
+    const quality =
+      "mode=curated; profile=strict; projected=4/7 messages; droppedToolResults=3; keptToolErrors=2; estimatedChunks=3; bytes=500/1500; reasons=tool-filter-excluded:3,assistant-text:1,tool-error-kept:1; topDroppedTools=read:3,bash:1,grep:1";
+
+    expect(renderProjectImportMessage({ ...base, dryRun: true })).toBe(
+      `Project import preview: sessions=2/3; documents=2; messages=7; malformedLines=1; ${quality}; write=no`,
+    );
+    expect(renderProjectImportMessage({ ...base, dryRun: false })).toBe(
+      `Imported project sessions: sessions=2/3; documents=2; messages=7; malformedLines=1; ${quality}`,
     );
   });
 });
