@@ -94,6 +94,7 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   },
   import: {
     mode: "curated",
+    qualityProfile: "compatible",
     turnsPerDocument: 12,
     maxDocumentBytes: 80_000,
     includeBranches: "current-only",

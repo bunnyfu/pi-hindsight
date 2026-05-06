@@ -347,6 +347,17 @@ export function buildBaseConfigEditingFields(
       choices: ["curated", "raw", "forensic"],
     }),
     selectField({
+      id: "importQualityProfile",
+      tab: "Import",
+      label: "Curated quality profile",
+      description:
+        "Compatible preserves current curated behavior; strict drops process/UI-like, oversized, or repeated successful tool output in curated mode.",
+      value: config.import.qualityProfile,
+      defaultValue: defaults.import.qualityProfile,
+      resetKey: "import.qualityProfile",
+      choices: ["compatible", "strict"],
+    }),
+    selectField({
       id: "importBranches",
       tab: "Import",
       label: "Historical import scope",
@@ -490,6 +501,7 @@ export const PROJECT_ONLY_FIELD_IDS = new Set<FieldId>([
   "memoryProfile",
   "queuePath",
   "importMode",
+  "importQualityProfile",
   "importBranches",
   "importToolResults",
   "importToolSummaryMaxChars",
@@ -624,6 +636,8 @@ export function patchForConfigEditingField(
       return { queuePath: value.trim() };
     case "importMode":
       return { importMode: value as "curated" | "raw" | "forensic" };
+    case "importQualityProfile":
+      return { importQualityProfile: value as "compatible" | "strict" };
     case "importBranches":
       return { importIncludeBranches: value as "current-only" | "all-leaves" };
     case "importToolResults":
@@ -695,6 +709,8 @@ export function inputDefaultForConfigEditingField(
       return config.retain.queuePath;
     case "importToolSummaryMaxChars":
       return String(config.import.toolResultSummaryMaxChars);
+    case "importQualityProfile":
+      return config.import.qualityProfile;
     case "importManifest":
       return config.import.manifestPath;
     case "importCheckpoint":

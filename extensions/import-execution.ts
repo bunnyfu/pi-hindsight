@@ -8,6 +8,7 @@ import {
 } from "./import-checkpoint.js";
 import { upsertImportManifestEntries } from "./import-manifest.js";
 import {
+  type ImportDocumentPreview,
   isImportRetainQueuedError,
   previewImportBranch,
   retainImportBranch,
@@ -15,24 +16,7 @@ import {
 import { redactError } from "./sanitize.js";
 import type { ImportPlan } from "./import-plan.js";
 
-export interface ImportSessionDocumentResult {
-  documentId: string;
-  leafId: string;
-  messageCount: number;
-  importMode?: "curated" | "raw" | "forensic";
-  projectionVersion?: string;
-  importProfile?: string;
-  chunkIndex?: number;
-  messageRange?: { start: number; end: number };
-  contentHash: string;
-  contentBytes: number;
-  tags: string[];
-  updateMode: "append" | "replace";
-  bankId: string;
-  wouldWrite: boolean;
-  status: "pending" | "queued" | "completed" | "failed" | "skipped";
-  error?: string;
-}
+export interface ImportSessionDocumentResult extends ImportDocumentPreview {}
 
 export interface ImportExecutionResult {
   documents: ImportSessionDocumentResult[];

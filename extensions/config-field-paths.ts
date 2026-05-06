@@ -24,6 +24,7 @@ export type FieldId =
   | "retainAsync"
   | "queuePath"
   | "importMode"
+  | "importQualityProfile"
   | "importBranches"
   | "importToolResults"
   | "importToolSummaryMaxChars"
@@ -65,6 +66,7 @@ export const CONFIG_FIELD_PATHS: Record<FieldId, string[]> = {
   retainAsync: ["retain", "async"],
   queuePath: ["retain", "queuePath"],
   importMode: ["import", "mode"],
+  importQualityProfile: ["import", "qualityProfile"],
   importBranches: ["import", "includeBranches"],
   importToolResults: ["import", "toolResults"],
   importToolSummaryMaxChars: ["import", "toolResultSummaryMaxChars"],
@@ -150,6 +152,7 @@ export const CONFIG_RESET_PATHS = {
   "retain.async": [["retain", "async"]],
   "retain.queuePath": [["retain", "queuePath"]],
   "import.mode": [["import", "mode"]],
+  "import.qualityProfile": [["import", "qualityProfile"]],
   "import.includeBranches": [["import", "includeBranches"]],
   "import.toolResults": [["import", "toolResults"]],
   "import.toolResultSummaryMaxChars": [["import", "toolResultSummaryMaxChars"]],
@@ -194,6 +197,7 @@ export const CONFIG_FIELD_RESET_KEYS: Record<FieldId, ConfigResetKey> = {
   retainAsync: "retain.async",
   queuePath: "retain.queuePath",
   importMode: "import.mode",
+  importQualityProfile: "import.qualityProfile",
   importBranches: "import.includeBranches",
   importToolResults: "import.toolResults",
   importToolSummaryMaxChars: "import.toolResultSummaryMaxChars",

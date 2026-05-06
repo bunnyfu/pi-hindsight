@@ -13,11 +13,52 @@ import {
 } from "../extensions/banking.js";
 import { liveDocumentId, stableSessionId } from "../extensions/session.js";
 
+const LOCAL_GIT_ENV_KEYS = [
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  "GIT_CONFIG",
+  "GIT_CONFIG_PARAMETERS",
+  "GIT_CONFIG_COUNT",
+  "GIT_DIR",
+  "GIT_IMPLICIT_WORK_TREE",
+  "GIT_INDEX_FILE",
+  "GIT_GRAFT_FILE",
+  "GIT_NO_REPLACE_OBJECTS",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_PREFIX",
+  "GIT_REPLACE_REF_BASE",
+  "GIT_SHALLOW_FILE",
+  "GIT_COMMON_DIR",
+  "GIT_WORK_TREE",
+] as const;
+
+function isolatedGitEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
+  const env = { ...process.env, ...extra };
+  for (const key of LOCAL_GIT_ENV_KEYS) delete env[key];
+  return env;
+}
+
+function withoutLocalGitEnv<T>(fn: () => T): T {
+  const previous = new Map<string, string | undefined>();
+  for (const key of LOCAL_GIT_ENV_KEYS) {
+    previous.set(key, process.env[key]);
+    delete process.env[key];
+  }
+  try {
+    return fn();
+  } finally {
+    for (const key of LOCAL_GIT_ENV_KEYS) {
+      const value = previous.get(key);
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
 function git(args: string[], cwd: string, home: string): void {
   execFileSync("git", args, {
     cwd,
     stdio: "ignore",
-    env: { ...process.env, HOME: home, GIT_CONFIG_NOSYSTEM: "1" },
+    env: isolatedGitEnv({ HOME: home, GIT_CONFIG_NOSYSTEM: "1" }),
   } satisfies ExecFileSyncOptions);
 }
 
@@ -27,10 +68,12 @@ describe("banking/session identity", () => {
     mkdirSync(join(root, ".git"));
     const child = join(root, "a", "b");
     mkdirSync(child, { recursive: true });
-    expect(findRepoRoot(child)).toBe(realpathSync.native(root));
-    expect(deriveProjectBankId(child, DEFAULT_CONFIG)).toBe(
-      deriveProjectBankId(root, DEFAULT_CONFIG),
-    );
+    withoutLocalGitEnv(() => {
+      expect(findRepoRoot(child)).toBe(realpathSync.native(root));
+      expect(deriveProjectBankId(child, DEFAULT_CONFIG)).toBe(
+        deriveProjectBankId(root, DEFAULT_CONFIG),
+      );
+    });
   });
 
   it("shares project identity across git linked worktrees", () => {
@@ -54,11 +97,13 @@ describe("banking/session identity", () => {
     copyFileSync(join(realpathSync.native(main), ".git", "HEAD"), join(linkedGitDir, "HEAD"));
     writeFileSync(join(linkedGitDir, "index"), "");
 
-    expect(findRepoRoot(linked)).toBe(realpathSync.native(main));
-    expect(deriveProjectBankId(linked, DEFAULT_CONFIG)).toBe(
-      deriveProjectBankId(main, DEFAULT_CONFIG),
-    );
-    expect(recallScopeTags(linked)).toEqual(recallScopeTags(main));
+    withoutLocalGitEnv(() => {
+      expect(findRepoRoot(linked)).toBe(realpathSync.native(main));
+      expect(deriveProjectBankId(linked, DEFAULT_CONFIG)).toBe(
+        deriveProjectBankId(main, DEFAULT_CONFIG),
+      );
+      expect(recallScopeTags(linked)).toEqual(recallScopeTags(main));
+    });
   }, 15_000);
 
   it("uses the submodule worktree root instead of superproject git storage", () => {
@@ -91,10 +136,12 @@ describe("banking/session identity", () => {
       home,
     );
 
-    expect(findRepoRoot(submodule)).toBe(realpathSync.native(submodule));
-    expect(deriveProjectBankId(submodule, DEFAULT_CONFIG)).not.toBe(
-      deriveProjectBankId(superProject, DEFAULT_CONFIG),
-    );
+    withoutLocalGitEnv(() => {
+      expect(findRepoRoot(submodule)).toBe(realpathSync.native(submodule));
+      expect(deriveProjectBankId(submodule, DEFAULT_CONFIG)).not.toBe(
+        deriveProjectBankId(superProject, DEFAULT_CONFIG),
+      );
+    });
   }, 15_000);
 
   it("uses stable live document ids", () => {

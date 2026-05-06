@@ -33,6 +33,13 @@ hindsight_import_gateway({ sourceFile: "/path/to/gateway.jsonl", dryRun: true })
 
 Raw and forensic modes preserve legacy document IDs and payload shape.
 
+## Curated quality profiles
+
+- `compatible` (default): preserves current curated import behavior.
+- `strict`: explicit opt-in profile for stronger curated noise handling.
+
+Strict applies only to `curated`. It keeps failed tool results as evidence and may keep useful tiny successful summaries/content, but drops successful tool results that are process/UI/status-like, larger than 2 KiB before summarization, or duplicate/repeated within the curated chunk. Raw and forensic ignore `import.qualityProfile`.
+
 ## Dry-run metrics
 
 Pi session dry-runs report items such as:
@@ -68,4 +75,4 @@ Curated import has a successful-tool-result policy:
 - `summary`: keep bounded summaries for allowed successful tools.
 - `content`: keep full content for allowed successful tools.
 
-Tool filters still apply in `summary` and `content`, so noisy tools remain excluded unless explicitly allowed.
+Tool filters still apply in `summary` and `content`, so noisy tools remain excluded unless explicitly allowed. Strict quality profile can drop additional successful tool output after filters.

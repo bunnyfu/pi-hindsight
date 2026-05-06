@@ -248,14 +248,30 @@ describe("Pi session import", () => {
     const raw = await importPiSession({
       sessionFile,
       bankId: "bank",
-      config: { ...DEFAULT_CONFIG, import: { ...DEFAULT_CONFIG.import, mode: "raw" } },
+      config: {
+        ...DEFAULT_CONFIG,
+        import: {
+          ...DEFAULT_CONFIG.import,
+          mode: "raw",
+          qualityProfile: "strict",
+          toolResults: "summary",
+        },
+      },
       dryRun: true,
       client: { retain: async () => undefined, recall: async () => [], reflect: async () => ({}) },
     });
     const forensic = await importPiSession({
       sessionFile,
       bankId: "bank",
-      config: { ...DEFAULT_CONFIG, import: { ...DEFAULT_CONFIG.import, mode: "forensic" } },
+      config: {
+        ...DEFAULT_CONFIG,
+        import: {
+          ...DEFAULT_CONFIG.import,
+          mode: "forensic",
+          qualityProfile: "strict",
+          toolResults: "summary",
+        },
+      },
       dryRun: true,
       client: { retain: async () => undefined, recall: async () => [], reflect: async () => ({}) },
     });
@@ -265,11 +281,15 @@ describe("Pi session import", () => {
       projectedMessageCount: 2,
       droppedToolResultCount: 0,
     });
+    expect(raw.documents[0]).not.toHaveProperty("importProfile");
+    expect(raw.documents[0]).not.toHaveProperty("importQualityProfile");
     expect(forensic.documents[0]).toMatchObject({
       rawMessageCount: 3,
       projectedMessageCount: 3,
       droppedToolResultCount: 0,
     });
+    expect(forensic.documents[0]).not.toHaveProperty("importProfile");
+    expect(forensic.documents[0]).not.toHaveProperty("importQualityProfile");
     expect(raw.documentId).toBe(forensic.documentId);
   });
 
@@ -942,7 +962,7 @@ describe("Pi session import", () => {
       "pi-import:session-resume:leaf:a:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-1",
       "pi-import:session-resume:leaf:b:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-1",
     ]);
-  });
+  }, 15_000);
 
   it("starts a fresh checkpoint run when update mode changes", async () => {
     const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-"));

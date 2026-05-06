@@ -125,7 +125,9 @@ Then rerun the import. Use `--dry-run` first.
 
 The default import mode is `curated`. It writes deterministic filtered historical documents as retained source evidence and computes projection metrics using the live retain filter so previews show how much successful tool-output noise is likely irrelevant.
 
-Curated import defaults to `import.toolResults: "errors-only"`. Successful tool results are dropped unless you deliberately configure `summary` or `content`; even then, existing tool filters still exclude noisy tools such as `read`, `grep`, `find`, and `ls`. `import.toolResultSummaryMaxChars` bounds successful-tool summaries.
+Curated import defaults to `import.qualityProfile: "compatible"` and `import.toolResults: "errors-only"`. Compatible preserves the current curated behavior. Successful tool results are dropped unless you deliberately configure `summary` or `content`; even then, existing tool filters still exclude noisy tools such as `read`, `grep`, `find`, and `ls`. `import.toolResultSummaryMaxChars` bounds successful-tool summaries.
+
+Set `import.qualityProfile: "strict"` only when you want stronger curated noise handling. Strict mode still keeps failed tool results as evidence and may keep useful tiny successful summaries/content, but it drops successful tool results that are process/UI/status-like, larger than 2 KiB before summarization, or duplicate/repeated within the curated chunk. Strict only affects `curated`; `raw` and `forensic` remain escape hatches.
 
 Use `raw` when you want the previous branch-document behavior without curated drop metrics. Raw mode still filters Hindsight recall blocks to avoid re-retaining injected memory.
 

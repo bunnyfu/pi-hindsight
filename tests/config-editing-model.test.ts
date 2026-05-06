@@ -39,6 +39,9 @@ describe("config editing model", () => {
     expect(fields.find((field) => field.id === "importBranches")?.editableScopes).toEqual([
       "project",
     ]);
+    expect(fields.find((field) => field.id === "importQualityProfile")?.editableScopes).toEqual([
+      "project",
+    ]);
     expect(fields.find((field) => field.id === "importToolResults")?.editableScopes).toEqual([
       "project",
     ]);
@@ -85,6 +88,7 @@ describe("config editing model", () => {
     const fields = buildConfigEditingFields(DEFAULT_CONFIG, "bank", layers());
     const memoryProfile = fields.find((field) => field.id === "memoryProfile");
     const queuePath = fields.find((field) => field.id === "queuePath");
+    const importQualityProfile = fields.find((field) => field.id === "importQualityProfile");
     const importToolResults = fields.find((field) => field.id === "importToolResults");
 
     expect(memoryProfile).toMatchObject({
@@ -92,6 +96,11 @@ describe("config editing model", () => {
       choices: ["project-only", "project+global", "global-only"],
     });
     expect(queuePath).toMatchObject({ kind: "text" });
+    expect(importQualityProfile).toMatchObject({
+      kind: "select",
+      choices: ["compatible", "strict"],
+      value: "compatible",
+    });
     expect(importToolResults).toMatchObject({
       kind: "select",
       choices: ["errors-only", "summary", "content"],
@@ -137,6 +146,9 @@ describe("config editing model", () => {
     });
     expect(patchForConfigEditingField("importToolResults", "summary", DEFAULT_CONFIG)).toEqual({
       importToolResults: "summary",
+    });
+    expect(patchForConfigEditingField("importQualityProfile", "strict", DEFAULT_CONFIG)).toEqual({
+      importQualityProfile: "strict",
     });
     expect(patchForConfigEditingField("importToolSummaryMaxChars", "250", DEFAULT_CONFIG)).toEqual({
       importToolResultSummaryMaxChars: 250,
