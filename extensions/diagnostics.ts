@@ -190,6 +190,26 @@ export function formatDebugReport(args: DebugReportArgs): string {
               leafId: args.latestImport.leafId,
               sessionId: args.latestImport.sessionId,
               contentHash: args.latestImport.contentHash,
+              ...(args.latestImport.importMode ? { importMode: args.latestImport.importMode } : {}),
+              ...(args.latestImport.toolResults
+                ? { toolResults: args.latestImport.toolResults }
+                : {}),
+              ...(args.latestImport.importQualityProfile
+                ? { importQualityProfile: args.latestImport.importQualityProfile }
+                : {}),
+              ...(args.latestImport.projectionVersion
+                ? { projectionVersion: args.latestImport.projectionVersion }
+                : {}),
+              ...(args.latestImport.importProfile
+                ? { importProfile: args.latestImport.importProfile }
+                : {}),
+              ...(args.latestImport.chunkIndex !== undefined
+                ? { chunkIndex: args.latestImport.chunkIndex }
+                : {}),
+              ...(args.latestImport.messageRange
+                ? { messageRange: args.latestImport.messageRange }
+                : {}),
+              ...(args.latestImport.updateMode ? { updateMode: args.latestImport.updateMode } : {}),
             }
           : null,
       },
