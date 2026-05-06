@@ -4,6 +4,7 @@ import {
   enqueueRetainJobWithStats,
   flushRetainQueue,
   readRetainQueue,
+  removeRetainQueueJobs,
   resolveQueuePath,
   summarizeRetainQueue,
 } from "./queue.js";
@@ -35,6 +36,14 @@ export async function flushRetain(
 
 export async function readQueuedRetains(cwd: string, config: ResolvedConfig): Promise<RetainJob[]> {
   return readRetainQueue(retainQueuePath(cwd, config));
+}
+
+export async function removeQueuedRetains(
+  cwd: string,
+  config: ResolvedConfig,
+  predicate: (job: RetainJob) => boolean,
+): Promise<number> {
+  return removeRetainQueueJobs(retainQueuePath(cwd, config), predicate);
 }
 
 export async function summarizeRetain(cwd: string, config: ResolvedConfig) {

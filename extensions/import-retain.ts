@@ -247,7 +247,7 @@ function buildImportBranch(args: Omit<ImportRetainArgs, "client">): ImportBranch
       {
         source: "pi-session-import",
         sessionFile: args.sessionFile,
-        cwd: args.parsed.cwd,
+        cwd: args.cwd,
         sessionId: args.sessionId,
         ...(parentSessionId ? { parentSessionId } : {}),
         ...(args.parsed.parentSessionFile

@@ -192,12 +192,13 @@ export async function withQueueLock<T>(path: string, fn: () => Promise<T>): Prom
   const lock = previous.catch(() => undefined).then(() => next);
   queueLocks.set(path, lock);
   await previous.catch(() => undefined);
-  const releaseFileLock = await acquireFileLock(path);
+  let releaseFileLock: (() => Promise<void>) | undefined;
   try {
+    releaseFileLock = await acquireFileLock(path);
     return await fn();
   } finally {
     try {
-      await releaseFileLock();
+      if (releaseFileLock) await releaseFileLock();
     } finally {
       release();
       if (queueLocks.get(path) === lock) queueLocks.delete(path);

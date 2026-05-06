@@ -1,6 +1,15 @@
 import type { HindsightLikeClient, ResolvedConfig, RetainJob, UpdateMode } from "./types.js";
 import { buildDurableRetainJob } from "./retain-durable.js";
-import { enqueueRetainWithStats, flushRetain, readQueuedRetains } from "./retain-queue.js";
+import {
+  enqueueRetainWithStats,
+  flushRetain,
+  readQueuedRetains,
+  removeQueuedRetains,
+} from "./retain-queue.js";
+import {
+  importRetainJobMatchesReference,
+  staleImportRetainJobForReference,
+} from "./import-queue-identity.js";
 
 export interface ImportRetainDeliveryArgs {
   cwd: string;
@@ -32,8 +41,6 @@ function stillQueued(jobs: RetainJob[], jobId: string): boolean {
 export async function deliverImportRetain(
   args: ImportRetainDeliveryArgs,
 ): Promise<ImportRetainDeliveryResult> {
-  const existing = await readQueuedRetains(args.cwd, args.config).catch(() => []);
-  const existingJob = existing.find((queued) => queued.documentId === args.documentId);
   const job = buildDurableRetainJob({
     cwd: args.cwd,
     config: args.config,
@@ -47,11 +54,16 @@ export async function deliverImportRetain(
     ...(args.metadata ? { metadata: args.metadata } : {}),
     ...(args.observationScopes?.length ? { observationScopes: args.observationScopes } : {}),
   });
+  await removeQueuedRetains(args.cwd, args.config, (queued) =>
+    staleImportRetainJobForReference(queued, job),
+  );
+  const existing = await readQueuedRetains(args.cwd, args.config);
+  const existingJob = existing.find((queued) => importRetainJobMatchesReference(queued, job));
   if (!existingJob) await enqueueRetainWithStats(args.cwd, args.config, job);
   const result = await flushRetain(args.cwd, args.config, args.client, {
     stopOnFirstFailure: true,
   });
-  const queued = await readQueuedRetains(args.cwd, args.config).catch(() => []);
+  const queued = await readQueuedRetains(args.cwd, args.config);
   const queueJobId = existingJob?.id ?? job.id;
   return {
     queueJobId,
