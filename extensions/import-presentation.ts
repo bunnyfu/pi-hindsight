@@ -37,6 +37,7 @@ export type ImportProjectPresentationResult = {
   documentCount: number;
   messageCount: number;
   malformedLineCount: number;
+  imported?: Array<{ documents: ImportDocumentSummaryResult["documents"] }>;
 };
 
 function sumReasonCounts(
@@ -84,12 +85,7 @@ function formatTopDroppedTools(documents: ImportDocumentSummaryResult["documents
     .join(",");
 }
 
-export function importDocumentSummary(result: ImportDocumentSummaryResult): string {
-  const modes = [...new Set(result.documents.map((document) => document.updateMode))].join(",");
-  const statuses = [...new Set(result.documents.map((document) => document.status))].join(",");
-  const malformed = result.malformedLineCount
-    ? `; malformedLines=${result.malformedLineCount}`
-    : "";
+function importDocumentQualitySummary(result: ImportDocumentSummaryResult): string {
   const rawMessages = result.documents.reduce(
     (count, document) => count + (document.rawMessageCount ?? document.messageCount ?? 0),
     0,
@@ -134,11 +130,18 @@ export function importDocumentSummary(result: ImportDocumentSummaryResult): stri
     ? "; WARNING forensic mode preserves recalled memory blocks for audit-only use"
     : "";
   const qualityDetails = `${reasonCounts ? `; reasons=${reasonCounts}` : ""}${topDroppedTools ? `; topDroppedTools=${topDroppedTools}` : ""}`;
-  const quality =
-    rawMessages || droppedToolResults || rawBytes || projectedBytes
-      ? `; mode=${importModes || "unknown"}${importProfiles ? `; profile=${importProfiles}` : ""}; projected=${projectedMessages}/${rawMessages || projectedMessages} messages; droppedToolResults=${droppedToolResults}; keptToolErrors=${keptErrors}; estimatedChunks=${estimatedChunks}; bytes=${projectedBytes}/${rawBytes}${qualityDetails}${forensicWarning}`
-      : "";
-  return `documents=${result.documents.length}; update=${modes || "n/a"}; status=${statuses || "n/a"}${malformed}${quality}`;
+  return rawMessages || droppedToolResults || rawBytes || projectedBytes
+    ? `; mode=${importModes || "unknown"}${importProfiles ? `; profile=${importProfiles}` : ""}; projected=${projectedMessages}/${rawMessages || projectedMessages} messages; droppedToolResults=${droppedToolResults}; keptToolErrors=${keptErrors}; estimatedChunks=${estimatedChunks}; bytes=${projectedBytes}/${rawBytes}${qualityDetails}${forensicWarning}`
+    : "";
+}
+
+export function importDocumentSummary(result: ImportDocumentSummaryResult): string {
+  const modes = [...new Set(result.documents.map((document) => document.updateMode))].join(",");
+  const statuses = [...new Set(result.documents.map((document) => document.status))].join(",");
+  const malformed = result.malformedLineCount
+    ? `; malformedLines=${result.malformedLineCount}`
+    : "";
+  return `documents=${result.documents.length}; update=${modes || "n/a"}; status=${statuses || "n/a"}${malformed}${importDocumentQualitySummary(result)}`;
 }
 
 export function renderImportSessionMessage(
@@ -160,7 +163,9 @@ export function renderImportSessionMessage(
 }
 
 export function renderProjectImportMessage(result: ImportProjectPresentationResult): string {
-  const summary = `sessions=${result.sessionFiles.length}/${result.scanned}; documents=${result.documentCount}; messages=${result.messageCount}; malformedLines=${result.malformedLineCount}`;
+  const documents = result.imported?.flatMap((session) => session.documents) ?? [];
+  const quality = documents.length ? importDocumentQualitySummary({ documents }) : "";
+  const summary = `sessions=${result.sessionFiles.length}/${result.scanned}; documents=${result.documentCount}; messages=${result.messageCount}; malformedLines=${result.malformedLineCount}${quality}`;
   return result.dryRun
     ? `Project import preview: ${summary}; write=no`
     : `Imported project sessions: ${summary}`;
