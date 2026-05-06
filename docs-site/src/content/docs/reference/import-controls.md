@@ -50,6 +50,8 @@ Pi session dry-runs report items such as:
 - curated projection count
 - dropped non-error tool-result count
 - kept tool-error count
+- kept signal categories (`keptSignals=`), when curated reason counts exist
+- dropped noise categories (`droppedNoise=`), when curated reason counts exist
 - estimated chunk count
 - byte counts
 - target bank

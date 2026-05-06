@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   importDocumentSummary,
   renderProjectImportMessage,
+  renderImportSessionMessage,
 } from "../extensions/import-presentation.js";
 
 describe("import presentation", () => {
@@ -33,7 +34,49 @@ describe("import presentation", () => {
         ],
       }),
     ).toContain(
-      "mode=forensic; projected=3/5 messages; droppedToolResults=2; keptToolErrors=1; estimatedChunks=1; bytes=400/1000; reasons=tool-filter-excluded:2,assistant-text:1,tool-error-kept:1; topDroppedTools=read:2,grep:1; WARNING forensic mode preserves recalled memory blocks for audit-only use",
+      "mode=forensic; projected=3/5 messages; droppedToolResults=2; keptToolErrors=1; estimatedChunks=1; bytes=400/1000; keptSignals=assistant:1,tool-errors:1; droppedNoise=successful-tools:2; reasons=tool-filter-excluded:2,assistant-text:1,tool-error-kept:1; topDroppedTools=read:2,grep:1; WARNING forensic mode preserves recalled memory blocks for audit-only use",
+    );
+  });
+
+  it("renders concise kept signal and dropped noise categories in single-session previews", () => {
+    expect(
+      renderImportSessionMessage({
+        dryRun: true,
+        messageCount: 21,
+        checkpointPath: "/tmp/checkpoint.json",
+        manifestPath: "/tmp/manifest.json",
+        documents: [
+          {
+            updateMode: "replace",
+            status: "pending",
+            rawMessageCount: 21,
+            projectedMessageCount: 5,
+            rawBytes: 2100,
+            projectedBytes: 500,
+            droppedToolResultCount: 15,
+            keptToolErrorCount: 1,
+            estimatedChunkCount: 1,
+            importMode: "curated",
+            classificationReasonCounts: {
+              "user-text": 2,
+              "assistant-text": 1,
+              "tool-error-kept": 1,
+              "message-kept": 1,
+              "successful-tool-output": 3,
+              "tool-filter-excluded": 2,
+              "recalled-memory": 1,
+              "ui-noise": 2,
+              "process-noise": 1,
+              "oversized-output": 1,
+              "repeated-output": 4,
+              "tool-result-empty": 1,
+              "empty-projection": 1,
+            },
+          },
+        ],
+      }),
+    ).toContain(
+      "keptSignals=user:2,assistant:1,tool-errors:1,workflow:1; droppedNoise=successful-tools:5,recalled-memory:1,ui/process:3,oversized/repeated:5,empty:2; reasons=",
     );
   });
 
@@ -133,7 +176,7 @@ describe("import presentation", () => {
       imported,
     };
     const quality =
-      "mode=curated; profile=strict; projected=4/7 messages; droppedToolResults=3; keptToolErrors=2; estimatedChunks=3; bytes=500/1500; reasons=tool-filter-excluded:3,assistant-text:1,tool-error-kept:1; topDroppedTools=read:3,bash:1,grep:1";
+      "mode=curated; profile=strict; projected=4/7 messages; droppedToolResults=3; keptToolErrors=2; estimatedChunks=3; bytes=500/1500; keptSignals=assistant:1,tool-errors:1; droppedNoise=successful-tools:3; reasons=tool-filter-excluded:3,assistant-text:1,tool-error-kept:1; topDroppedTools=read:3,bash:1,grep:1";
 
     expect(renderProjectImportMessage({ ...base, dryRun: true })).toBe(
       `Project import preview: sessions=2/3; documents=2; messages=7; malformedLines=1; ${quality}; write=no`,

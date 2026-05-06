@@ -63,6 +63,34 @@ function formatReasonCounts(counts: Record<string, number>): string {
     .join(",");
 }
 
+const KEPT_SIGNAL_REASON_CATEGORIES = [
+  { label: "user", reasons: ["user-text"] },
+  { label: "assistant", reasons: ["assistant-text"] },
+  { label: "tool-errors", reasons: ["tool-error-kept"] },
+  { label: "workflow", reasons: ["message-kept"] },
+] as const;
+
+const DROPPED_NOISE_REASON_CATEGORIES = [
+  { label: "successful-tools", reasons: ["successful-tool-output", "tool-filter-excluded"] },
+  { label: "recalled-memory", reasons: ["recalled-memory"] },
+  { label: "ui/process", reasons: ["ui-noise", "process-noise"] },
+  { label: "oversized/repeated", reasons: ["oversized-output", "repeated-output"] },
+  { label: "empty", reasons: ["tool-result-empty", "empty-projection"] },
+] as const;
+
+function formatReasonCategoryCounts(
+  counts: Record<string, number>,
+  categories: readonly { label: string; reasons: readonly string[] }[],
+): string {
+  return categories
+    .map(({ label, reasons }) => {
+      const count = reasons.reduce((total, reason) => total + (counts[reason] ?? 0), 0);
+      return count > 0 ? `${label}:${count}` : undefined;
+    })
+    .filter((entry): entry is string => Boolean(entry))
+    .join(",");
+}
+
 function formatTopDroppedTools(documents: ImportDocumentSummaryResult["documents"]): string {
   const totals = new Map<string, { count: number; bytes: number }>();
   for (const document of documents) {
@@ -124,12 +152,18 @@ function importDocumentQualitySummary(result: ImportDocumentSummaryResult): stri
         .filter((profile): profile is "strict" => profile === "strict"),
     ),
   ].join(",");
-  const reasonCounts = formatReasonCounts(sumReasonCounts(result.documents));
+  const summedReasonCounts = sumReasonCounts(result.documents);
+  const keptSignals = formatReasonCategoryCounts(summedReasonCounts, KEPT_SIGNAL_REASON_CATEGORIES);
+  const droppedNoise = formatReasonCategoryCounts(
+    summedReasonCounts,
+    DROPPED_NOISE_REASON_CATEGORIES,
+  );
+  const reasonCounts = formatReasonCounts(summedReasonCounts);
   const topDroppedTools = formatTopDroppedTools(result.documents);
   const forensicWarning = importModes.includes("forensic")
     ? "; WARNING forensic mode preserves recalled memory blocks for audit-only use"
     : "";
-  const qualityDetails = `${reasonCounts ? `; reasons=${reasonCounts}` : ""}${topDroppedTools ? `; topDroppedTools=${topDroppedTools}` : ""}`;
+  const qualityDetails = `${keptSignals ? `; keptSignals=${keptSignals}` : ""}${droppedNoise ? `; droppedNoise=${droppedNoise}` : ""}${reasonCounts ? `; reasons=${reasonCounts}` : ""}${topDroppedTools ? `; topDroppedTools=${topDroppedTools}` : ""}`;
   return rawMessages || droppedToolResults || rawBytes || projectedBytes
     ? `; mode=${importModes || "unknown"}${importProfiles ? `; profile=${importProfiles}` : ""}; projected=${projectedMessages}/${rawMessages || projectedMessages} messages; droppedToolResults=${droppedToolResults}; keptToolErrors=${keptErrors}; estimatedChunks=${estimatedChunks}; bytes=${projectedBytes}/${rawBytes}${qualityDetails}${forensicWarning}`
     : "";
