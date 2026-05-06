@@ -6,6 +6,24 @@ import {
   observationScopeDiagnostics,
   safeConfig,
 } from "../extensions/diagnostics.js";
+import type { ImportManifestEntry } from "../extensions/import-manifest.js";
+
+function latestImport(overrides: Partial<ImportManifestEntry> = {}): ImportManifestEntry {
+  return {
+    documentId: "doc-1",
+    bankId: "bank",
+    sourceFile: "/tmp/session.jsonl",
+    importedAt: "2026-05-06T12:00:00.000Z",
+    contentHash: "sha256:abc",
+    messageCount: 3,
+    leafId: "leaf-1",
+    sessionId: "session-1",
+    cwd: "/repo",
+    includeBranches: "current-only",
+    updateMode: "append",
+    ...overrides,
+  };
+}
 
 describe("diagnostics", () => {
   it("explains automatic bank selection and override", () => {
@@ -246,5 +264,69 @@ describe("diagnostics", () => {
 
     expect(report.queue.deadLetterMalformedLines).toBe(1);
     expect(report.queue.action).toContain("Inspect queue files");
+  });
+
+  it("includes latest import quality context when manifest fields are present", () => {
+    const report = JSON.parse(
+      formatDebugReport({
+        cwd: process.cwd(),
+        projectBankId: "bank",
+        config: DEFAULT_CONFIG,
+        queueLength: 0,
+        latestImport: latestImport({
+          importMode: "curated",
+          toolResults: "summary",
+          importQualityProfile: "strict",
+          projectionVersion: "curated-turns-v1",
+          importProfile: "turns-12-bytes-80000",
+          chunkIndex: 0,
+          messageRange: { start: 4, end: 8 },
+          updateMode: "replace",
+        }),
+      }),
+    ) as Record<string, any>;
+
+    expect(report.imports.latest).toEqual({
+      documentId: "doc-1",
+      sourceFile: "/tmp/session.jsonl",
+      importedAt: "2026-05-06T12:00:00.000Z",
+      messageCount: 3,
+      leafId: "leaf-1",
+      sessionId: "session-1",
+      contentHash: "sha256:abc",
+      importMode: "curated",
+      toolResults: "summary",
+      importQualityProfile: "strict",
+      projectionVersion: "curated-turns-v1",
+      importProfile: "turns-12-bytes-80000",
+      chunkIndex: 0,
+      messageRange: { start: 4, end: 8 },
+      updateMode: "replace",
+    });
+  });
+
+  it("omits absent latest import quality fields", () => {
+    const importWithoutQualityContext = latestImport() as Partial<ImportManifestEntry>;
+    delete importWithoutQualityContext.updateMode;
+
+    const report = JSON.parse(
+      formatDebugReport({
+        cwd: process.cwd(),
+        projectBankId: "bank",
+        config: DEFAULT_CONFIG,
+        queueLength: 0,
+        latestImport: importWithoutQualityContext as ImportManifestEntry,
+      }),
+    ) as Record<string, any>;
+
+    expect(report.imports.latest).toEqual({
+      documentId: "doc-1",
+      sourceFile: "/tmp/session.jsonl",
+      importedAt: "2026-05-06T12:00:00.000Z",
+      messageCount: 3,
+      leafId: "leaf-1",
+      sessionId: "session-1",
+      contentHash: "sha256:abc",
+    });
   });
 });
