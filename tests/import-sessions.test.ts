@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { DEFAULT_CONFIG } from "../extensions/config.js";
+import type { RetainJob, UpdateMode } from "../extensions/types.js";
 import {
   discoverProjectSessionFiles,
   importPiSession,
@@ -12,7 +13,7 @@ import {
   selectImportBranches,
 } from "../extensions/import-sessions.js";
 import { readImportCheckpoint } from "../extensions/import-checkpoint.js";
-import { readImportManifest } from "../extensions/import-manifest.js";
+import { hashImportContent, readImportManifest } from "../extensions/import-manifest.js";
 import { enqueueRetainJob, readRetainQueue, resolveQueuePath } from "../extensions/queue.js";
 import { stableSessionId } from "../extensions/session.js";
 import { setNextSessionRetainMode } from "../extensions/session-memory-meta.js";
@@ -27,6 +28,68 @@ const equivalentPathVariants = [
   },
   { name: "resolved path", sessionCwd: (project: string) => resolve(project) },
 ];
+
+function projectSessionCheckpointPath(basePath: string, sessionFile: string): string {
+  return `${basePath}.${hashImportContent(sessionFile).slice(0, 12)}.json`;
+}
+
+function queuedImportRetainJob(args: {
+  id: string;
+  bankId?: string;
+  documentId: string;
+  updateMode?: UpdateMode;
+  content?: string;
+  context?: string;
+  sourceFile: string;
+  cwd: string;
+  sessionId: string;
+  leafId: string;
+  contentHash: string;
+  includeBranches?: "current-only" | "all-leaves";
+  importMode?: "curated" | "raw" | "forensic";
+  toolResults?: "errors-only" | "summary" | "content";
+  importQualityProfile?: "compatible" | "strict" | undefined;
+  projectionVersion?: string | undefined;
+  importProfile?: string | undefined;
+  chunkIndex?: number | undefined;
+  messageRange?: { start: number; end: number } | undefined;
+}): RetainJob {
+  return {
+    id: args.id,
+    bankId: args.bankId ?? "bank",
+    createdAt: "now",
+    documentId: args.documentId,
+    updateMode: args.updateMode ?? "replace",
+    item: {
+      content: args.content ?? "queued import content",
+      context: args.context ?? "queued import context",
+      metadata: {
+        source: "pi-hindsight",
+        retainSource: "import",
+        pi_session_file: args.sourceFile,
+        imported: "true",
+        cwd: args.cwd,
+        session_id: args.sessionId,
+        branch_leaf_id: args.leafId,
+        import_mode: args.importMode ?? "curated",
+        ...(args.importQualityProfile ? { import_quality_profile: args.importQualityProfile } : {}),
+        ...(args.projectionVersion ? { projection_version: args.projectionVersion } : {}),
+        ...(args.importProfile ? { import_profile: args.importProfile } : {}),
+        ...(args.chunkIndex !== undefined ? { chunk_index: String(args.chunkIndex) } : {}),
+        ...(args.messageRange
+          ? {
+              message_range_start: String(args.messageRange.start),
+              message_range_end: String(args.messageRange.end),
+            }
+          : {}),
+        content_hash: args.contentHash,
+        include_branches: args.includeBranches ?? "current-only",
+        tool_results: args.toolResults ?? "errors-only",
+      },
+    },
+    retries: 0,
+  };
+}
 
 describe("Pi session import", () => {
   it("parses message entries from Pi JSONL", () => {
@@ -298,6 +361,203 @@ describe("Pi session import", () => {
     expect(manifest.imports[documentId]).toMatchObject({
       toolResults: "summary",
       importQualityProfile: "strict",
+    });
+  });
+
+  it("keeps retained content, manifest, and checkpoint provenance aligned for strict single-session imports", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-provenance-"));
+    mkdirSync(join(dir, ".git"));
+    const sessionFile = join(dir, "session.jsonl");
+    writeFileSync(
+      sessionFile,
+      [
+        JSON.stringify({
+          type: "session",
+          id: "session-provenance",
+          cwd: `${dir}${sep}.${sep}`,
+        }),
+        JSON.stringify({
+          type: "message",
+          id: "u-original",
+          parentId: null,
+          timestamp: "2026-01-01T00:00:00.000Z",
+          message: {
+            role: "user",
+            id: "spoof-user",
+            parentId: "spoof-parent",
+            timestamp: "spoof-time",
+            content: "remember provenance",
+          },
+        }),
+        JSON.stringify({
+          type: "message",
+          id: "a-original",
+          parentId: "u-original",
+          timestamp: "2026-01-01T00:01:00.000Z",
+          message: {
+            role: "assistant",
+            id: "spoof-assistant",
+            parentId: "spoof-parent",
+            timestamp: "spoof-time",
+            content: "kept answer",
+          },
+        }),
+      ].join("\n"),
+    );
+    const calls: unknown[][] = [];
+    const config = {
+      ...DEFAULT_CONFIG,
+      import: {
+        ...DEFAULT_CONFIG.import,
+        qualityProfile: "strict" as const,
+        toolResults: "summary" as const,
+      },
+    };
+
+    const result = await importPiSession({
+      sessionFile,
+      bankId: "bank",
+      config,
+      client: {
+        retain: async (...args: unknown[]) => {
+          calls.push(args);
+        },
+        recall: async () => [],
+        reflect: async () => ({}),
+      },
+    });
+
+    const documentId =
+      "pi-import:session-provenance:leaf:a-original:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-1";
+    expect(result.documentId).toBe(documentId);
+    expect(calls).toHaveLength(1);
+    const retainedContent = JSON.parse(calls[0]?.[1] as string) as {
+      cwd: string;
+      sessionFile: string;
+      sessionId: string;
+      branchLeafId: string;
+      projection: string;
+      importQualityProfile: string;
+      chunkIndex: number;
+      messageRange: { start: number; end: number };
+      messages: Array<Record<string, unknown>>;
+    };
+    expect(retainedContent).toMatchObject({
+      source: "pi-session-import",
+      sessionFile,
+      cwd: dir,
+      sessionId: "session-provenance",
+      branchLeafId: "a-original",
+      projection: "curated-turns-v1",
+      importQualityProfile: "strict",
+      chunkIndex: 0,
+      messageRange: { start: 0, end: 1 },
+    });
+    expect(retainedContent.messages).toEqual([
+      expect.objectContaining({
+        id: "u-original",
+        parentId: null,
+        role: "user",
+        timestamp: "2026-01-01T00:00:00.000Z",
+      }),
+      expect.objectContaining({
+        id: "a-original",
+        parentId: "u-original",
+        role: "assistant",
+        timestamp: "2026-01-01T00:01:00.000Z",
+      }),
+    ]);
+    expect(retainedContent.messages).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "spoof-user" }),
+        expect.objectContaining({ parentId: "spoof-parent" }),
+      ]),
+    );
+    const retainedOptions = calls[0]?.[2] as {
+      documentId: string;
+      updateMode: string;
+      tags: string[];
+      metadata: Record<string, string>;
+    };
+    expect(retainedOptions).toMatchObject({
+      documentId,
+      updateMode: "replace",
+      tags: expect.arrayContaining([
+        "source:pi",
+        "import:historical",
+        "imported:true",
+        "session:session-provenance",
+        "branch:a-original",
+        `document:${documentId}`,
+        expect.stringMatching(/^repo:/),
+      ]),
+      metadata: expect.objectContaining({
+        source: "pi-hindsight",
+        retainSource: "import",
+        pi_session_file: sessionFile,
+        imported: "true",
+        cwd: dir,
+        session_id: "session-provenance",
+        branch_leaf_id: "a-original",
+        import_mode: "curated",
+        import_quality_profile: "strict",
+        projection_version: "curated-turns-v1",
+        import_profile: "turns-12-bytes-80000",
+        chunk_index: "0",
+        message_range_start: "0",
+        message_range_end: "1",
+        include_branches: "current-only",
+        tool_results: "summary",
+        content_hash: result.documents[0]?.contentHash,
+      }),
+    });
+
+    const manifest = await readImportManifest(result.manifestPath);
+    const checkpoint = await readImportCheckpoint(result.checkpointPath);
+    expect(manifest.imports[documentId]).toMatchObject({
+      documentId,
+      bankId: "bank",
+      sourceFile: sessionFile,
+      contentHash: result.documents[0]?.contentHash,
+      messageCount: 2,
+      leafId: "a-original",
+      sessionId: "session-provenance",
+      cwd: dir,
+      includeBranches: "current-only",
+      importMode: "curated",
+      toolResults: "summary",
+      importQualityProfile: "strict",
+      projectionVersion: "curated-turns-v1",
+      importProfile: "turns-12-bytes-80000",
+      chunkIndex: 0,
+      messageRange: { start: 0, end: 1 },
+      updateMode: "replace",
+    });
+    expect(checkpoint).toMatchObject({
+      runId: result.runId,
+      sourceFile: sessionFile,
+      bankId: "bank",
+      sessionId: "session-provenance",
+      cwd: dir,
+      includeBranches: "current-only",
+      importMode: "curated",
+      toolResults: "summary",
+      importQualityProfile: "strict",
+      updateMode: "replace",
+    });
+    expect(checkpoint?.documents[documentId]).toMatchObject({
+      documentId,
+      leafId: "a-original",
+      contentHash: result.documents[0]?.contentHash,
+      messageCount: 2,
+      importMode: "curated",
+      toolResults: "summary",
+      importQualityProfile: "strict",
+      projectionVersion: "curated-turns-v1",
+      importProfile: "turns-12-bytes-80000",
+      chunkIndex: 0,
+      messageRange: { start: 0, end: 1 },
+      status: "completed",
     });
   });
 
@@ -1062,19 +1322,46 @@ describe("Pi session import", () => {
       }),
     ).rejects.toThrow(/queued/);
 
+    const documentA =
+      "pi-import:session-resume:leaf:a:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-1";
+    const documentB =
+      "pi-import:session-resume:leaf:b:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-1";
     const checkpoint = await readImportCheckpoint(
       join(dir, ".pi/hindsight/import-checkpoint.json"),
     );
-    expect(
-      checkpoint?.documents[
-        "pi-import:session-resume:leaf:a:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-1"
-      ]?.status,
-    ).toBe("completed");
-    expect(
-      checkpoint?.documents[
-        "pi-import:session-resume:leaf:b:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-1"
-      ]?.status,
-    ).toBe("queued");
+    expect(checkpoint?.documents[documentA]?.status).toBe("completed");
+    expect(checkpoint?.documents[documentB]?.status).toBe("queued");
+    const interruptedManifest = await readImportManifest(
+      join(dir, ".pi/hindsight/import-manifest.json"),
+    );
+    expect(interruptedManifest.imports[documentA]).toMatchObject({
+      documentId: documentA,
+      leafId: "a",
+      contentHash: checkpoint?.documents[documentA]?.contentHash,
+    });
+    const documentAImportedAt = interruptedManifest.imports[documentA]?.importedAt;
+    expect(documentAImportedAt).toEqual(expect.any(String));
+
+    const queuePath = resolveQueuePath(dir, DEFAULT_CONFIG.retain.queuePath);
+    const documentACheckpoint = checkpoint?.documents[documentA];
+    expect(documentACheckpoint).toMatchObject({ contentHash: expect.any(String) });
+    await enqueueRetainJob(
+      queuePath,
+      queuedImportRetainJob({
+        id: "stale-completed-doc",
+        documentId: documentA,
+        sourceFile: sessionFile,
+        cwd: dir,
+        sessionId: "session-resume",
+        leafId: "a",
+        contentHash: documentACheckpoint?.contentHash ?? "",
+        includeBranches: "all-leaves",
+        projectionVersion: documentACheckpoint?.projectionVersion,
+        importProfile: documentACheckpoint?.importProfile,
+        chunkIndex: documentACheckpoint?.chunkIndex,
+        messageRange: documentACheckpoint?.messageRange,
+      }),
+    );
 
     const secondCalls: unknown[][] = [];
     const result = await importPiSession({
@@ -1093,30 +1380,93 @@ describe("Pi session import", () => {
 
     expect(secondCalls).toHaveLength(1);
     const retainedOptions = secondCalls[0]?.[2] as { documentId: string };
-    expect(retainedOptions.documentId).toBe(
-      "pi-import:session-resume:leaf:b:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-1",
-    );
+    expect(retainedOptions.documentId).toBe(documentB);
     expect(result.documents.map((document) => [document.leafId, document.status])).toEqual([
       ["a", "skipped"],
       ["b", "completed"],
     ]);
     const resumedCheckpoint = await readImportCheckpoint(result.checkpointPath);
-    expect(
-      resumedCheckpoint?.documents[
-        "pi-import:session-resume:leaf:a:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-1"
-      ]?.status,
-    ).toBe("completed");
-    expect(
-      resumedCheckpoint?.documents[
-        "pi-import:session-resume:leaf:b:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-1"
-      ]?.status,
-    ).toBe("completed");
+    expect(resumedCheckpoint?.documents[documentA]?.status).toBe("completed");
+    expect(resumedCheckpoint?.documents[documentB]?.status).toBe("completed");
     const manifest = await readImportManifest(result.manifestPath);
-    expect(Object.keys(manifest.imports).sort()).toEqual([
-      "pi-import:session-resume:leaf:a:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-1",
-      "pi-import:session-resume:leaf:b:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-1",
-    ]);
+    expect(Object.keys(manifest.imports).sort()).toEqual([documentA, documentB]);
+    expect(manifest.imports[documentA]?.importedAt).toBe(documentAImportedAt);
+    await expect(readRetainQueue(queuePath)).resolves.toEqual([]);
   }, 15_000);
+
+  it("keeps non-import queued retains that share a completed import document id", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-skip-cleanup-"));
+    mkdirSync(join(dir, ".git"));
+    const sessionFile = join(dir, "session.jsonl");
+    writeFileSync(
+      sessionFile,
+      [
+        JSON.stringify({ type: "session", id: "session-skip-cleanup", cwd: dir }),
+        JSON.stringify({
+          type: "message",
+          id: "root",
+          parentId: null,
+          message: { role: "user", content: "root" },
+        }),
+      ].join("\n"),
+    );
+    const documentId =
+      "pi-import:session-skip-cleanup:leaf:root:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-0";
+
+    const first = await importPiSession({
+      sessionFile,
+      bankId: "bank",
+      config: DEFAULT_CONFIG,
+      client: { retain: async () => undefined, recall: async () => [], reflect: async () => ({}) },
+    });
+    expect(first.documents[0]?.status).toBe("completed");
+    const checkpoint = await readImportCheckpoint(first.checkpointPath);
+    const checkpointDocument = checkpoint?.documents[documentId];
+    expect(checkpointDocument).toMatchObject({ contentHash: expect.any(String) });
+
+    const queuePath = resolveQueuePath(dir, DEFAULT_CONFIG.retain.queuePath);
+    await enqueueRetainJob(
+      queuePath,
+      queuedImportRetainJob({
+        id: "duplicate-completed-import",
+        documentId,
+        sourceFile: sessionFile,
+        cwd: dir,
+        sessionId: "session-skip-cleanup",
+        leafId: "root",
+        contentHash: checkpointDocument?.contentHash ?? "",
+        projectionVersion: checkpointDocument?.projectionVersion,
+        importProfile: checkpointDocument?.importProfile,
+        chunkIndex: checkpointDocument?.chunkIndex,
+        messageRange: checkpointDocument?.messageRange,
+      }),
+    );
+    await enqueueRetainJob(queuePath, {
+      id: "explicit-same-document-id",
+      bankId: "bank",
+      createdAt: "now",
+      documentId,
+      updateMode: "replace",
+      item: {
+        content: "explicit content must stay queued",
+        context: "explicit context must stay queued",
+        metadata: { source: "pi-hindsight", retainSource: "tool" },
+      },
+      retries: 0,
+    });
+
+    const second = await importPiSession({
+      sessionFile,
+      bankId: "bank",
+      config: DEFAULT_CONFIG,
+      client: { retain: async () => undefined, recall: async () => [], reflect: async () => ({}) },
+    });
+
+    expect(second.documents[0]?.status).toBe("skipped");
+    expect((await readRetainQueue(queuePath)).map((job) => job.id)).toEqual([
+      "explicit-same-document-id",
+    ]);
+  });
 
   it("starts a fresh checkpoint run when update mode changes", async () => {
     const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-"));
@@ -1168,6 +1518,258 @@ describe("Pi session import", () => {
     expect(calls).toHaveLength(1);
     expect(result.documents[0]).toMatchObject({ status: "completed", updateMode: "replace" });
     expect(result.runId).toContain(":replace:");
+  });
+
+  it("drops queued import jobs when update mode changes before retry", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-queued-mode-"));
+    mkdirSync(join(dir, ".git"));
+    const sessionFile = join(dir, "session.jsonl");
+    writeFileSync(
+      sessionFile,
+      [
+        JSON.stringify({ type: "session", id: "session-queued-mode", cwd: dir }),
+        JSON.stringify({
+          type: "message",
+          id: "root",
+          parentId: null,
+          message: { role: "user", content: "mode mismatch" },
+        }),
+      ].join("\n"),
+    );
+    const documentId =
+      "pi-import:session-queued-mode:leaf:root:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-0";
+    const queuePath = resolveQueuePath(dir, DEFAULT_CONFIG.retain.queuePath);
+
+    await expect(
+      importPiSession({
+        sessionFile,
+        bankId: "bank",
+        config: {
+          ...DEFAULT_CONFIG,
+          import: { ...DEFAULT_CONFIG.import, replaceExistingImportedDocs: false },
+        },
+        client: {
+          retain: async () => {
+            throw new Error("offline");
+          },
+          recall: async () => [],
+          reflect: async () => ({}),
+        },
+      }),
+    ).rejects.toThrow(/queued/);
+    expect(
+      (await readRetainQueue(queuePath)).map((job) => [job.documentId, job.updateMode]),
+    ).toEqual([[documentId, "append"]]);
+
+    const calls: unknown[][] = [];
+    const result = await importPiSession({
+      sessionFile,
+      bankId: "bank",
+      config: DEFAULT_CONFIG,
+      client: {
+        retain: async (...args: unknown[]) => {
+          calls.push(args);
+        },
+        recall: async () => [],
+        reflect: async () => ({}),
+      },
+    });
+
+    expect(calls).toHaveLength(1);
+    const retainedOptions = calls[0]?.[2] as { updateMode: string };
+    expect(retainedOptions.updateMode).toBe("replace");
+    expect(result.documents[0]).toMatchObject({
+      documentId,
+      updateMode: "replace",
+      status: "completed",
+    });
+    await expect(readRetainQueue(queuePath)).resolves.toEqual([]);
+  });
+
+  it("drops queued import jobs when content hash changes before retry", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-queued-content-"));
+    mkdirSync(join(dir, ".git"));
+    const sessionFile = join(dir, "session.jsonl");
+    const writeSession = (content: string) =>
+      writeFileSync(
+        sessionFile,
+        [
+          JSON.stringify({ type: "session", id: "session-queued-content", cwd: dir }),
+          JSON.stringify({
+            type: "message",
+            id: "root",
+            parentId: null,
+            message: { role: "user", content },
+          }),
+        ].join("\n"),
+      );
+    writeSession("old queued content");
+    const documentId =
+      "pi-import:session-queued-content:leaf:root:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-0";
+    const queuePath = resolveQueuePath(dir, DEFAULT_CONFIG.retain.queuePath);
+
+    await expect(
+      importPiSession({
+        sessionFile,
+        bankId: "bank",
+        config: DEFAULT_CONFIG,
+        client: {
+          retain: async () => {
+            throw new Error("offline");
+          },
+          recall: async () => [],
+          reflect: async () => ({}),
+        },
+      }),
+    ).rejects.toThrow(/queued/);
+    const oldQueue = await readRetainQueue(queuePath);
+    expect(oldQueue[0]?.item.content).toContain("old queued content");
+
+    writeSession("new retained content");
+    const calls: unknown[][] = [];
+    const result = await importPiSession({
+      sessionFile,
+      bankId: "bank",
+      config: DEFAULT_CONFIG,
+      client: {
+        retain: async (...args: unknown[]) => {
+          calls.push(args);
+        },
+        recall: async () => [],
+        reflect: async () => ({}),
+      },
+    });
+
+    expect(calls).toHaveLength(1);
+    const retainedContent = calls[0]?.[1] as string;
+    const retainedOptions = calls[0]?.[2] as { metadata: Record<string, string> };
+    expect(retainedContent).toContain("new retained content");
+    expect(retainedContent).not.toContain("old queued content");
+    expect(retainedOptions.metadata.content_hash).toBe(result.documents[0]?.contentHash);
+    expect(result.documents[0]).toMatchObject({ documentId, status: "completed" });
+    const manifest = await readImportManifest(result.manifestPath);
+    expect(manifest.imports[documentId]?.contentHash).toBe(result.documents[0]?.contentHash);
+    await expect(readRetainQueue(queuePath)).resolves.toEqual([]);
+  });
+
+  it("fails closed when stale queued import cleanup cannot quarantine malformed queue lines", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-stale-cleanup-"));
+    mkdirSync(join(dir, ".git"));
+    const sessionFile = join(dir, "session.jsonl");
+    writeFileSync(
+      sessionFile,
+      [
+        JSON.stringify({ type: "session", id: "session-stale-cleanup", cwd: dir }),
+        JSON.stringify({
+          type: "message",
+          id: "root",
+          parentId: null,
+          message: { role: "user", content: "NEW_CONTENT" },
+        }),
+      ].join("\n"),
+    );
+    const documentId =
+      "pi-import:session-stale-cleanup:leaf:root:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-0";
+    const queuePath = resolveQueuePath(dir, DEFAULT_CONFIG.retain.queuePath);
+    mkdirSync(join(dir, ".pi", "hindsight"), { recursive: true });
+    mkdirSync(`${queuePath}.malformed.jsonl`, { recursive: true });
+    writeFileSync(
+      queuePath,
+      `${JSON.stringify(
+        queuedImportRetainJob({
+          id: "stale-old-import",
+          documentId,
+          content: "OLD_CONTENT",
+          context: "OLD_CONTEXT",
+          sourceFile: sessionFile,
+          cwd: dir,
+          sessionId: "session-stale-cleanup",
+          leafId: "root",
+          contentHash: "old-content-hash",
+          projectionVersion: "curated-turns-v1",
+          importProfile: "turns-12-bytes-80000",
+          chunkIndex: 0,
+          messageRange: { start: 0, end: 0 },
+        }),
+      )}\n{not json\n`,
+    );
+    const calls: string[] = [];
+
+    await expect(
+      importPiSession({
+        sessionFile,
+        bankId: "bank",
+        config: DEFAULT_CONFIG,
+        client: {
+          retain: async (_bankId, content) => {
+            calls.push(content);
+          },
+          recall: async () => [],
+          reflect: async () => ({}),
+        },
+      }),
+    ).rejects.toThrow();
+
+    expect(calls).toEqual([]);
+    expect(readFileSync(queuePath, "utf8")).toContain("OLD_CONTENT");
+  });
+
+  it("starts a fresh checkpoint run when import mode changes", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-mode-change-"));
+    mkdirSync(join(dir, ".git"));
+    const sessionFile = join(dir, "session.jsonl");
+    writeFileSync(
+      sessionFile,
+      [
+        JSON.stringify({ type: "session", id: "session-import-mode-change", cwd: dir }),
+        JSON.stringify({
+          type: "message",
+          id: "root",
+          parentId: null,
+          message: { role: "user", content: "root" },
+        }),
+        JSON.stringify({
+          type: "message",
+          id: "leaf",
+          parentId: "root",
+          message: { role: "assistant", content: "leaf" },
+        }),
+      ].join("\n"),
+    );
+
+    await importPiSession({
+      sessionFile,
+      bankId: "bank",
+      config: DEFAULT_CONFIG,
+      client: { retain: async () => undefined, recall: async () => [], reflect: async () => ({}) },
+    });
+
+    const calls: unknown[][] = [];
+    const raw = await importPiSession({
+      sessionFile,
+      bankId: "bank",
+      config: { ...DEFAULT_CONFIG, import: { ...DEFAULT_CONFIG.import, mode: "raw" } },
+      client: {
+        retain: async (...args: unknown[]) => {
+          calls.push(args);
+        },
+        recall: async () => [],
+        reflect: async () => ({}),
+      },
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(raw.documents[0]).toMatchObject({
+      documentId: "pi-import:session-import-mode-change:leaf:leaf",
+      importMode: "raw",
+      status: "completed",
+    });
+    expect(raw.runId).toContain(":raw:replace:");
+    const checkpoint = await readImportCheckpoint(raw.checkpointPath);
+    expect(checkpoint).toMatchObject({ runId: raw.runId, importMode: "raw" });
+    expect(Object.keys(checkpoint?.documents ?? {})).toEqual([
+      "pi-import:session-import-mode-change:leaf:leaf",
+    ]);
   });
 
   it.each(equivalentPathVariants)(
@@ -1426,6 +2028,324 @@ describe("Pi session import", () => {
     ]);
     expect(result.imported[0]?.checkpointPath).not.toBe(result.imported[1]?.checkpointPath);
   });
+
+  it("keeps all-leaves project import provenance aligned across retained docs, manifest, and checkpoint", async () => {
+    const project = mkdtempSync(join(tmpdir(), "pi-hindsight-project-provenance-"));
+    const sessionsDir = mkdtempSync(join(tmpdir(), "pi-hindsight-sessions-provenance-"));
+    const sessionFile = join(sessionsDir, "project.jsonl");
+    writeFileSync(
+      sessionFile,
+      [
+        JSON.stringify({ type: "session", id: "project-all-leaves", cwd: project }),
+        JSON.stringify({
+          type: "message",
+          id: "root",
+          parentId: null,
+          message: { role: "user", content: "root" },
+        }),
+        JSON.stringify({
+          type: "message",
+          id: "leaf-a",
+          parentId: "root",
+          message: { role: "assistant", content: "leaf a" },
+        }),
+        JSON.stringify({
+          type: "message",
+          id: "leaf-b",
+          parentId: "root",
+          message: { role: "assistant", content: "leaf b" },
+        }),
+      ].join("\n"),
+    );
+    const calls: unknown[][] = [];
+    const config = {
+      ...DEFAULT_CONFIG,
+      import: {
+        ...DEFAULT_CONFIG.import,
+        includeBranches: "all-leaves" as const,
+        qualityProfile: "strict" as const,
+        toolResults: "summary" as const,
+      },
+    };
+
+    const result = await importProjectSessions({
+      cwd: project,
+      currentSessionFile: sessionFile,
+      bankId: "bank",
+      config,
+      client: {
+        retain: async (...args: unknown[]) => {
+          calls.push(args);
+        },
+        recall: async () => [],
+        reflect: async () => ({}),
+      },
+    });
+
+    expect(result.imported).toHaveLength(1);
+    expect(calls).toHaveLength(2);
+    const imported = result.imported[0];
+    expect(imported?.documents.map((document) => document.leafId)).toEqual(["leaf-a", "leaf-b"]);
+    const manifest = await readImportManifest(imported?.manifestPath ?? "");
+    const checkpoint = await readImportCheckpoint(imported?.checkpointPath ?? "");
+    expect(checkpoint).toMatchObject({
+      sourceFile: sessionFile,
+      bankId: "bank",
+      sessionId: "project-all-leaves",
+      cwd: project,
+      includeBranches: "all-leaves",
+      importMode: "curated",
+      toolResults: "summary",
+      importQualityProfile: "strict",
+    });
+
+    for (const [index, leafId] of ["leaf-a", "leaf-b"].entries()) {
+      const documentId = `pi-import:project-all-leaves:leaf:${leafId}:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-1`;
+      const document = imported?.documents[index];
+      const retainedContent = JSON.parse(calls[index]?.[1] as string) as {
+        cwd: string;
+        sessionFile: string;
+        sessionId: string;
+        branchLeafId: string;
+        messageRange: { start: number; end: number };
+        messages: Array<Record<string, unknown>>;
+      };
+      const retainedOptions = calls[index]?.[2] as {
+        documentId: string;
+        tags: string[];
+        metadata: Record<string, string>;
+      };
+
+      expect(retainedContent).toMatchObject({
+        sessionFile,
+        cwd: project,
+        sessionId: "project-all-leaves",
+        branchLeafId: leafId,
+        messageRange: { start: 0, end: 1 },
+      });
+      expect(retainedContent.messages).toEqual([
+        expect.objectContaining({ id: "root", parentId: null }),
+        expect.objectContaining({ id: leafId, parentId: "root" }),
+      ]);
+      expect(retainedOptions).toMatchObject({
+        documentId,
+        tags: expect.arrayContaining([
+          "source:pi",
+          "import:historical",
+          "imported:true",
+          "session:project-all-leaves",
+          `branch:${leafId}`,
+          "forked:true",
+          expect.stringMatching(/^repo:/),
+        ]),
+        metadata: expect.objectContaining({
+          pi_session_file: sessionFile,
+          cwd: project,
+          session_id: "project-all-leaves",
+          branch_leaf_id: leafId,
+          include_branches: "all-leaves",
+          import_mode: "curated",
+          import_quality_profile: "strict",
+          tool_results: "summary",
+          message_range_start: "0",
+          message_range_end: "1",
+          content_hash: document?.contentHash,
+        }),
+      });
+      expect(manifest.imports[documentId]).toMatchObject({
+        documentId,
+        bankId: "bank",
+        sourceFile: sessionFile,
+        contentHash: document?.contentHash,
+        messageCount: 2,
+        leafId,
+        sessionId: "project-all-leaves",
+        cwd: project,
+        includeBranches: "all-leaves",
+        importMode: "curated",
+        toolResults: "summary",
+        importQualityProfile: "strict",
+        messageRange: { start: 0, end: 1 },
+      });
+      expect(checkpoint?.documents[documentId]).toMatchObject({
+        documentId,
+        contentHash: document?.contentHash,
+        messageCount: 2,
+        leafId,
+        importMode: "curated",
+        toolResults: "summary",
+        importQualityProfile: "strict",
+        messageRange: { start: 0, end: 1 },
+        status: "completed",
+      });
+    }
+  });
+
+  it("retries repeated project imports across completed, queued, failed, and skipped docs without duplicate completed retain", async () => {
+    const project = mkdtempSync(join(tmpdir(), "pi-hindsight-project-retry-"));
+    const sessionsDir = mkdtempSync(join(tmpdir(), "pi-hindsight-sessions-retry-"));
+    const completeFile = join(sessionsDir, "01-complete.jsonl");
+    const queuedFile = join(sessionsDir, "02-queued.jsonl");
+    const failedFile = join(sessionsDir, "03-failed.jsonl");
+    const files = [
+      [completeFile, "project-complete", "complete"],
+      [queuedFile, "project-queued", "queued"],
+      [failedFile, "project-failed", "failed"],
+    ] as const;
+    for (const [file, sessionId, content] of files) {
+      writeFileSync(
+        file,
+        [
+          JSON.stringify({ type: "session", id: sessionId, cwd: project }),
+          JSON.stringify({
+            type: "message",
+            id: "root",
+            parentId: null,
+            message: { role: "user", content },
+          }),
+        ].join("\n"),
+      );
+    }
+    const completeDocument =
+      "pi-import:project-complete:leaf:root:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-0";
+    const queuedDocument =
+      "pi-import:project-queued:leaf:root:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-0";
+    const failedDocument =
+      "pi-import:project-failed:leaf:root:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-0";
+
+    const firstCalls: unknown[][] = [];
+    await expect(
+      importProjectSessions({
+        cwd: project,
+        currentSessionFile: completeFile,
+        bankId: "bank",
+        config: DEFAULT_CONFIG,
+        client: {
+          retain: async (...args: unknown[]) => {
+            firstCalls.push(args);
+            if (firstCalls.length === 2) throw new Error("offline queued");
+          },
+          recall: async () => [],
+          reflect: async () => ({}),
+        },
+      }),
+    ).rejects.toThrow(/queued/);
+    expect(firstCalls.map((call) => (call[2] as { documentId: string }).documentId)).toEqual([
+      completeDocument,
+      queuedDocument,
+    ]);
+
+    const completeCheckpointPath = join(
+      project,
+      projectSessionCheckpointPath(DEFAULT_CONFIG.import.checkpointPath, completeFile),
+    );
+    const queuedCheckpointPath = join(
+      project,
+      projectSessionCheckpointPath(DEFAULT_CONFIG.import.checkpointPath, queuedFile),
+    );
+    const failedCheckpointPath = join(
+      project,
+      projectSessionCheckpointPath(DEFAULT_CONFIG.import.checkpointPath, failedFile),
+    );
+    const completeCheckpoint = await readImportCheckpoint(completeCheckpointPath);
+    expect(completeCheckpoint?.documents[completeDocument]?.status).toBe("completed");
+    expect(
+      (await readImportCheckpoint(queuedCheckpointPath))?.documents[queuedDocument]?.status,
+    ).toBe("queued");
+
+    mkdirSync(join(project, ".pi", "hindsight"), { recursive: true });
+    writeFileSync(join(project, ".pi/hindsight/queue-blocker"), "block queue dir");
+    await expect(
+      importPiSession({
+        sessionFile: failedFile,
+        cwd: project,
+        bankId: "bank",
+        config: {
+          ...DEFAULT_CONFIG,
+          retain: {
+            ...DEFAULT_CONFIG.retain,
+            queuePath: ".pi/hindsight/queue-blocker/retain-queue.jsonl",
+          },
+          import: {
+            ...DEFAULT_CONFIG.import,
+            checkpointPath: projectSessionCheckpointPath(
+              DEFAULT_CONFIG.import.checkpointPath,
+              failedFile,
+            ),
+          },
+        },
+        client: {
+          retain: async () => undefined,
+          recall: async () => [],
+          reflect: async () => ({}),
+        },
+      }),
+    ).rejects.toThrow();
+    expect(
+      (await readImportCheckpoint(failedCheckpointPath))?.documents[failedDocument]?.status,
+    ).toBe("failed");
+
+    const queuePath = resolveQueuePath(project, DEFAULT_CONFIG.retain.queuePath);
+    const completeCheckpointDocument = completeCheckpoint?.documents[completeDocument];
+    expect(completeCheckpointDocument).toMatchObject({ contentHash: expect.any(String) });
+    await enqueueRetainJob(
+      queuePath,
+      queuedImportRetainJob({
+        id: "stale-project-completed-doc",
+        documentId: completeDocument,
+        sourceFile: completeFile,
+        cwd: project,
+        sessionId: "project-complete",
+        leafId: "root",
+        contentHash: completeCheckpointDocument?.contentHash ?? "",
+        projectionVersion: completeCheckpointDocument?.projectionVersion,
+        importProfile: completeCheckpointDocument?.importProfile,
+        chunkIndex: completeCheckpointDocument?.chunkIndex,
+        messageRange: completeCheckpointDocument?.messageRange,
+      }),
+    );
+
+    const secondCalls: unknown[][] = [];
+    const result = await importProjectSessions({
+      cwd: project,
+      currentSessionFile: completeFile,
+      bankId: "bank",
+      config: DEFAULT_CONFIG,
+      client: {
+        retain: async (...args: unknown[]) => {
+          secondCalls.push(args);
+        },
+        recall: async () => [],
+        reflect: async () => ({}),
+      },
+    });
+
+    expect(result.imported.map((item) => [item.sessionFile, item.documents[0]?.status])).toEqual([
+      [completeFile, "skipped"],
+      [queuedFile, "completed"],
+      [failedFile, "completed"],
+    ]);
+    expect(secondCalls.map((call) => (call[2] as { documentId: string }).documentId)).toEqual([
+      queuedDocument,
+      failedDocument,
+    ]);
+    expect(
+      (await readImportCheckpoint(completeCheckpointPath))?.documents[completeDocument]?.status,
+    ).toBe("completed");
+    expect(
+      (await readImportCheckpoint(queuedCheckpointPath))?.documents[queuedDocument]?.status,
+    ).toBe("completed");
+    expect(
+      (await readImportCheckpoint(failedCheckpointPath))?.documents[failedDocument]?.status,
+    ).toBe("completed");
+    const manifest = await readImportManifest(join(project, DEFAULT_CONFIG.import.manifestPath));
+    expect(Object.keys(manifest.imports).sort()).toEqual([
+      completeDocument,
+      failedDocument,
+      queuedDocument,
+    ]);
+    await expect(readRetainQueue(queuePath)).resolves.toEqual([]);
+  }, 15_000);
 
   it("dry-runs project session import without writing unrelated sessions", async () => {
     const project = mkdtempSync(join(tmpdir(), "pi-hindsight-project-"));

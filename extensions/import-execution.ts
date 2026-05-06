@@ -8,15 +8,18 @@ import {
   type ImportCheckpointDocument,
   type ImportDocumentStatus,
 } from "./import-checkpoint.js";
-import { upsertImportManifestEntries } from "./import-manifest.js";
+import { readImportManifestSafe, upsertImportManifestEntries } from "./import-manifest.js";
 import {
   type ImportDocumentPreview,
+  type ImportRetainResult,
   isImportRetainQueuedError,
   previewImportBranch,
   retainImportBranch,
 } from "./import-retain.js";
 import { redactError } from "./sanitize.js";
 import type { ImportPlan } from "./import-plan.js";
+import { removeQueuedRetains } from "./retain-queue.js";
+import { importRetainJobMatchesIdentity } from "./import-queue-identity.js";
 
 export interface ImportSessionDocumentResult extends ImportDocumentPreview {}
 
@@ -123,6 +126,31 @@ export async function executeImportPlan(args: {
         previous?.status === "completed" &&
         previous.contentHash === preview.document.contentHash;
       if (args.dryRun || canSkip) {
+        if (canSkip && previous)
+          await removeQueuedRetains(cwd, importConfig, (job) =>
+            importRetainJobMatchesIdentity(job, {
+              bankId,
+              documentId: preview.document.documentId,
+              updateMode,
+              sourceFile: sessionFile,
+              cwd,
+              sessionId,
+              leafId: previous.leafId,
+              includeBranches,
+              ...(previous.importMode ? { importMode: previous.importMode } : {}),
+              ...(previous.toolResults ? { toolResults: previous.toolResults } : {}),
+              ...(previous.importQualityProfile
+                ? { importQualityProfile: previous.importQualityProfile }
+                : {}),
+              ...(previous.projectionVersion
+                ? { projectionVersion: previous.projectionVersion }
+                : {}),
+              ...(previous.importProfile ? { importProfile: previous.importProfile } : {}),
+              ...(previous.chunkIndex !== undefined ? { chunkIndex: previous.chunkIndex } : {}),
+              ...(previous.messageRange ? { messageRange: previous.messageRange } : {}),
+              contentHash: previous.contentHash,
+            }),
+          );
         results.push({
           ...preview,
           document: {
@@ -142,6 +170,7 @@ export async function executeImportPlan(args: {
       });
       await writeImportCheckpoint(checkpointPath, checkpoint);
 
+      let completed: ImportRetainResult | undefined;
       try {
         const retained = await retainImportBranch({
           ...common,
@@ -157,10 +186,7 @@ export async function executeImportPlan(args: {
         });
         checkpoint.updatedAt = completedAt;
         await writeImportCheckpoint(checkpointPath, checkpoint);
-        results.push({
-          ...retained,
-          document: { ...retained.document, status: "completed" as const },
-        });
+        completed = retained;
       } catch (error) {
         const failedAt = new Date().toISOString();
         const message = redactError(error);
@@ -180,17 +206,23 @@ export async function executeImportPlan(args: {
         });
         throw error;
       }
+      if (!completed) throw new Error("Import retain completed without result.");
+      await upsertImportManifestEntries(manifestPath, [completed.manifestEntry]);
+      results.push({
+        ...completed,
+        document: { ...completed.document, status: "completed" as const },
+      });
     }
   }
 
-  const completedResults = results.filter(
-    (result) => result.document.status === "completed" || result.document.status === "skipped",
-  );
-  if (!args.dryRun && completedResults.length > 0) {
-    await upsertImportManifestEntries(
-      manifestPath,
-      completedResults.map((result) => result.manifestEntry),
-    );
+  const skippedResults = results.filter((result) => result.document.status === "skipped");
+  if (!args.dryRun && skippedResults.length > 0) {
+    const manifest = (await readImportManifestSafe(manifestPath)).manifest;
+    const missingSkippedEntries = skippedResults
+      .filter((result) => !manifest.imports[result.document.documentId])
+      .map((result) => result.manifestEntry);
+    if (missingSkippedEntries.length > 0)
+      await upsertImportManifestEntries(manifestPath, missingSkippedEntries);
   }
 
   const documents = results.map((result) => result.document);

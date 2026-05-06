@@ -81,10 +81,10 @@ export function parseImportSessionJsonl(text: string): ParsedSession {
       parentId: entry.parentId ?? null,
       ...(typeof entry.timestamp === "string" ? { timestamp: entry.timestamp } : {}),
       data: {
+        ...entry.message,
         ...(typeof entry.id === "string" ? { id: entry.id } : {}),
         parentId: entry.parentId ?? null,
         ...(typeof entry.timestamp === "string" ? { timestamp: entry.timestamp } : {}),
-        ...entry.message,
       },
     });
   }

@@ -72,6 +72,22 @@ export async function writeRetainQueue(path: string, jobs: RetainJob[]): Promise
   await retainQueueStore(path).replace(jobs);
 }
 
+export async function removeRetainQueueJobs(
+  path: string,
+  predicate: (job: RetainJob) => boolean,
+): Promise<number> {
+  return withQueueLock(path, async () => {
+    const parsed = await readRetainQueueTolerant(path);
+    const remaining = parsed.jobs.filter((job) => !predicate(job));
+    const removed = parsed.jobs.length - remaining.length;
+    if (removed > 0) {
+      await appendMalformedQueueLines(path, parsed.malformedLines);
+      await writeRetainQueue(path, remaining);
+    }
+    return removed;
+  });
+}
+
 async function appendDeadLetterJobs(path: string, jobs: RetainJob[]): Promise<number> {
   if (jobs.length === 0) return 0;
   const deadLetterPath = resolveDeadLetterQueuePath(path);

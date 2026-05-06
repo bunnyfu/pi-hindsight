@@ -474,6 +474,16 @@ describe("retain queue", () => {
     RETAIN_QUEUE_LOCK.retryMs = 1;
     try {
       await expect(enqueueRetainJob(path, job)).rejects.toThrow(/Timed out waiting/);
+      const secondResult = await Promise.race<unknown>([
+        enqueueRetainJob(path, { ...job, id: "2" }).then(
+          () => new Error("second waiter unexpectedly acquired lock"),
+          (error: unknown) => error,
+        ),
+        new Promise((resolve) =>
+          setTimeout(() => resolve(new Error("second waiter hung behind failed waiter")), 500),
+        ),
+      ]);
+      expect(String(secondResult)).toMatch(/Timed out waiting/);
       expect(existsSync(lockPath)).toBe(true);
       expect(await readRetainQueue(path)).toHaveLength(0);
     } finally {
