@@ -310,23 +310,39 @@ async function writeConfig(
   const next = deepMergeConfig(base, patch);
   await mkdir(dirname(path), { recursive: true });
   if (existsSync(path) && path.endsWith(".jsonc")) {
-    await writeJsoncConfig(path, patch, deletePaths);
+    await writeJsoncConfig(path, base, patch, deletePaths);
   } else {
     await writeFile(path, `${JSON.stringify(next, null, 2)}\n`, "utf8");
   }
   return { path, config: next };
 }
 
-function flattenPatch(
+function getPathValue(value: unknown, path: string[]): unknown {
+  let current = value;
+  for (const part of path) {
+    if (!isRecord(current)) return undefined;
+    current = current[part];
+  }
+  return current;
+}
+
+function flattenPatchForJsonc(
   value: unknown,
+  base: Record<string, unknown>,
   prefix: string[] = [],
 ): Array<{ path: string[]; value: unknown }> {
   if (!isRecord(value)) return [{ path: prefix, value }];
-  return Object.entries(value).flatMap(([key, child]) => flattenPatch(child, [...prefix, key]));
+  if (prefix.length > 0 && !isRecord(getPathValue(base, prefix))) {
+    return [{ path: prefix, value }];
+  }
+  return Object.entries(value).flatMap(([key, child]) =>
+    flattenPatchForJsonc(child, base, [...prefix, key]),
+  );
 }
 
 async function writeJsoncConfig(
   path: string,
+  base: Record<string, unknown>,
   patch: Record<string, unknown>,
   deletePaths: string[][],
 ): Promise<void> {
@@ -337,7 +353,7 @@ async function writeJsoncConfig(
       modify(text, pathParts, undefined, { formattingOptions: { insertSpaces: true, tabSize: 2 } }),
     );
   }
-  for (const item of flattenPatch(patch)) {
+  for (const item of flattenPatchForJsonc(patch, base)) {
     text = applyEdits(
       text,
       modify(text, item.path, item.value, {

@@ -225,6 +225,55 @@ describe("config writer", () => {
     });
   });
 
+  it("replaces scalar JSONC values with object patches without creating shadow config", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-jsonc-scalar-object-"));
+    const jsoncPath = join(cwd, ".pi", "hindsight.jsonc");
+    mkdirSync(join(cwd, ".pi"), { recursive: true });
+    writeFileSync(
+      jsoncPath,
+      `{
+  // keep scalar-to-object comment
+  "hindsight": { "apiKey": "old-secret", "baseUrl": "http://old" }
+}\n`,
+      "utf8",
+    );
+
+    const result = await writeProjectConfig(
+      cwd,
+      buildProjectConfigPatch({ apiKeyEnvVar: "HINDSIGHT_API_KEY" }),
+    );
+
+    expect(result.path).toBe(jsoncPath);
+    expect(existsSync(projectConfigPath(cwd))).toBe(false);
+    const text = readFileSync(jsoncPath, "utf8");
+    expect(text).toContain("// keep scalar-to-object comment");
+    expect(readProjectConfig(cwd)).toMatchObject({
+      hindsight: {
+        apiKey: { source: "env", name: "HINDSIGHT_API_KEY" },
+        baseUrl: "http://old",
+      },
+    });
+  });
+
+  it("replaces scalar global JSONC values with object patches", async () => {
+    const home = mkdtempSync(join(tmpdir(), "pi-hindsight-global-jsonc-scalar-object-"));
+    const jsoncPath = join(home, ".pi", "agent", "hindsight.jsonc");
+    mkdirSync(join(home, ".pi", "agent"), { recursive: true });
+    writeFileSync(jsoncPath, `{ "hindsight": { "apiKey": "old-secret" } }\n`, "utf8");
+
+    const result = await writeGlobalConfig(
+      buildProjectConfigPatch({ apiKeyEnvVar: "HINDSIGHT_API_KEY" }),
+      [],
+      home,
+    );
+
+    expect(result.path).toBe(jsoncPath);
+    expect(existsSync(globalConfigPath(home))).toBe(false);
+    expect(readGlobalConfig(home)).toMatchObject({
+      hindsight: { apiKey: { source: "env", name: "HINDSIGHT_API_KEY" } },
+    });
+  });
+
   it("deletes global config values when resetting global overrides", async () => {
     const home = mkdtempSync(join(tmpdir(), "pi-hindsight-global-reset-"));
     await writeGlobalConfig(buildProjectConfigPatch({ recallBudget: "high" }), [], home);
