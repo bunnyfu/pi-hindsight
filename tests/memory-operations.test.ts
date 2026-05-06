@@ -171,6 +171,10 @@ describe("memory operations", () => {
       async: true,
       entities: [{ text: "Alice", type: "person" }],
     });
+    const retainOptions = calls.find((call) => call.method === "retain")?.options as {
+      metadata?: Record<string, string>;
+    };
+    expect(retainOptions.metadata).not.toHaveProperty("pi_session_file");
     expect(calls.find((call) => call.method === "reflect")?.options).toMatchObject({
       responseSchema: { type: "object", properties: { answer: { type: "string" } } },
       factTypes: ["observation"],

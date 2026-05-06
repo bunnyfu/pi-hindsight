@@ -74,6 +74,73 @@ function tagGroupsSchema(description: string) {
   return Type.Optional(Type.Array(tagGroupSchema, { description }));
 }
 
+const retainEntitySchema = Type.Object({
+  text: Type.String({ description: "Entity text to associate with the retained content." }),
+  type: Type.Optional(Type.String({ description: "Optional entity type." })),
+});
+
+const retainUpdateModeSchema = Type.Union([Type.Literal("append"), Type.Literal("replace")], {
+  description: "Optional Hindsight update mode for this explicit retain call.",
+});
+
+function explicitRetainOptionParameters() {
+  return {
+    documentId: Type.Optional(
+      Type.String({
+        description:
+          "Optional Hindsight document ID. Defaults to the existing deterministic explicit retain document ID.",
+      }),
+    ),
+    timestamp: Type.Optional(
+      Type.String({
+        description:
+          "Optional Hindsight timestamp string, including ISO-ish strings or literal unset, passed through as provided.",
+      }),
+    ),
+    metadata: Type.Optional(
+      Type.Record(Type.String(), Type.String(), {
+        description:
+          "Optional caller metadata string map. Reserved provenance keys such as cwd, pi_session_file, source, and retainSource are set by pi-hindsight and cannot be overridden.",
+      }),
+    ),
+    updateMode: Type.Optional(retainUpdateModeSchema),
+    observationScopes: Type.Optional(
+      Type.Array(Type.Array(Type.String()), {
+        description:
+          "Optional Hindsight observation scopes as string groups. When provided, overrides configured default observation scopes for this retain call.",
+      }),
+    ),
+    async: Type.Optional(
+      Type.Boolean({
+        description:
+          "Optional Hindsight async extraction flag for this retain call. Defaults to configured retain.async.",
+      }),
+    ),
+  };
+}
+
+type ExplicitRetainOptionParams = {
+  documentId?: string;
+  timestamp?: string;
+  metadata?: Record<string, string>;
+  updateMode?: import("./types.js").UpdateMode;
+  observationScopes?: string[][];
+  async?: boolean;
+};
+
+function explicitRetainOptions(params: ExplicitRetainOptionParams) {
+  return {
+    ...(params.documentId !== undefined ? { documentId: params.documentId } : {}),
+    ...(params.timestamp !== undefined ? { timestamp: params.timestamp } : {}),
+    ...(params.metadata !== undefined ? { metadata: params.metadata } : {}),
+    ...(params.updateMode !== undefined ? { updateMode: params.updateMode } : {}),
+    ...(params.observationScopes !== undefined
+      ? { observationScopes: params.observationScopes }
+      : {}),
+    ...(params.async !== undefined ? { async: params.async } : {}),
+  };
+}
+
 function defineCatalogTool<TParams extends ToolDefinition["parameters"], TDetails = unknown>(
   tool: ToolDefinition<TParams, TDetails>,
 ): ToolOperation {
@@ -150,13 +217,11 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
         ),
         tags: Type.Optional(Type.Array(Type.String())),
         entities: Type.Optional(
-          Type.Array(
-            Type.Object({
-              text: Type.String(),
-              type: Type.Optional(Type.String()),
-            }),
-          ),
+          Type.Array(retainEntitySchema, {
+            description: "Optional Hindsight entities to associate with this retained content.",
+          }),
         ),
+        ...explicitRetainOptionParameters(),
       }),
       async execute(_id, params, signal, _onUpdate, ctx) {
         useCwd(ctx.cwd);
@@ -169,6 +234,7 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
           ...(params.bank ? { bank: params.bank } : {}),
           ...(params.tags ? { tags: params.tags } : {}),
           ...(params.entities ? { entities: params.entities } : {}),
+          ...explicitRetainOptions(params),
         });
         return retainToolResponse(result);
       },
@@ -183,13 +249,11 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
         context: Type.String({ description: "Why this memory is durable user context." }),
         tags: Type.Optional(Type.Array(Type.String())),
         entities: Type.Optional(
-          Type.Array(
-            Type.Object({
-              text: Type.String(),
-              type: Type.Optional(Type.String()),
-            }),
-          ),
+          Type.Array(retainEntitySchema, {
+            description: "Optional Hindsight entities to associate with this retained content.",
+          }),
         ),
+        ...explicitRetainOptionParameters(),
       }),
       async execute(_id, params, _signal, _onUpdate, ctx) {
         useCwd(ctx.cwd);
@@ -202,6 +266,7 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
           ...(sessionFile ? { sessionFile } : {}),
           ...(params.tags ? { tags: params.tags } : {}),
           ...(params.entities ? { entities: params.entities } : {}),
+          ...explicitRetainOptions(params),
         });
         return retainToolResponse(result);
       },

@@ -19,8 +19,20 @@ export interface RetainJobBuildArgs {
   async?: boolean;
 }
 
+function sanitizedMetadata(
+  metadata: Record<string, string> | undefined,
+  redact: boolean,
+): Record<string, string> | undefined {
+  if (!metadata) return undefined;
+  if (!redact) return metadata;
+  return Object.fromEntries(
+    Object.entries(metadata).map(([key, value]) => [key, redactSecrets(value)]),
+  );
+}
+
 export function buildRetainJob(args: RetainJobBuildArgs): RetainJob {
   const content = args.config.retain.redactSecrets ? redactSecrets(args.content) : args.content;
+  const metadata = sanitizedMetadata(args.metadata, args.config.retain.redactSecrets);
   const target = resolveRetainDocumentTarget({
     config: args.config,
     ...(args.capabilities ? { capabilities: args.capabilities } : {}),
@@ -42,7 +54,7 @@ export function buildRetainJob(args: RetainJobBuildArgs): RetainJob {
         ? { entities: [...args.config.retain.entities, ...(args.entities ?? [])] }
         : {}),
       tags: args.tags,
-      ...(args.metadata ? { metadata: args.metadata } : {}),
+      ...(metadata ? { metadata } : {}),
       ...(args.observationScopes?.length ? { observationScopes: args.observationScopes } : {}),
     },
     retries: 0,

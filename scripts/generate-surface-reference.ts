@@ -27,6 +27,8 @@ type JsonSchema = {
   items?: JsonSchema;
   anyOf?: JsonSchema[];
   enum?: unknown[];
+  const?: unknown;
+  patternProperties?: Record<string, JsonSchema>;
   additionalProperties?: JsonSchema | boolean;
 };
 
@@ -55,8 +57,10 @@ function table(headers: string[], rows: string[][]): string[] {
 function schemaType(schema: JsonSchema | undefined): string {
   if (!schema) return "unknown";
   if (schema.enum) return schema.enum.map(String).join(" | ");
+  if (schema.const !== undefined) return String(schema.const);
   if (schema.type === "array") return `array<${schemaType(schema.items)}>`;
-  if (schema.type === "object" && schema.additionalProperties) return "object/map";
+  if (schema.type === "object" && (schema.additionalProperties || schema.patternProperties))
+    return "object/map";
   if (schema.type) return schema.type;
   if (schema.anyOf?.length) return schema.anyOf.map(schemaType).join(" | ");
   return "unknown";

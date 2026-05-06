@@ -1,7 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../extensions/config.js";
 import { createOperationCatalog } from "../extensions/operation-catalog.js";
-import type { HindsightLikeClient } from "../extensions/types.js";
+import type { HindsightLikeClient, ResolvedConfig } from "../extensions/types.js";
+
+type RetainOptions = Parameters<HindsightLikeClient["retain"]>[2];
+
+type JsonSchema = {
+  type?: string;
+  properties?: Record<string, JsonSchema>;
+  patternProperties?: Record<string, JsonSchema>;
+  items?: JsonSchema;
+  anyOf?: JsonSchema[];
+  const?: unknown;
+};
 
 function client(): HindsightLikeClient {
   return {
@@ -20,7 +34,200 @@ function client(): HindsightLikeClient {
   };
 }
 
+function retainMock() {
+  return vi.fn(async (_bankId: string, _content: string, _options?: RetainOptions) => undefined);
+}
+
+function requireTool(catalog: ReturnType<typeof createOperationCatalog>, name: string) {
+  const tool = catalog.tools.find((candidate) => candidate.name === name);
+  if (!tool) throw new Error(`Missing ${name} tool`);
+  return tool;
+}
+
 describe("operation catalog", () => {
+  it("exposes and maps advanced explicit retain options on the project retain tool", async () => {
+    const retain = retainMock();
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-catalog-"));
+    const sessionFile = join(cwd, "session.jsonl");
+    const catalog = createOperationCatalog({
+      getClient: () => ({ ...client(), retain }),
+      getConfig: () => DEFAULT_CONFIG,
+      getProjectBankId: () => "project-bank",
+    });
+    const tool = requireTool(catalog, "hindsight_retain");
+    const properties = (tool.parameters as JsonSchema).properties ?? {};
+
+    expect(properties.documentId?.type).toBe("string");
+    expect(properties.timestamp?.type).toBe("string");
+    expect(properties.metadata?.patternProperties?.["^.*$"]?.type).toBe("string");
+    expect(properties.updateMode?.anyOf?.map((schema) => schema.const)).toEqual([
+      "append",
+      "replace",
+    ]);
+    expect(properties.observationScopes?.items?.items?.type).toBe("string");
+    expect(properties.async?.type).toBe("boolean");
+
+    await tool.execute(
+      "call",
+      {
+        content: "Remember exact decision",
+        context: "unit test retain tool",
+        bank: "target-bank",
+        tags: ["decision:test"],
+        entities: [{ text: "Alice", type: "person" }],
+        documentId: "manual-doc",
+        timestamp: "unset",
+        metadata: {
+          cwd: "wrong-cwd",
+          pi_session_file: "wrong-session",
+          source: "wrong-source",
+          retainSource: "wrong-retain-source",
+          caller: "kept",
+        },
+        updateMode: "append",
+        observationScopes: [["repo:manual"], ["bank:manual"]],
+        async: false,
+      },
+      new AbortController().signal,
+      () => undefined,
+      { cwd, sessionManager: { getSessionFile: () => sessionFile } } as never,
+    );
+
+    expect(retain).toHaveBeenCalledWith(
+      "target-bank",
+      "Remember exact decision",
+      expect.objectContaining({
+        context: "unit test retain tool",
+        documentId: "manual-doc",
+        timestamp: "unset",
+        metadata: {
+          cwd,
+          pi_session_file: sessionFile,
+          source: "pi-hindsight",
+          retainSource: "tool",
+          caller: "kept",
+        },
+        updateMode: "append",
+        observationScopes: [["repo:manual"], ["bank:manual"]],
+        async: false,
+        entities: [{ text: "Alice", type: "person" }],
+      }),
+    );
+
+    retain.mockClear();
+    await tool.execute(
+      "call",
+      {
+        content: "Append using deterministic explicit document ID",
+        context: "unit test append default document ID",
+        updateMode: "append",
+      },
+      new AbortController().signal,
+      () => undefined,
+      { cwd, sessionManager: { getSessionFile: () => sessionFile } } as never,
+    );
+
+    expect(retain).toHaveBeenCalledWith(
+      "project-bank",
+      "Append using deterministic explicit document ID",
+      expect.objectContaining({
+        context: "unit test append default document ID",
+        documentId: expect.stringMatching(/^pi-explicit:/),
+        updateMode: "append",
+      }),
+    );
+  });
+
+  it("keeps simple retain defaults unchanged when advanced tool options are omitted", async () => {
+    const retain = retainMock();
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-catalog-"));
+    const sessionFile = join(cwd, "session.jsonl");
+    const catalog = createOperationCatalog({
+      getClient: () => ({ ...client(), retain }),
+      getConfig: () => DEFAULT_CONFIG,
+      getProjectBankId: () => "project-bank",
+    });
+    const tool = requireTool(catalog, "hindsight_retain");
+
+    await tool.execute(
+      "call",
+      { content: "Remember simple default", context: "unit test retain defaults" },
+      new AbortController().signal,
+      () => undefined,
+      { cwd, sessionManager: { getSessionFile: () => sessionFile } } as never,
+    );
+
+    const options = retain.mock.calls[0]?.[2] as Record<string, unknown>;
+    expect(options).toMatchObject({
+      context: "unit test retain defaults",
+      updateMode: "replace",
+      async: true,
+      metadata: {
+        cwd,
+        pi_session_file: sessionFile,
+        source: "pi-hindsight",
+        retainSource: "tool",
+      },
+      observationScopes: [["harness:pi"], [expect.stringMatching(/^repo:/)]],
+    });
+    expect(options.documentId).toEqual(expect.stringMatching(/^pi-explicit:/));
+    expect(options.tags).toEqual(
+      expect.arrayContaining([
+        "source:pi",
+        expect.stringMatching(/^repo:/),
+        expect.stringMatching(/^session:/),
+      ]),
+    );
+  });
+
+  it("maps advanced explicit retain options on the global retain tool", async () => {
+    const retain = retainMock();
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-catalog-"));
+    const config: ResolvedConfig = {
+      ...DEFAULT_CONFIG,
+      banks: {
+        ...DEFAULT_CONFIG.banks,
+        user: { ...DEFAULT_CONFIG.banks.user, enabled: true, bankId: "global-bank" },
+      },
+    };
+    const catalog = createOperationCatalog({
+      getClient: () => ({ ...client(), retain }),
+      getConfig: () => config,
+      getProjectBankId: () => "project-bank",
+    });
+    const tool = requireTool(catalog, "hindsight_retain_global");
+
+    await tool.execute(
+      "call",
+      {
+        content: "Remember global preference",
+        context: "unit test global retain tool",
+        documentId: "global-doc",
+        timestamp: "2026-05-06T00:00:00Z",
+        metadata: { caller: "kept", source: "wrong-source", retainSource: "wrong-retain" },
+        updateMode: "append",
+        observationScopes: [["user:manual"]],
+        async: false,
+      },
+      new AbortController().signal,
+      () => undefined,
+      { cwd, sessionManager: {} } as never,
+    );
+
+    expect(retain).toHaveBeenCalledWith(
+      "global-bank",
+      "Remember global preference",
+      expect.objectContaining({
+        documentId: "global-doc",
+        timestamp: "2026-05-06T00:00:00Z",
+        metadata: { cwd, source: "pi-hindsight", retainSource: "tool", caller: "kept" },
+        updateMode: "append",
+        observationScopes: [["user:manual"]],
+        async: false,
+      }),
+    );
+  });
+
   it("passes nullable directive updates through the public tool surface", async () => {
     const updateDirective = vi.fn(async () => ({ id: "directive", content: "Updated" }));
     const catalog = createOperationCatalog({
