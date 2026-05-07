@@ -83,7 +83,7 @@ Pages:
 - Use `/hindsight` setup and status
 - Import historical Pi sessions
 - Import gateway transcripts
-- Export and import bank templates
+- Export bank templates; guided setup bank-template import
 - Inspect recalls and retain receipts
 - Recover from outages or failed queue jobs
 - Run local smoke tests
@@ -146,32 +146,33 @@ Pages should be hidden from primary navigation or clearly marked as internal whe
 
 ## Migration map
 
-| Current file                               | Target section                                                          | Action                                                                                                   |
-| ------------------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `README.md`                                | Start / Overview                                                        | Keep as repository landing page. Later mirror core overview into docs site.                              |
-| `docs/getting-started.md`                  | Start / Getting started                                                 | Keep. Refresh setup text when site navigation exists.                                                    |
-| `docs/configuration.md`                    | Reference / Configuration reference; Guides / Configure memory profiles | Split later: reference stays exact, guide becomes task-oriented.                                         |
-| `docs/memory-behavior.md`                  | Concepts / Memory model overview                                        | Keep and align with glossary.                                                                            |
-| `docs/hindsight-core-functions.md`         | Concepts / Retain, Recall, Reflect                                      | Keep as concept page; link to official Hindsight docs for authoritative API behavior.                    |
-| `docs/risky-memory-modes.md`               | Concepts / Session Memory Modes                                         | Keep; may merge with `docs/adr/003-tui-memory-mode-vocabulary.md` summary.                               |
-| `docs/importing-sessions.md`               | Guides / Import historical sessions and gateway transcripts             | Keep as task guide. Later split Pi sessions vs gateway transcripts if it grows.                          |
-| `docs/tools-and-commands.md`               | Reference / Tools and commands                                          | Keep hand-authored overview. Link to generated surface reference.                                        |
-| `docs/surface-reference.md`                | Reference / Generated surface reference                                 | Keep generated. Mark as generated and do not edit by hand.                                               |
-| `docs/core-vs-companion-adapters.md`       | Architecture / System architecture overview                             | Keep. Link from architecture section.                                                                    |
-| `docs/adr/*.md`                            | Architecture / ADR index                                                | Keep as authoritative decision records. Add index/navigation later.                                      |
-| `docs/development.md`                      | Development / Development setup and verification                        | Keep. Link this documentation architecture note.                                                         |
-| `docs/release.md`                          | Development / Release process                                           | Keep.                                                                                                    |
-| `docs/starter-mental-model-suggestions.md` | Concepts / Bank templates, mental models, directives                    | Keep as concept/reference seed material; clarify relationship to built-in templates if copied into site. |
-| `docs/next-opt-out-design.md`              | Internal and archive                                                    | Keep internal unless next opt-out becomes user-facing guide.                                             |
-| `docs/post-mvp-roadmap.md`                 | Internal and archive                                                    | Keep internal roadmap, not primary user navigation.                                                      |
-| `docs/pr-roadmap.md`                       | Internal and archive                                                    | Keep internal roadmap or archive after issues carry remaining work.                                      |
-| `docs/architecture-todos.md`               | Internal and archive                                                    | Convert actionable items to issues, then archive or remove.                                              |
-| `docs/agents/*.md`                         | Development / Agent guidance                                            | Keep as contributor/agent support docs.                                                                  |
-| `CONTEXT.md`                               | Development / Glossary and invariants                                   | Keep at repository root as shared vocabulary. Link from docs site.                                       |
-| `AGENTS.md`                                | Development / Agent guidance                                            | Keep at repository root. Link from docs site but do not duplicate all rules.                             |
-| `CONTRIBUTING.md`                          | Development / Contributing                                              | Keep at repository root. Link from docs site.                                                            |
-| `SECURITY.md`                              | Start / Security and support; Development / Security policy             | Keep at repository root and link from docs site.                                                         |
-| `CHANGELOG.md`                             | Reference / Changelog                                                   | Keep generated/release-owned. Do not hand-edit release entries.                                          |
+| Current file                                         | Target section                                                          | Action                                                                                                   |
+| ---------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `README.md`                                          | Start / Overview                                                        | Keep as repository landing page. Later mirror core overview into docs site.                              |
+| `docs/getting-started.md`                            | Start / Getting started                                                 | Keep. Refresh setup text when site navigation exists.                                                    |
+| `docs/configuration.md`                              | Reference / Configuration reference; Guides / Configure memory profiles | Split later: reference stays exact, guide becomes task-oriented.                                         |
+| `docs/memory-behavior.md`                            | Concepts / Memory model overview                                        | Keep and align with glossary.                                                                            |
+| `docs/hindsight-core-functions.md`                   | Concepts / Retain, Recall, Reflect                                      | Keep as concept page; link to official Hindsight docs for authoritative API behavior.                    |
+| `docs/risky-memory-modes.md`                         | Concepts / Session Memory Modes                                         | Keep; may merge with `docs/adr/003-tui-memory-mode-vocabulary.md` summary.                               |
+| `docs/importing-sessions.md`                         | Guides / Import historical sessions and gateway transcripts             | Keep as task guide. Later split Pi sessions vs gateway transcripts if it grows.                          |
+| `docs/tools-and-commands.md`                         | Reference / Tools and commands                                          | Keep hand-authored overview. Link to generated surface reference.                                        |
+| `docs-site/src/content/docs/development/code-map.md` | Development / Generated code map                                        | Generated site-only maintainer map. Keep generated by `scripts/generate-code-map.mjs`; do not hand-edit. |
+| `docs/surface-reference.md`                          | Reference / Generated surface reference                                 | Keep generated. Mark as generated and do not edit by hand.                                               |
+| `docs/core-vs-companion-adapters.md`                 | Architecture / System architecture overview                             | Keep. Link from architecture section.                                                                    |
+| `docs/adr/*.md`                                      | Architecture / ADR index                                                | Keep as authoritative decision records. Add index/navigation later.                                      |
+| `docs/development.md`                                | Development / Development setup and verification                        | Keep. Link this documentation architecture note.                                                         |
+| `docs/release.md`                                    | Development / Release process                                           | Keep.                                                                                                    |
+| `docs/starter-mental-model-suggestions.md`           | Concepts / Bank templates, mental models, directives                    | Keep as concept/reference seed material; clarify relationship to built-in templates if copied into site. |
+| `docs/next-opt-out-design.md`                        | Internal and archive                                                    | Keep internal unless next opt-out becomes user-facing guide.                                             |
+| `docs/post-mvp-roadmap.md`                           | Internal and archive                                                    | Keep internal roadmap, not primary user navigation.                                                      |
+| `docs/pr-roadmap.md`                                 | Internal and archive                                                    | Keep internal roadmap or archive after issues carry remaining work.                                      |
+| `docs/architecture-todos.md`                         | Internal and archive                                                    | Convert actionable items to issues, then archive or remove.                                              |
+| `docs/agents/*.md`                                   | Development / Agent guidance                                            | Keep as contributor/agent support docs.                                                                  |
+| `CONTEXT.md`                                         | Development / Glossary and invariants                                   | Keep at repository root as shared vocabulary. Link from docs site.                                       |
+| `AGENTS.md`                                          | Development / Agent guidance                                            | Keep at repository root. Link from docs site but do not duplicate all rules.                             |
+| `CONTRIBUTING.md`                                    | Development / Contributing                                              | Keep at repository root. Link from docs site.                                                            |
+| `SECURITY.md`                                        | Start / Security and support; Development / Security policy             | Keep at repository root and link from docs site.                                                         |
+| `CHANGELOG.md`                                       | Reference / Changelog                                                   | Keep generated/release-owned. Do not hand-edit release entries.                                          |
 
 ## Hand-authored versus generated
 
@@ -182,7 +183,8 @@ Hand-authored documentation:
 
 Generated documentation:
 
-- `docs/surface-reference.md` from `scripts/generate-surface-reference.ts`.
+- `docs/surface-reference.md` and the docs-site surface reference from `scripts/generate-surface-reference.ts`.
+- `docs-site/src/content/docs/development/code-map.md` from `scripts/generate-code-map.mjs`.
 - `CHANGELOG.md` from release/changelog automation.
 - Future generated API tables should remain clearly labeled and reproducible from scripts.
 
