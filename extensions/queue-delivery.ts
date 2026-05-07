@@ -39,11 +39,42 @@ export function retainOptionsForJob(job: RetainJob) {
     ...(job.item.entities?.length ? { entities: job.item.entities } : {}),
     ...(job.item.tags ? { tags: job.item.tags } : {}),
     ...(job.item.observationScopes ? { observationScopes: job.item.observationScopes } : {}),
+    ...(job.item.documentTags ? { documentTags: job.item.documentTags } : {}),
     documentId: job.documentId,
     updateMode: job.updateMode,
   };
 }
 
-export async function deliverRetainJob(client: HindsightLikeClient, job: RetainJob): Promise<void> {
-  await client.retain(job.bankId, job.item.content, retainOptionsForJob(job));
+export function operationIdsFromResponse(response: unknown): string[] {
+  if (!response || typeof response !== "object") return [];
+  const record = response as Record<string, unknown>;
+  const candidates = [record.operation_id, record.operationId, record.id];
+  const operationIds = candidates.filter(
+    (candidate): candidate is string => typeof candidate === "string" && candidate.length > 0,
+  );
+  const nested = record.operations;
+  if (Array.isArray(nested)) {
+    for (const item of nested) {
+      if (typeof item === "string") operationIds.push(item);
+      else if (item && typeof item === "object") {
+        const id =
+          (item as Record<string, unknown>).id ?? (item as Record<string, unknown>).operation_id;
+        if (typeof id === "string") operationIds.push(id);
+      }
+    }
+  }
+  const operationIdsArray = record.operation_ids ?? record.operationIds;
+  if (Array.isArray(operationIdsArray)) {
+    for (const item of operationIdsArray) {
+      if (typeof item === "string" && item.length > 0) operationIds.push(item);
+    }
+  }
+  return [...new Set(operationIds)];
+}
+
+export async function deliverRetainJob(
+  client: HindsightLikeClient,
+  job: RetainJob,
+): Promise<unknown> {
+  return client.retain(job.bankId, job.item.content, retainOptionsForJob(job));
 }

@@ -25,7 +25,7 @@ import {
   summarizeRetainQueue,
   writeRetainQueue,
 } from "../extensions/queue.js";
-import { retainOptionsForJob } from "../extensions/queue-delivery.js";
+import { operationIdsFromResponse, retainOptionsForJob } from "../extensions/queue-delivery.js";
 import type { RetainJob } from "../extensions/types.js";
 
 const job: RetainJob = {
@@ -111,6 +111,7 @@ describe("retain queue", () => {
           metadata: { source: "test" },
           entities: [{ text: "entity", type: "thing" }],
           observationScopes: [["repo:abc"]],
+          documentTags: ["doc:test"],
         },
       }),
     ).toMatchObject({
@@ -121,9 +122,23 @@ describe("retain queue", () => {
       entities: [{ text: "entity", type: "thing" }],
       tags: ["source:pi"],
       observationScopes: [["repo:abc"]],
+      documentTags: ["doc:test"],
       documentId: "doc",
       updateMode: "append",
     });
+  });
+
+  it("extracts async operation IDs from retain responses", () => {
+    expect(operationIdsFromResponse(undefined)).toEqual([]);
+    expect(operationIdsFromResponse({ operation_id: "op-1", operationId: "op-1" })).toEqual([
+      "op-1",
+    ]);
+    expect(
+      operationIdsFromResponse({
+        operations: ["op-2", { id: "op-3" }, { operation_id: "op-4" }],
+        operation_ids: ["op-5"],
+      }),
+    ).toEqual(["op-2", "op-3", "op-4", "op-5"]);
   });
 
   it("persists and flushes jobs", async () => {
@@ -134,11 +149,13 @@ describe("retain queue", () => {
     const result = await flushRetainQueue(path, {
       retain: async (...args: unknown[]) => {
         calls.push(args);
+        return { operation_id: "op-retain" };
       },
       recall: async () => [],
       reflect: async () => ({}),
     });
     expect(result.sent).toBe(1);
+    expect(result.operationIds).toEqual(["op-retain"]);
     expect(await readRetainQueue(path)).toHaveLength(0);
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject(["b", "raw", { async: true }]);

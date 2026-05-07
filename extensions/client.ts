@@ -8,16 +8,24 @@ import {
   bankTemplateExportPath,
   bankTemplateImportPath,
   bankTemplateSchemaPath,
+  chunkItemPath,
   createDirectiveRequestBody,
   createHindsightRestTransport,
   createMentalModelRequestBody,
   directiveItemPath,
   directivesCollectionPath,
   encodeBankPath,
+  memoriesCollectionPath,
+  memoryHistoryPath,
+  memoryItemPath,
+  memoryObservationsPath,
   mentalModelCollectionPath,
   mentalModelHistoryPath,
   mentalModelItemPath,
   mentalModelRefreshPath,
+  operationCancelPath,
+  operationRetryPath,
+  operationsCollectionPath,
   reflectRequestBody,
   updateBankConfigRequestBody,
   updateDirectiveRequestBody,
@@ -81,11 +89,11 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
         "hindsight retain",
         timeoutMs,
         (signal) =>
-          raw.retainBatch(
-            bankId,
-            [retainBatchItem(content, options)],
-            options?.async !== undefined ? { async: options.async, signal } : { signal },
-          ),
+          raw.retainBatch(bankId, [retainBatchItem(content, options)], {
+            ...(options?.async !== undefined ? { async: options.async } : {}),
+            ...(options?.documentTags ? { documentTags: options.documentTags } : {}),
+            signal,
+          }),
         options?.signal,
       ),
     retainBatch: (...args) =>
@@ -245,6 +253,38 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
     refreshMentalModel: (bankId, mentalModelId) =>
       withTimeout("hindsight refreshMentalModel", timeoutMs, (signal) =>
         rest.request(mentalModelRefreshPath(bankId, mentalModelId), { method: "POST", signal }),
+      ),
+    listOperations: (bankId, options) =>
+      withTimeout("hindsight listOperations", timeoutMs, (signal) =>
+        rest.request(operationsCollectionPath(bankId, options), { signal }),
+      ),
+    cancelOperation: (bankId, operationId) =>
+      withTimeout("hindsight cancelOperation", timeoutMs, (signal) =>
+        rest.request(operationCancelPath(bankId, operationId), { method: "DELETE", signal }),
+      ),
+    retryOperation: (bankId, operationId) =>
+      withTimeout("hindsight retryOperation", timeoutMs, (signal) =>
+        rest.request(operationRetryPath(bankId, operationId), { method: "POST", signal }),
+      ),
+    listMemories: (bankId, options) =>
+      withTimeout("hindsight listMemories", timeoutMs, (signal) =>
+        rest.request(memoriesCollectionPath(bankId, options), { signal }),
+      ),
+    getMemory: (bankId, memoryId) =>
+      withTimeout("hindsight getMemory", timeoutMs, (signal) =>
+        rest.request(memoryItemPath(bankId, memoryId), { signal }),
+      ),
+    getChunk: (chunkId) =>
+      withTimeout("hindsight getChunk", timeoutMs, (signal) =>
+        rest.request(chunkItemPath(chunkId), { signal }),
+      ),
+    getMemoryHistory: (bankId, memoryId) =>
+      withTimeout("hindsight getMemoryHistory", timeoutMs, (signal) =>
+        rest.request(memoryHistoryPath(bankId, memoryId), { signal }),
+      ),
+    deleteMemoryObservations: (bankId, memoryId) =>
+      withTimeout("hindsight deleteMemoryObservations", timeoutMs, (signal) =>
+        rest.request(memoryObservationsPath(bankId, memoryId), { method: "DELETE", signal }),
       ),
   };
 }

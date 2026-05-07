@@ -2,8 +2,10 @@ import type {
   CreateDirectiveRequest,
   CreateMentalModelRequest,
   GetMentalModelOptions,
+  ListMemoriesOptions,
   ListDirectivesOptions,
   ListMentalModelsOptions,
+  ListOperationsOptions,
   ResolvedConfig,
   UpdateDirectiveRequest,
   UpdateMentalModelRequest,
@@ -127,6 +129,55 @@ function appendQuery(path: string, params: URLSearchParams): string {
 
 export function encodeBankPath(bankId: string, suffix: string): string {
   return `/v1/default/banks/${encodeURIComponent(bankId)}${suffix}`;
+}
+
+export function chunkItemPath(chunkId: string): string {
+  return `/v1/default/chunks/${encodeURIComponent(chunkId)}`;
+}
+
+export function operationsCollectionPath(
+  bankId: string,
+  options: ListOperationsOptions = {},
+): string {
+  const params = new URLSearchParams();
+  if (options.status) params.set("status", options.status);
+  if (options.taskType) params.set("type", options.taskType);
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  if (options.offset !== undefined) params.set("offset", String(options.offset));
+  return appendQuery(encodeBankPath(bankId, "/operations"), params);
+}
+
+export function operationItemPath(bankId: string, operationId: string): string {
+  return `${encodeBankPath(bankId, "/operations")}/${encodeURIComponent(operationId)}`;
+}
+
+export function operationCancelPath(bankId: string, operationId: string): string {
+  return operationItemPath(bankId, operationId);
+}
+
+export function operationRetryPath(bankId: string, operationId: string): string {
+  return `${operationItemPath(bankId, operationId)}/retry`;
+}
+
+export function memoriesCollectionPath(bankId: string, options: ListMemoriesOptions = {}): string {
+  const params = new URLSearchParams();
+  if (options.type) params.set("type", options.type);
+  if (options.q) params.set("q", options.q);
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  if (options.offset !== undefined) params.set("offset", String(options.offset));
+  return appendQuery(encodeBankPath(bankId, "/memories/list"), params);
+}
+
+export function memoryItemPath(bankId: string, memoryId: string): string {
+  return `${encodeBankPath(bankId, "/memories")}/${encodeURIComponent(memoryId)}`;
+}
+
+export function memoryHistoryPath(bankId: string, memoryId: string): string {
+  return `${memoryItemPath(bankId, memoryId)}/history`;
+}
+
+export function memoryObservationsPath(bankId: string, memoryId: string): string {
+  return `${memoryItemPath(bankId, memoryId)}/observations`;
 }
 
 export function bankConfigPath(bankId: string): string {

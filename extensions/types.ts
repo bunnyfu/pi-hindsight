@@ -19,6 +19,8 @@ export type HindsightTagGroup =
   | TagGroupNotInput;
 export type MentalModelDetail = "metadata" | "content" | "full";
 export type MentalModelTagsMatch = "any" | "all" | "exact";
+export type OperationStatus = "pending" | "processing" | "completed" | "failed" | "cancelled";
+export type HindsightObservationScopes = "per_tag" | "combined" | "all_combinations" | string[][];
 export type StatusStyle = "off" | "text" | "emoji" | "nerdfont";
 export type StatusDetail = "minimal" | "project" | "activity" | "verbose";
 export type RecallRole = "user" | "assistant" | "tool" | "system";
@@ -181,7 +183,8 @@ export interface RetainJob {
     async?: boolean;
     tags?: string[];
     metadata?: Record<string, string>;
-    observationScopes?: string[][];
+    observationScopes?: HindsightObservationScopes;
+    documentTags?: string[];
     entities?: HindsightEntityInput[];
   };
   retries: number;
@@ -263,6 +266,20 @@ export interface GetMentalModelOptions {
   detail?: MentalModelDetail;
 }
 
+export interface ListOperationsOptions {
+  status?: OperationStatus;
+  taskType?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ListMemoriesOptions {
+  type?: string;
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
+
 export interface HindsightLikeClient {
   retain(
     bankId: string,
@@ -272,11 +289,12 @@ export interface HindsightLikeClient {
       context?: string;
       metadata?: Record<string, string>;
       documentId?: string;
+      documentTags?: string[];
       async?: boolean;
       entities?: HindsightEntityInput[];
       tags?: string[];
       updateMode?: UpdateMode;
-      observationScopes?: string[][];
+      observationScopes?: HindsightObservationScopes;
       signal?: AbortSignal;
     },
   ): Promise<unknown>;
@@ -290,7 +308,7 @@ export interface HindsightLikeClient {
       document_id?: string;
       entities?: Array<{ text: string; type?: string }>;
       tags?: string[];
-      observation_scopes?: string[][];
+      observation_scopes?: HindsightObservationScopes;
       update_mode?: UpdateMode;
     }>,
     options?: {
@@ -389,4 +407,12 @@ export interface HindsightLikeClient {
   deleteMentalModel?(bankId: string, mentalModelId: string): Promise<unknown>;
   getMentalModelHistory?(bankId: string, mentalModelId: string): Promise<unknown>;
   refreshMentalModel?(bankId: string, mentalModelId: string): Promise<unknown>;
+  listOperations?(bankId: string, options?: ListOperationsOptions): Promise<unknown>;
+  cancelOperation?(bankId: string, operationId: string): Promise<unknown>;
+  retryOperation?(bankId: string, operationId: string): Promise<unknown>;
+  listMemories?(bankId: string, options?: ListMemoriesOptions): Promise<unknown>;
+  getMemory?(bankId: string, memoryId: string): Promise<unknown>;
+  getChunk?(chunkId: string): Promise<unknown>;
+  getMemoryHistory?(bankId: string, memoryId: string): Promise<unknown>;
+  deleteMemoryObservations?(bankId: string, memoryId: string): Promise<unknown>;
 }

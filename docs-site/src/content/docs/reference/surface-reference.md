@@ -34,36 +34,38 @@ Recall raw memories from Hindsight for this project.
 
 Retain explicit raw content in Hindsight. Use for durable facts or decisions.
 
-| Parameter           | Type                 | Required | Description                                                                                                                                                            |
-| ------------------- | -------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `content`           | string               | yes      | Raw content to retain, not summary if source content is available.                                                                                                     |
-| `context`           | string               | yes      | Source context for this memory.                                                                                                                                        |
-| `bank`              | string               | no       | Optional bank id. Defaults to project bank.                                                                                                                            |
-| `tags`              | array<string>        | no       |                                                                                                                                                                        |
-| `entities`          | array<object>        | no       | Optional Hindsight entities to associate with this retained content.                                                                                                   |
-| `documentId`        | string               | no       | Optional Hindsight document ID. Defaults to the existing deterministic explicit retain document ID.                                                                    |
-| `timestamp`         | string               | no       | Optional Hindsight timestamp string, including ISO-ish strings or literal unset, passed through as provided.                                                           |
-| `metadata`          | object/map           | no       | Optional caller metadata string map. Reserved provenance keys such as cwd, pi_session_file, source, and retainSource are set by pi-hindsight and cannot be overridden. |
-| `updateMode`        | append \| replace    | no       | Optional Hindsight update mode for this explicit retain call.                                                                                                          |
-| `observationScopes` | array<array<string>> | no       | Optional Hindsight observation scopes as string groups. When provided, overrides configured default observation scopes for this retain call.                           |
-| `async`             | boolean              | no       | Optional Hindsight async extraction flag for this retain call. Defaults to configured retain.async.                                                                    |
+| Parameter           | Type                                                            | Required | Description                                                                                                                                                                                     |
+| ------------------- | --------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `content`           | string                                                          | yes      | Raw content to retain, not summary if source content is available.                                                                                                                              |
+| `context`           | string                                                          | yes      | Source context for this memory.                                                                                                                                                                 |
+| `bank`              | string                                                          | no       | Optional bank id. Defaults to project bank.                                                                                                                                                     |
+| `tags`              | array<string>                                                   | no       |                                                                                                                                                                                                 |
+| `entities`          | array<object>                                                   | no       | Optional Hindsight entities to associate with this retained content.                                                                                                                            |
+| `documentId`        | string                                                          | no       | Optional Hindsight document ID. Defaults to the existing deterministic explicit retain document ID.                                                                                             |
+| `timestamp`         | string                                                          | no       | Optional Hindsight timestamp string, including ISO-ish strings or literal unset, passed through as provided.                                                                                    |
+| `metadata`          | object/map                                                      | no       | Optional caller metadata string map. Reserved provenance keys such as cwd, pi_session_file, source, and retainSource are set by pi-hindsight and cannot be overridden.                          |
+| `updateMode`        | append \| replace                                               | no       | Optional Hindsight update mode for this explicit retain call.                                                                                                                                   |
+| `observationScopes` | per_tag \| combined \| all_combinations \| array<array<string>> | no       | Optional Hindsight observation scopes. Use per_tag, combined, all_combinations, or explicit string groups. When provided, overrides configured default observation scopes for this retain call. |
+| `documentTags`      | array<string>                                                   | no       | Optional Hindsight document_tags for this retained document when supported.                                                                                                                     |
+| `async`             | boolean                                                         | no       | Optional Hindsight async extraction flag for this retain call. Defaults to configured retain.async.                                                                                             |
 
 ### `hindsight_retain_global`
 
 Retain explicit durable user memory in the configured user bank. Use for stable user identity, preferences, and cross-project workflows only.
 
-| Parameter           | Type                 | Required | Description                                                                                                                                                            |
-| ------------------- | -------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `content`           | string               | yes      | Raw memory content to retain.                                                                                                                                          |
-| `context`           | string               | yes      | Why this memory is durable user context.                                                                                                                               |
-| `tags`              | array<string>        | no       |                                                                                                                                                                        |
-| `entities`          | array<object>        | no       | Optional Hindsight entities to associate with this retained content.                                                                                                   |
-| `documentId`        | string               | no       | Optional Hindsight document ID. Defaults to the existing deterministic explicit retain document ID.                                                                    |
-| `timestamp`         | string               | no       | Optional Hindsight timestamp string, including ISO-ish strings or literal unset, passed through as provided.                                                           |
-| `metadata`          | object/map           | no       | Optional caller metadata string map. Reserved provenance keys such as cwd, pi_session_file, source, and retainSource are set by pi-hindsight and cannot be overridden. |
-| `updateMode`        | append \| replace    | no       | Optional Hindsight update mode for this explicit retain call.                                                                                                          |
-| `observationScopes` | array<array<string>> | no       | Optional Hindsight observation scopes as string groups. When provided, overrides configured default observation scopes for this retain call.                           |
-| `async`             | boolean              | no       | Optional Hindsight async extraction flag for this retain call. Defaults to configured retain.async.                                                                    |
+| Parameter           | Type                                                            | Required | Description                                                                                                                                                                                     |
+| ------------------- | --------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `content`           | string                                                          | yes      | Raw memory content to retain.                                                                                                                                                                   |
+| `context`           | string                                                          | yes      | Why this memory is durable user context.                                                                                                                                                        |
+| `tags`              | array<string>                                                   | no       |                                                                                                                                                                                                 |
+| `entities`          | array<object>                                                   | no       | Optional Hindsight entities to associate with this retained content.                                                                                                                            |
+| `documentId`        | string                                                          | no       | Optional Hindsight document ID. Defaults to the existing deterministic explicit retain document ID.                                                                                             |
+| `timestamp`         | string                                                          | no       | Optional Hindsight timestamp string, including ISO-ish strings or literal unset, passed through as provided.                                                                                    |
+| `metadata`          | object/map                                                      | no       | Optional caller metadata string map. Reserved provenance keys such as cwd, pi_session_file, source, and retainSource are set by pi-hindsight and cannot be overridden.                          |
+| `updateMode`        | append \| replace                                               | no       | Optional Hindsight update mode for this explicit retain call.                                                                                                                                   |
+| `observationScopes` | per_tag \| combined \| all_combinations \| array<array<string>> | no       | Optional Hindsight observation scopes. Use per_tag, combined, all_combinations, or explicit string groups. When provided, overrides configured default observation scopes for this retain call. |
+| `documentTags`      | array<string>                                                   | no       | Optional Hindsight document_tags for this retained document when supported.                                                                                                                     |
+| `async`             | boolean                                                         | no       | Optional Hindsight async extraction flag for this retain call. Defaults to configured retain.async.                                                                                             |
 
 ### `hindsight_retain_receipts`
 
@@ -91,6 +93,85 @@ Delete a specific Hindsight document and all memories extracted from it. Destruc
 | `bank`       | string  | yes      | Bank ID containing the document.              |
 | `documentId` | string  | yes      | Exact Hindsight document ID to delete.        |
 | `confirm`    | boolean | yes      | Must be true to confirm destructive deletion. |
+
+### `hindsight_list_operations`
+
+List Hindsight async operations for a bank with supported server filters.
+
+| Parameter  | Type   | Required | Description                                 |
+| ---------- | ------ | -------- | ------------------------------------------- |
+| `bank`     | string | no       | Optional bank id. Defaults to project bank. |
+| `status`   | string | no       | Optional operation status filter.           |
+| `taskType` | string | no       | Optional task type filter.                  |
+| `limit`    | number | no       | Maximum operations to return.               |
+| `offset`   | number | no       | Pagination offset.                          |
+
+### `hindsight_cancel_operation`
+
+Cancel a pending Hindsight async operation. Requires confirm=true.
+
+| Parameter     | Type   | Required | Description                                             |
+| ------------- | ------ | -------- | ------------------------------------------------------- |
+| `operationId` | string | yes      | Hindsight operation ID.                                 |
+| `bank`        | string | no       | Optional bank id. Defaults to project bank.             |
+| `confirm`     | true   | yes      | Required destructive-action confirmation. Must be true. |
+
+### `hindsight_retry_operation`
+
+Retry a failed or cancelled Hindsight async operation.
+
+| Parameter     | Type   | Required | Description                                 |
+| ------------- | ------ | -------- | ------------------------------------------- |
+| `operationId` | string | yes      | Hindsight operation ID.                     |
+| `bank`        | string | no       | Optional bank id. Defaults to project bank. |
+
+### `hindsight_list_memories`
+
+List raw Hindsight memory units for inspection.
+
+| Parameter | Type   | Required | Description                                 |
+| --------- | ------ | -------- | ------------------------------------------- |
+| `bank`    | string | no       | Optional bank id. Defaults to project bank. |
+| `type`    | string | no       | Optional memory type filter.                |
+| `q`       | string | no       | Optional text query filter.                 |
+| `limit`   | number | no       | Maximum memories to return.                 |
+| `offset`  | number | no       | Pagination offset.                          |
+
+### `hindsight_get_memory`
+
+Fetch a raw Hindsight memory unit by ID.
+
+| Parameter  | Type   | Required | Description                                 |
+| ---------- | ------ | -------- | ------------------------------------------- |
+| `memoryId` | string | yes      | Hindsight memory ID.                        |
+| `bank`     | string | no       | Optional bank id. Defaults to project bank. |
+
+### `hindsight_get_chunk`
+
+Fetch a raw Hindsight source chunk by chunk ID.
+
+| Parameter | Type   | Required | Description         |
+| --------- | ------ | -------- | ------------------- |
+| `chunkId` | string | yes      | Hindsight chunk ID. |
+
+### `hindsight_get_memory_history`
+
+Fetch Hindsight memory history by memory ID when server supports it.
+
+| Parameter  | Type   | Required | Description                                 |
+| ---------- | ------ | -------- | ------------------------------------------- |
+| `memoryId` | string | yes      | Hindsight memory ID.                        |
+| `bank`     | string | no       | Optional bank id. Defaults to project bank. |
+
+### `hindsight_delete_memory_observations`
+
+Delete observations for one Hindsight memory. Destructive; requires exact memory ID and confirm=true.
+
+| Parameter  | Type   | Required | Description                                             |
+| ---------- | ------ | -------- | ------------------------------------------------------- |
+| `memoryId` | string | yes      | Hindsight memory ID.                                    |
+| `bank`     | string | no       | Optional bank id. Defaults to project bank.             |
+| `confirm`  | true   | yes      | Required destructive-action confirmation. Must be true. |
 
 ### `hindsight_configure`
 

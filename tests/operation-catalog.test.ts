@@ -34,6 +34,14 @@ function client(): HindsightLikeClient {
     updateDirective: async () => ({ id: "directive", name: "Rule", content: "Updated." }),
     deleteDirective: async () => ({ deleted: true }),
     exportBankTemplate: async () => ({ version: "1" }),
+    listOperations: async () => ({ items: [] }),
+    cancelOperation: async () => ({ status: "cancelled" }),
+    retryOperation: async () => ({ status: "pending" }),
+    listMemories: async () => ({ items: [] }),
+    getMemory: async () => ({ id: "memory" }),
+    getChunk: async () => ({ id: "chunk" }),
+    getMemoryHistory: async () => ({ items: [] }),
+    deleteMemoryObservations: async () => ({ deleted: true }),
   };
 }
 
@@ -67,7 +75,13 @@ describe("operation catalog", () => {
       "append",
       "replace",
     ]);
-    expect(properties.observationScopes?.items?.items?.type).toBe("string");
+    expect(properties.observationScopes?.anyOf?.some((entry) => entry.const === "per_tag")).toBe(
+      true,
+    );
+    expect(properties.observationScopes?.anyOf?.some((entry) => entry.const === "combined")).toBe(
+      true,
+    );
+    expect(properties.documentTags?.items?.type).toBe("string");
     expect(properties.async?.type).toBe("boolean");
 
     await tool.execute(
@@ -88,7 +102,8 @@ describe("operation catalog", () => {
           caller: "kept",
         },
         updateMode: "append",
-        observationScopes: [["repo:manual"], ["bank:manual"]],
+        observationScopes: "per_tag",
+        documentTags: ["doc:manual"],
         async: false,
       },
       new AbortController().signal,
@@ -111,7 +126,8 @@ describe("operation catalog", () => {
           caller: "kept",
         },
         updateMode: "append",
-        observationScopes: [["repo:manual"], ["bank:manual"]],
+        observationScopes: "per_tag",
+        documentTags: ["doc:manual"],
         async: false,
         entities: [{ text: "Alice", type: "person" }],
       }),
@@ -370,6 +386,134 @@ describe("operation catalog", () => {
       (requireTool(catalog, "hindsight_delete_directive").parameters as JsonSchema).properties
         ?.confirm?.const,
     ).toBe(true);
+    expect(
+      (requireTool(catalog, "hindsight_cancel_operation").parameters as JsonSchema).properties
+        ?.confirm?.const,
+    ).toBe(true);
+    expect(
+      (requireTool(catalog, "hindsight_delete_memory_observations").parameters as JsonSchema)
+        .properties?.confirm?.const,
+    ).toBe(true);
+  });
+
+  it("maps operation and memory inspection tools to client calls", async () => {
+    const calls: unknown[] = [];
+    const catalog = createOperationCatalog({
+      getClient: () => ({
+        ...client(),
+        listOperations: async (bank, options) => {
+          calls.push({ method: "listOperations", bank, options });
+          return { items: [{ id: "op-1", status: "failed", task_type: "retain" }] };
+        },
+        cancelOperation: async (bank, operationId) => {
+          calls.push({ method: "cancelOperation", bank, operationId });
+          return { id: operationId, status: "cancelled" };
+        },
+        retryOperation: async (bank, operationId) => {
+          calls.push({ method: "retryOperation", bank, operationId });
+          return { id: operationId, status: "pending" };
+        },
+        listMemories: async (bank, options) => {
+          calls.push({ method: "listMemories", bank, options });
+          return { items: [{ id: "mem-1", type: "observation" }] };
+        },
+        getMemory: async (bank, memoryId) => {
+          calls.push({ method: "getMemory", bank, memoryId });
+          return { id: memoryId };
+        },
+        getChunk: async (chunkId) => {
+          calls.push({ method: "getChunk", chunkId });
+          return { id: chunkId };
+        },
+        getMemoryHistory: async (bank, memoryId) => {
+          calls.push({ method: "getMemoryHistory", bank, memoryId });
+          return { items: [] };
+        },
+        deleteMemoryObservations: async (bank, memoryId) => {
+          calls.push({ method: "deleteMemoryObservations", bank, memoryId });
+          return { deleted: true };
+        },
+      }),
+      getConfig: () => DEFAULT_CONFIG,
+      getProjectBankId: () => "project-bank",
+    });
+    const ctx = { cwd: "/repo", sessionManager: {} } as never;
+
+    await requireTool(catalog, "hindsight_list_operations").execute(
+      "call",
+      { status: "failed", taskType: "retain", limit: 2, offset: 1 },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_cancel_operation").execute(
+      "call",
+      { operationId: "op-1", confirm: true },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_retry_operation").execute(
+      "call",
+      { operationId: "op-1" },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_list_memories").execute(
+      "call",
+      { type: "observation", q: "needle", limit: 3, offset: 0 },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_get_memory").execute(
+      "call",
+      { memoryId: "mem-1" },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_get_chunk").execute(
+      "call",
+      { chunkId: "chunk-1" },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_get_memory_history").execute(
+      "call",
+      { memoryId: "mem-1" },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_delete_memory_observations").execute(
+      "call",
+      { memoryId: "mem-1", confirm: true },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+
+    expect(calls).toEqual([
+      {
+        method: "listOperations",
+        bank: "project-bank",
+        options: { status: "failed", taskType: "retain", limit: 2, offset: 1 },
+      },
+      { method: "cancelOperation", bank: "project-bank", operationId: "op-1" },
+      { method: "retryOperation", bank: "project-bank", operationId: "op-1" },
+      {
+        method: "listMemories",
+        bank: "project-bank",
+        options: { type: "observation", q: "needle", limit: 3, offset: 0 },
+      },
+      { method: "getMemory", bank: "project-bank", memoryId: "mem-1" },
+      { method: "getChunk", chunkId: "chunk-1" },
+      { method: "getMemoryHistory", bank: "project-bank", memoryId: "mem-1" },
+      { method: "deleteMemoryObservations", bank: "project-bank", memoryId: "mem-1" },
+    ]);
   });
 
   it("passes nullable directive updates through the public tool surface", async () => {
@@ -409,6 +553,14 @@ describe("operation catalog", () => {
       "hindsight_retain_receipts",
       "hindsight_route_memory",
       "hindsight_delete_document",
+      "hindsight_list_operations",
+      "hindsight_cancel_operation",
+      "hindsight_retry_operation",
+      "hindsight_list_memories",
+      "hindsight_get_memory",
+      "hindsight_get_chunk",
+      "hindsight_get_memory_history",
+      "hindsight_delete_memory_observations",
       "hindsight_configure",
       "hindsight_get_bank_config",
       "hindsight_reset_bank_config",

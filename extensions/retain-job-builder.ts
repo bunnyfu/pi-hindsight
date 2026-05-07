@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import type { HindsightCapabilities, ResolvedConfig, RetainJob, UpdateMode } from "./types.js";
+import type {
+  HindsightCapabilities,
+  HindsightObservationScopes,
+  ResolvedConfig,
+  RetainJob,
+  UpdateMode,
+} from "./types.js";
 import { redactSecrets } from "./sanitize.js";
 import { resolveRetainDocumentTarget } from "./capabilities.js";
 
@@ -13,7 +19,8 @@ export interface RetainJobBuildArgs {
   updateMode: UpdateMode;
   metadata?: Record<string, string>;
   timestamp?: string;
-  observationScopes?: string[][];
+  observationScopes?: HindsightObservationScopes;
+  documentTags?: string[];
   entities?: RetainJob["item"]["entities"];
   capabilities?: HindsightCapabilities;
   async?: boolean;
@@ -58,6 +65,7 @@ export function buildRetainJob(args: RetainJobBuildArgs): RetainJob {
       tags: args.tags,
       ...(metadata ? { metadata } : {}),
       ...(args.observationScopes?.length ? { observationScopes: args.observationScopes } : {}),
+      ...(args.documentTags?.length ? { documentTags: args.documentTags } : {}),
     },
     retries: 0,
   };
