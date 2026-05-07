@@ -247,7 +247,7 @@ Before merging or considering a task done, always run:
 npm run check
 ```
 
-`npm run check` includes `npm run docs:check`, so the normal fast path builds the documentation site, validates internal documentation routes/sidebar entries, validates packaged Markdown links, enforces GitHub Pages base-prefixed docs links, and checks generated surface-reference docs. When iterating only on documentation-site content, run the narrower docs path first:
+`npm run check` includes `npm run docs:check`, which verifies generated surface-reference freshness, generated code-map freshness, internal docs links/sidebar routes, packaged Markdown links, GitHub Pages base-prefixed docs links, and docs-site build. When iterating only on documentation-site content, run the narrower docs path first:
 
 ```bash
 npm run docs:check

@@ -21,7 +21,7 @@ Build and verify the same docs checks used by CI:
 npm run docs:check
 ```
 
-`docs:check` verifies generated surface-reference freshness, generated code-map freshness, internal docs links/sidebar routes, and the Astro/Starlight build.
+`docs:check` verifies generated surface-reference freshness, generated code-map freshness, internal docs links/sidebar routes, packaged Markdown links, GitHub Pages base-prefixed docs links, and docs-site build.
 
 ## GitHub Pages path
 
