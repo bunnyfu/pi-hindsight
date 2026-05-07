@@ -57,6 +57,7 @@ export interface ImportDocumentPreview {
   bankId: string;
   wouldWrite: boolean;
   status: "pending" | "queued" | "completed" | "failed" | "skipped";
+  skipReason?: "already-imported" | "empty-curated-projection";
   error?: string;
 }
 
@@ -312,8 +313,14 @@ function buildImportBranch(args: Omit<ImportRetainArgs, "client">): ImportBranch
       tags,
       updateMode,
       bankId: args.bankId,
-      wouldWrite: true,
-      status: "pending" as const,
+      wouldWrite: !(mode === "curated" && projection.messages.length === 0),
+      status:
+        mode === "curated" && projection.messages.length === 0
+          ? ("skipped" as const)
+          : ("pending" as const),
+      ...(mode === "curated" && projection.messages.length === 0
+        ? { skipReason: "empty-curated-projection" as const }
+        : {}),
     };
     const manifestEntry: ImportManifestEntry = {
       documentId,

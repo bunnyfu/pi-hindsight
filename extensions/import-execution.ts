@@ -53,6 +53,7 @@ function checkpointDocument(args: {
     ...(args.document.chunkIndex !== undefined ? { chunkIndex: args.document.chunkIndex } : {}),
     ...(args.document.messageRange ? { messageRange: args.document.messageRange } : {}),
     status: args.status,
+    ...(args.document.skipReason ? { skipReason: args.document.skipReason } : {}),
     updatedAt: args.updatedAt,
     ...(args.error ? { error: args.error } : {}),
   };
@@ -157,7 +158,25 @@ export async function executeImportPlan(args: {
             ...preview.document,
             wouldWrite: false,
             status: canSkip ? ("skipped" as const) : preview.document.status,
+            ...(canSkip ? { skipReason: "already-imported" as const } : {}),
           },
+        });
+        continue;
+      }
+
+      if (preview.document.status === "skipped") {
+        const skippedAt = new Date().toISOString();
+        checkpoint.documents[preview.document.documentId] = checkpointDocument({
+          document: preview.document,
+          status: "skipped",
+          toolResults: importConfig.import.toolResults,
+          updatedAt: skippedAt,
+        });
+        checkpoint.updatedAt = skippedAt;
+        await writeImportCheckpoint(checkpointPath, checkpoint);
+        results.push({
+          ...preview,
+          document: { ...preview.document, wouldWrite: false, status: "skipped" as const },
         });
         continue;
       }
@@ -219,6 +238,7 @@ export async function executeImportPlan(args: {
   if (!args.dryRun && skippedResults.length > 0) {
     const manifest = (await readImportManifestSafe(manifestPath)).manifest;
     const missingSkippedEntries = skippedResults
+      .filter((result) => result.document.skipReason !== "empty-curated-projection")
       .filter((result) => !manifest.imports[result.document.documentId])
       .map((result) => result.manifestEntry);
     if (missingSkippedEntries.length > 0)
