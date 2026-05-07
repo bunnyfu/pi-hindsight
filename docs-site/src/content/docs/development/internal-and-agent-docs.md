@@ -18,11 +18,8 @@ Agent docs explain repository workflow and domain guidance for coding agents. Th
 
 ## Internal and archive docs
 
-Internal docs include PR roadmaps, architecture TODOs, product requirements, coding plans, and superseded design notes. Convert actionable content to GitHub issues before deleting or archiving these pages.
+Internal docs include architecture TODOs, product requirements, and active design notes. Completed coding plans and superseded roadmaps are tracked through GitHub issues and PR history instead of packaged docs.
 
 - [Architecture TODOs](/pi-hindsight/internal/architecture-todos/)
 - [Next opt-out design](/pi-hindsight/internal/next-opt-out-design/)
-- [Post-MVP roadmap](/pi-hindsight/internal/post-mvp-roadmap/)
-- [PR roadmap](/pi-hindsight/internal/pr-roadmap/)
 - [PRD](/pi-hindsight/internal/prd/)
-- [Coding plan](/pi-hindsight/internal/coding-plan/)

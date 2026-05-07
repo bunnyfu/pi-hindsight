@@ -8,10 +8,15 @@ import {
   type ProjectConfigPatchInput,
 } from "./config-writer.js";
 import type { ConfigEditingField, FieldId } from "./config-editing-types.js";
-import { CONFIG_FIELD_PATHS, CONFIG_FIELD_RESET_KEYS } from "./config-field-paths.js";
+import {
+  CONFIG_FIELD_PATHS,
+  CONFIG_FIELD_RESET_KEYS,
+  CONFIG_RESET_PATHS,
+} from "./config-field-paths.js";
 export { CONFIG_FIELD_PATHS, CONFIG_FIELD_RESET_KEYS } from "./config-field-paths.js";
 
 function memoryProfileLabel(config: ResolvedConfig): MemoryProfile {
+  if (config.recall.enabled && !config.retain.enabled) return "recall-only";
   if (!config.banks.project.enabled) return "global-only";
   if (config.banks.user.enabled) return "project+global";
   return "project-only";
@@ -110,7 +115,7 @@ function selectField(
   return field({ ...args, kind: "select" });
 }
 
-function valueAt(config: Record<string, unknown>, path: string[]): unknown {
+function valueAt(config: Record<string, unknown>, path: readonly string[]): unknown {
   let value: unknown = config;
   for (const part of path) {
     if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
@@ -140,14 +145,44 @@ function displayLayerValue(fieldId: FieldId, value: unknown): string | undefined
   return JSON.stringify(value);
 }
 
+function firstLayerValue(
+  config: Record<string, unknown>,
+  paths: ReadonlyArray<readonly string[]>,
+): unknown {
+  for (const path of paths) {
+    const value = valueAt(config, path);
+    if (value !== undefined) return value;
+  }
+  return undefined;
+}
+
+function resetPathsForKey(resetKey: string | undefined): ReadonlyArray<readonly string[]> {
+  if (!resetKey) return [];
+  return CONFIG_RESET_PATHS[resetKey as keyof typeof CONFIG_RESET_PATHS] ?? [];
+}
+
+function fieldSourcePaths(
+  fieldId: FieldId,
+  resetKey: string | undefined,
+): ReadonlyArray<readonly string[]> {
+  const paths = [CONFIG_FIELD_PATHS[fieldId], ...resetPathsForKey(resetKey)];
+  const seen = new Set<string>();
+  return paths.filter((path) => {
+    const key = path.join(".");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function sourceFor(
   layers: { project: Record<string, unknown>; global: Record<string, unknown> },
-  path: string[],
+  paths: ReadonlyArray<readonly string[]>,
   envValue?: string,
 ): ConfigSource {
   if (envValue !== undefined) return "env";
-  if (valueAt(layers.project, path) !== undefined) return "project";
-  if (valueAt(layers.global, path) !== undefined) return "global";
+  if (firstLayerValue(layers.project, paths) !== undefined) return "project";
+  if (firstLayerValue(layers.global, paths) !== undefined) return "global";
   return "default";
 }
 
@@ -215,11 +250,11 @@ export function buildBaseConfigEditingFields(
       tab: "Banks",
       label: "Memory scope",
       description:
-        "Project-only is safest. Project+global also recalls personal cross-project memory.",
+        "Choose Project Only for strict isolation, Project + User for personal coding, User Only for cross-repo preference memory, or Recall Only to disable automatic retain.",
       value: profile,
       defaultValue: defaultProfile,
       resetKey: "banks.profile",
-      choices: ["project-only", "project+global", "global-only"],
+      choices: ["project-only", "project+global", "global-only", "recall-only"],
     }),
     textField({
       id: "projectBankId",
@@ -541,10 +576,10 @@ function layerField(
   layers: { project: Record<string, unknown>; global: Record<string, unknown> },
   envValue: string | undefined,
 ): ConfigEditingField {
-  const path = CONFIG_FIELD_PATHS[base.id];
-  const projectValue = displayLayerValue(base.id, valueAt(layers.project, path));
-  const globalValue = displayLayerValue(base.id, valueAt(layers.global, path));
-  const source = sourceFor(layers, path, envValue);
+  const paths = fieldSourcePaths(base.id, base.resetKey);
+  const projectValue = displayLayerValue(base.id, firstLayerValue(layers.project, paths));
+  const globalValue = displayLayerValue(base.id, firstLayerValue(layers.global, paths));
+  const source = sourceFor(layers, paths, envValue);
   return {
     ...base,
     ...(projectValue !== undefined ? { projectValue } : {}),

@@ -139,10 +139,7 @@ export default defineConfig({
                 { label: "Internal index", slug: "internal" },
                 { label: "Architecture TODOs", slug: "internal/architecture-todos" },
                 { label: "Next opt-out design", slug: "internal/next-opt-out-design" },
-                { label: "Post-MVP roadmap", slug: "internal/post-mvp-roadmap" },
-                { label: "PR roadmap", slug: "internal/pr-roadmap" },
                 { label: "PRD", slug: "internal/prd" },
-                { label: "Coding plan", slug: "internal/coding-plan" },
               ],
             },
             {

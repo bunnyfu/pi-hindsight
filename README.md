@@ -31,8 +31,8 @@ Package name: `@luxusai/pi-hindsight`.
    - [Self-hosted Hindsight installation](https://hindsight.vectorize.io/developer/installation); use Hindsight's built-in llama.cpp/local-LLM option when you want a no-LLM-API-key private setup
 2. Open Pi in your repo and run `/hindsight`.
 3. Configure the Hindsight API URL. The default self-hosted URL is `http://localhost:8888`.
-4. Choose the narrowest memory profile that fits the repo: `project-only`, `project+global`, or `global-only`.
-5. Start coding. Recall happens before provider calls; retain happens after completed agent runs.
+4. Choose the narrowest memory profile that fits the repo: **Project + User**, **Project Only**, **User Only**, or **Recall Only**.
+5. Start coding. Recall happens before provider calls; retain happens after completed agent runs when the selected profile allows automatic retain.
 
 See the [getting started guide](https://luxus.github.io/pi-hindsight/start/getting-started/) for setup details.
 

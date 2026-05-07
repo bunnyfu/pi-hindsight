@@ -1,16 +1,27 @@
 ---
 title: "Session memory modes"
-description: Risk boundaries for read-only, ignored, next-turn opt-out, and deferred memory modes.
+description: Risk boundaries for normal, read-only, ignored, next-turn opt-out, and setup memory profiles.
 ---
 
 Session memory modes control automatic Recall and automatic Retain. Prefer the narrowest mode that fits the work.
+
+## Setup profiles
+
+Guided setup chooses the default memory posture for a repository:
+
+- **Project + User**: project memory for repo facts, user memory for durable cross-repo preferences.
+- **Project Only**: project memory only.
+- **User Only**: user memory only.
+- **Recall Only**: automatic recall enabled, automatic retain disabled.
+
+Session commands can temporarily narrow behavior inside that configured profile.
 
 ## Normal mode
 
 Normal mode uses the selected profile:
 
 - Recall runs before provider calls.
-- Retain runs after completed agent runs.
+- Retain runs after completed agent runs when the profile allows automatic retain.
 - Project memory writes use stable live-session document IDs.
 
 ## Read-only mode

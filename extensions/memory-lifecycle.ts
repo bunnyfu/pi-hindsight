@@ -199,7 +199,9 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       event: AgentEndEvent,
       ctx: RuntimeCtx,
     ): Promise<{ queued: boolean; sent: number; remaining: number }> {
-      if (!config.enabled || !config.retain.enabled || !config.banks.project.enabled)
+      const canRetainProject = config.banks.project.enabled;
+      const canRetainUser = config.banks.user.enabled && Boolean(config.banks.user.bankId);
+      if (!config.enabled || !config.retain.enabled || (!canRetainProject && !canRetainUser))
         return { queued: false, sent: 0, remaining: 0 };
       const runtime = snapshotRuntime(ctx);
       if (!runtime) return { queued: false, sent: 0, remaining: 0 };

@@ -4,34 +4,46 @@ title: "Memory profiles"
 
 Choose the narrowest memory route that fits the repository.
 
-## `project-only`
-
-Safest default.
-
-- Recall reads the Project Bank.
-- Automatic Retain writes session deltas to the Project Bank.
-- Global/User memory is not used by default.
-
-Use this for sensitive repositories, client work, or any project where memory must stay isolated.
-
-## `project+global`
+## Project + User
 
 Best for most personal coding.
 
-- Project facts stay in the Project Bank.
-- Durable user preferences and cross-project habits can be recalled from the configured Global/User Bank.
-- Automatic Retain still writes project transcript deltas to the Project Bank by default.
+- Recall can read project memory and user memory.
+- Automatic retain writes repository session deltas to the Project Bank.
+- User Bank settings are stored once in global Pi config and reused across repositories.
 
-Global/User writes remain explicit unless Router Mode is intentionally enabled.
+Use this when you want repo-specific memory plus durable cross-repo preferences and workflows.
 
-## `global-only`
+## Project Only
 
-Broad shared recall.
+Best for strict isolation.
+
+- Recall reads the Project Bank.
+- Automatic retain writes session deltas to the Project Bank.
+- User memory is not used by default.
+
+Use this for sensitive repositories, client work, or any project where memory must stay isolated.
+
+## User Only
+
+Best for non-repo assistance.
 
 - Project Bank is disabled.
-- Automatic Retain is disabled because there is no project-scoped write route.
-- Use explicit Retain when you intentionally want Global/User memory.
+- User Bank settings are stored in global Pi config.
+- Automatic retain follows user-memory policy rather than project-memory policy.
+
+Use this when project-specific memory would be noise but user preferences still matter.
+
+## Recall Only
+
+Best for cautious adoption.
+
+- Automatic recall stays enabled.
+- Automatic retain is disabled.
+- Explicit tools and import remain available.
+
+Use this when you want memory context but do not want the current session written automatically.
 
 ## Terminology note
 
-The product is migrating user-facing UI from “global” toward “user” where that is clearer. The glossary still uses **Global Bank** for the configured cross-project bank term. Tool aliases may still accept `global` for compatibility.
+User-facing docs and setup use **User Bank** for cross-project memory. Older config, internal fields, and tool aliases may still say `global`; that alias remains supported for compatibility.

@@ -51,9 +51,15 @@ describe("config writer", () => {
   it("builds memory profile patches", () => {
     expect(buildProjectConfigPatch({ memoryProfile: "project-only" })).toEqual({
       banks: { project: { enabled: true }, user: { enabled: false } },
+      userRetain: { mode: "explicit-only" },
+      recall: { enabled: true },
+      retain: { enabled: true },
     });
     expect(buildProjectConfigPatch({ memoryProfile: "project+global" })).toEqual({
-      banks: { project: { enabled: true }, user: { enabled: true, bankId: "pi-global" } },
+      banks: { project: { enabled: true }, user: { enabled: true } },
+      userRetain: { mode: "explicit-only" },
+      recall: { enabled: true },
+      retain: { enabled: true },
     });
     expect(
       buildProjectConfigPatch({
@@ -63,6 +69,13 @@ describe("config writer", () => {
       }),
     ).toEqual({
       banks: { project: { enabled: false }, user: { enabled: true, bankId: "shared" } },
+      userRetain: { mode: "router" },
+      recall: { enabled: true },
+      retain: { enabled: true },
+    });
+    expect(buildProjectConfigPatch({ memoryProfile: "recall-only" })).toEqual({
+      recall: { enabled: true },
+      retain: { enabled: false },
     });
   });
 
@@ -117,6 +130,18 @@ describe("config writer", () => {
     expect(buildProjectConfigPatch({ globalRetainMode: "router" })).toEqual({
       userRetain: { mode: "router" },
     });
+  });
+
+  it("resets profile-controlled recall, retain, and user retain overrides", () => {
+    expect(buildProjectConfigDeletes({ resetDefaults: ["banks.profile"] })).toEqual([
+      ["banks", "project", "enabled"],
+      ["banks", "user", "enabled"],
+      ["banks", "global", "enabled"],
+      ["userRetain", "mode"],
+      ["globalRetain", "mode"],
+      ["recall", "enabled"],
+      ["retain", "enabled"],
+    ]);
   });
 
   it("can write direct API keys only for user config while keeping env refs preferred", () => {

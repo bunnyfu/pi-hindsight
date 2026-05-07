@@ -93,7 +93,7 @@ describe("config editing model", () => {
 
     expect(memoryProfile).toMatchObject({
       kind: "select",
-      choices: ["project-only", "project+global", "global-only"],
+      choices: ["project-only", "project+global", "global-only", "recall-only"],
     });
     expect(queuePath).toMatchObject({ kind: "text" });
     expect(importQualityProfile).toMatchObject({
@@ -122,6 +122,46 @@ describe("config editing model", () => {
       kind: "boolean",
       advanced: true,
       value: "disabled",
+    });
+  });
+
+  it("marks memory profile overrides from current and legacy profile paths", () => {
+    const recallOnlyConfig = {
+      ...DEFAULT_CONFIG,
+      recall: { ...DEFAULT_CONFIG.recall, enabled: true },
+      retain: { ...DEFAULT_CONFIG.retain, enabled: false },
+    };
+    const recallOnlyFields = buildConfigEditingFields(
+      recallOnlyConfig,
+      "bank",
+      layers({ project: { recall: { enabled: true }, retain: { enabled: false } } }),
+    );
+
+    expect(recallOnlyFields.find((field) => field.id === "memoryProfile")).toMatchObject({
+      value: "recall-only",
+      source: "project",
+      changed: true,
+      projectValue: "disabled",
+    });
+
+    const projectGlobalConfig = {
+      ...DEFAULT_CONFIG,
+      banks: {
+        ...DEFAULT_CONFIG.banks,
+        user: { ...DEFAULT_CONFIG.banks.user, enabled: true, bankId: "user-bank" },
+      },
+    };
+    const projectGlobalFields = buildConfigEditingFields(
+      projectGlobalConfig,
+      "bank",
+      layers({ project: { banks: { project: { enabled: true }, user: { enabled: true } } } }),
+    );
+
+    expect(projectGlobalFields.find((field) => field.id === "memoryProfile")).toMatchObject({
+      value: "project+global",
+      source: "project",
+      changed: true,
+      projectValue: "enabled",
     });
   });
 

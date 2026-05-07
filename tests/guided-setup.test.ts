@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_CONFIG } from "../extensions/config-defaults.js";
 import {
+  buildGuidedSetupGlobalPatch,
   buildGuidedSetupPatch,
   editTemplateManifestForSetup,
   enabledTemplateTargets,
@@ -43,9 +44,10 @@ describe("guided setup", () => {
   });
 
   it("maps setup profile choices to config writer profiles", () => {
+    expect(setupProfileChoiceToMemoryProfile("project-user")).toBe("project+global");
     expect(setupProfileChoiceToMemoryProfile("project-only")).toBe("project-only");
-    expect(setupProfileChoiceToMemoryProfile("project-global")).toBe("project+global");
-    expect(setupProfileChoiceToMemoryProfile("global-only")).toBe("global-only");
+    expect(setupProfileChoiceToMemoryProfile("user-only")).toBe("global-only");
+    expect(setupProfileChoiceToMemoryProfile("recall-only")).toBe("recall-only");
   });
 
   it("builds profile and bank patches without inventing global bank IDs", () => {
@@ -59,7 +61,7 @@ describe("guided setup", () => {
 
     expect(
       buildGuidedSetupPatch({
-        profile: "project-global",
+        profile: "project-user",
         projectBankId: "project-bank",
         globalBankId: "global-luxus",
         config: DEFAULT_CONFIG,
@@ -67,23 +69,55 @@ describe("guided setup", () => {
     ).toEqual({
       memoryProfile: "project+global",
       projectBankId: "project-bank",
-      globalBankId: "global-luxus",
+      resetDefaults: ["banks.global.bankId"],
     });
 
     expect(
       buildGuidedSetupPatch({
-        profile: "global-only",
+        profile: "user-only",
         projectBankId: "ignored-project",
         globalBankId: "global-luxus",
         config: DEFAULT_CONFIG,
       }),
-    ).toEqual({ memoryProfile: "global-only", globalBankId: "global-luxus" });
+    ).toEqual({ memoryProfile: "global-only", resetDefaults: ["banks.global.bankId"] });
+
+    expect(
+      buildGuidedSetupPatch({
+        profile: "recall-only",
+        projectBankId: "project-bank",
+        globalBankId: "ignored-user",
+        config: DEFAULT_CONFIG,
+      }),
+    ).toEqual({ memoryProfile: "recall-only", projectBankId: "project-bank" });
+  });
+
+  it("builds global config patches for user memory profiles", () => {
+    expect(
+      buildGuidedSetupGlobalPatch({
+        profile: "project-user",
+        globalBankId: "global-luxus",
+        config: DEFAULT_CONFIG,
+      }),
+    ).toEqual({ scope: "global", enableGlobalBank: true, globalBankId: "global-luxus" });
+    expect(
+      buildGuidedSetupGlobalPatch({
+        profile: "user-only",
+        globalBankId: "global-luxus",
+        config: DEFAULT_CONFIG,
+      }),
+    ).toEqual({ scope: "global", enableGlobalBank: true, globalBankId: "global-luxus" });
+    expect(
+      buildGuidedSetupGlobalPatch({ profile: "project-only", config: DEFAULT_CONFIG }),
+    ).toBeUndefined();
+    expect(
+      buildGuidedSetupGlobalPatch({ profile: "recall-only", config: DEFAULT_CONFIG }),
+    ).toBeUndefined();
   });
 
   it("builds template targets with concrete project and user bank locations", () => {
     expect(
       enabledTemplateTargets({
-        setupProfile: "project-global",
+        setupProfile: "project-user",
         projectBankId: "project-bank",
         globalBankId: "global-luxus",
       }),
@@ -228,7 +262,7 @@ describe("guided setup", () => {
   it("limits setup import choices to configured setup banks", () => {
     expect(
       importChoicesForSetup({
-        setupProfile: "global-only",
+        setupProfile: "user-only",
         appliedProfiles: new Set(["coding-project"]),
         globalBankId: "user-bank",
       }),
@@ -242,7 +276,7 @@ describe("guided setup", () => {
     ).toEqual(["Skip import", "Preview repo Pi sessions"]);
     expect(
       importChoicesForSetup({
-        setupProfile: "project-global",
+        setupProfile: "project-user",
         appliedProfiles: new Set(["assistant-personal"]),
         projectBankId: "project-bank",
         globalBankId: "user-bank",
@@ -316,7 +350,7 @@ describe("guided setup", () => {
     await maybeOfferHistoricalImportForSetup({
       ctx,
       operations,
-      setupProfile: "global-only",
+      setupProfile: "user-only",
       appliedTemplates: [
         {
           bank: "user-bank",
@@ -383,7 +417,7 @@ describe("guided setup", () => {
     await maybeOfferHistoricalImportForSetup({
       ctx,
       operations,
-      setupProfile: "global-only",
+      setupProfile: "user-only",
       appliedTemplates: [
         {
           bank: "user-bank",
@@ -455,7 +489,7 @@ describe("guided setup", () => {
         importGatewayTranscript,
         refreshMentalModel,
       } as never,
-      setupProfile: "global-only",
+      setupProfile: "user-only",
       appliedTemplates: [
         {
           bank: "user-bank",
@@ -508,7 +542,7 @@ describe("guided setup", () => {
           .mockResolvedValueOnce({ bankId: "user-bank", skipped: false, documentId: "doc" }),
         refreshMentalModel,
       } as never,
-      setupProfile: "global-only",
+      setupProfile: "user-only",
       appliedTemplates: [
         {
           bank: "user-bank",
@@ -580,7 +614,7 @@ describe("guided setup", () => {
     await maybeOfferHistoricalImportForSetup({
       ctx,
       operations,
-      setupProfile: "project-global",
+      setupProfile: "project-user",
       appliedTemplates: [
         {
           bank: "shared-bank",
@@ -612,14 +646,20 @@ describe("guided setup", () => {
   it("uses existing configured global bank ID when profile enables global memory", () => {
     expect(
       buildGuidedSetupPatch({
-        profile: "project-global",
+        profile: "project-user",
         projectBankId: "project-bank",
         config: configuredGlobal,
       }),
     ).toEqual({
       memoryProfile: "project+global",
       projectBankId: "project-bank",
-      globalBankId: "global-luxus",
+      resetDefaults: ["banks.global.bankId"],
     });
+    expect(
+      buildGuidedSetupGlobalPatch({
+        profile: "project-user",
+        config: configuredGlobal,
+      }),
+    ).toEqual({ scope: "global", enableGlobalBank: true, globalBankId: "global-luxus" });
   });
 });

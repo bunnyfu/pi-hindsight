@@ -46,7 +46,17 @@ export function hasProjectHindsightConfig(cwd: string): boolean {
 }
 
 export function setupProfileChoiceToMemoryProfile(choice: SetupProfileChoice): MemoryProfile {
-  return choice === "project-global" ? "project+global" : choice;
+  if (choice === "project-user") return "project+global";
+  if (choice === "user-only") return "global-only";
+  return choice;
+}
+
+function profileUsesProject(profile: SetupProfileChoice): boolean {
+  return profile === "project-user" || profile === "project-only" || profile === "recall-only";
+}
+
+function profileUsesUser(profile: SetupProfileChoice): boolean {
+  return profile === "project-user" || profile === "user-only";
 }
 
 export function buildGuidedSetupPatch(args: {
@@ -58,14 +68,24 @@ export function buildGuidedSetupPatch(args: {
   const memoryProfile = setupProfileChoiceToMemoryProfile(args.profile);
   return {
     memoryProfile,
-    ...(memoryProfile !== "global-only" && args.projectBankId?.trim()
+    ...(profileUsesProject(args.profile) && args.projectBankId?.trim()
       ? { projectBankId: args.projectBankId.trim() }
       : {}),
-    ...(memoryProfile !== "project-only" && args.globalBankId?.trim()
-      ? { globalBankId: args.globalBankId.trim() }
-      : args.config.banks.user.bankId && memoryProfile !== "project-only"
-        ? { globalBankId: args.config.banks.user.bankId }
-        : {}),
+    ...(profileUsesUser(args.profile) ? { resetDefaults: ["banks.global.bankId" as const] } : {}),
+  };
+}
+
+export function buildGuidedSetupGlobalPatch(args: {
+  profile: SetupProfileChoice;
+  globalBankId?: string;
+  config: ResolvedConfig;
+}): ProjectConfigPatchInput | undefined {
+  if (!profileUsesUser(args.profile)) return undefined;
+  const globalBankId = args.globalBankId?.trim() || args.config.banks.user.bankId;
+  return {
+    scope: "global",
+    enableGlobalBank: true,
+    ...(globalBankId ? { globalBankId } : {}),
   };
 }
 
@@ -100,7 +120,7 @@ export function enabledTemplateTargets(args: {
   globalBankId?: string;
 }): TemplateTarget[] {
   return [
-    ...(args.setupProfile !== "global-only" && args.projectBankId
+    ...(profileUsesProject(args.setupProfile) && args.projectBankId
       ? [
           {
             label: bankSettingsTargetDisplay({ location: "Project", bankId: args.projectBankId })
@@ -111,7 +131,7 @@ export function enabledTemplateTargets(args: {
           },
         ]
       : []),
-    ...(args.setupProfile !== "project-only" && args.globalBankId
+    ...(profileUsesUser(args.setupProfile) && args.globalBankId
       ? [
           {
             label: bankSettingsTargetDisplay({ location: "User", bankId: args.globalBankId })
@@ -359,8 +379,8 @@ export function importChoicesForSetup(args: {
 }): string[] {
   const choices = ["Skip import"];
   const profileHints = args.appliedProfiles;
-  const canProject = args.setupProfile !== "global-only" && Boolean(args.projectBankId);
-  const canGateway = args.setupProfile !== "project-only" && Boolean(args.globalBankId);
+  const canProject = profileUsesProject(args.setupProfile) && Boolean(args.projectBankId);
+  const canGateway = profileUsesUser(args.setupProfile) && Boolean(args.globalBankId);
   const wantsProject = profileHints.has("coding-project") || (!profileHints.size && canProject);
   const wantsGateway =
     profileHints.has("assistant-personal") ||
@@ -549,35 +569,37 @@ export async function runGuidedSetup(args: {
   cwd: string;
 }): Promise<boolean> {
   const profile = await args.ctx.ui.select("Choose memory profile", [
-    "project-only",
-    "project+global",
-    "global-only",
+    "Project + User",
+    "Project Only",
+    "User Only",
+    "Recall Only",
   ]);
   if (!profile) return false;
 
-  const setupProfile = (
-    profile === "project+global" ? "project-global" : profile
-  ) as SetupProfileChoice;
+  const setupProfile = {
+    "Project + User": "project-user",
+    "Project Only": "project-only",
+    "User Only": "user-only",
+    "Recall Only": "recall-only",
+  }[profile] as SetupProfileChoice;
   const config = args.deps.getConfig();
-  const projectBankId =
-    setupProfile === "global-only"
-      ? undefined
-      : await askBankId({
-          ctx: args.ctx,
-          title: "Project bank ID",
-          fallback: config.banks.project.bankId ?? args.deps.getProjectBankId(),
-        });
-  if (setupProfile !== "global-only" && projectBankId === undefined) return false;
+  const projectBankId = profileUsesProject(setupProfile)
+    ? await askBankId({
+        ctx: args.ctx,
+        title: "Project bank ID",
+        fallback: config.banks.project.bankId ?? args.deps.getProjectBankId(),
+      })
+    : undefined;
+  if (profileUsesProject(setupProfile) && projectBankId === undefined) return false;
 
-  const globalBankId =
-    setupProfile === "project-only"
-      ? undefined
-      : await askBankId({
-          ctx: args.ctx,
-          title: "User bank ID",
-          fallback: config.banks.user.bankId ?? "",
-        });
-  if (setupProfile !== "project-only" && !globalBankId) {
+  const globalBankId = profileUsesUser(setupProfile)
+    ? await askBankId({
+        ctx: args.ctx,
+        title: "User bank ID",
+        fallback: config.banks.user.bankId ?? "",
+      })
+    : undefined;
+  if (profileUsesUser(setupProfile) && !globalBankId) {
     args.ctx.ui.notify("User bank ID required for user memory profiles.", "warning");
     return false;
   }
@@ -588,15 +610,27 @@ export async function runGuidedSetup(args: {
     ...(globalBankId !== undefined ? { globalBankId } : {}),
     config,
   });
+  const globalPatch = buildGuidedSetupGlobalPatch({
+    profile: setupProfile,
+    ...(globalBankId !== undefined ? { globalBankId } : {}),
+    config,
+  });
   const summary = [
     `Profile: ${setupProfileChoiceToMemoryProfile(setupProfile)}`,
-    ...(projectBankId ? [`Project bank: ${projectBankId}`] : []),
-    ...(globalBankId ? [`User bank: ${globalBankId}`] : []),
+    ...(projectBankId ? [`Project config: project bank ${projectBankId}`] : []),
+    ...(globalBankId ? [`Global config: user bank ${globalBankId}`] : []),
+    ...(setupProfile === "recall-only"
+      ? ["Automatic retain: disabled; automatic recall: enabled"]
+      : []),
   ].join("\n");
   const confirmed = await args.ctx.ui.confirm("Write Pi Hindsight config?", summary);
   if (!confirmed) return false;
 
   const operations = createMemoryOperations(args.deps);
+  if (globalPatch) {
+    const globalResult = await operations.configure(args.cwd, globalPatch);
+    args.ctx.ui.notify(`Wrote ${globalResult.path}`, "info");
+  }
   const result = await operations.configure(args.cwd, patch);
   args.ctx.ui.notify(`Wrote ${result.path}`, "info");
 

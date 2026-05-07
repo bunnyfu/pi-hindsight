@@ -49,11 +49,12 @@ Project config SecretRef shape:
 
 ## Memory profiles
 
-- `project-only`: Project Bank enabled; user bank disabled; automatic Retain writes to the Project Bank.
-- `project+global`: project and user recall enabled; automatic Retain still writes project transcript deltas to the Project Bank by default.
-- `global-only`: Project Bank disabled; user recall enabled; automatic Retain disabled.
+- **Project + User**: Project Bank enabled; User Bank enabled; user bank settings are written once to global Pi config.
+- **Project Only**: Project Bank enabled; User Bank disabled; automatic Retain writes to the Project Bank.
+- **User Only**: Project Bank disabled; User Bank enabled from global Pi config.
+- **Recall Only**: automatic recall enabled; automatic Retain disabled; explicit tools and imports remain available.
 
-When a profile enables user memory without an existing bank ID, setup writes `pi-global` as the default user bank ID for compatibility. Override it with `PI_HINDSIGHT_USER_BANK_ID`, `.pi/hindsight.json` `banks.user.bankId`, or the setup TUI if you prefer a different shared bank. Legacy `PI_HINDSIGHT_GLOBAL_BANK_ID` and `banks.global` configs are migrated/supported during transition.
+When a profile uses user memory, guided setup asks for a user bank ID and writes it to global Pi config. Override it later with `PI_HINDSIGHT_USER_BANK_ID`, `~/.pi/agent/hindsight.json` `banks.user.bankId`, or the setup TUI if you prefer a different shared bank. Legacy `PI_HINDSIGHT_GLOBAL_BANK_ID`, `banks.global`, and `global-only` config names are migrated/supported during transition.
 
 ## Bank settings display
 
