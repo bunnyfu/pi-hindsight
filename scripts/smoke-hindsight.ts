@@ -22,6 +22,8 @@ const marker = smokeMarker();
 const adapterMarker = smokeMarker();
 const operationsMarker = smokeMarker();
 const importMarker = smokeMarker();
+const importKeptToolMarker = smokeMarker();
+const importNoiseMarker = smokeMarker();
 const operationsCwd = mkdtempSync(join(tmpdir(), "pi-hindsight-smoke-ops-"));
 mkdirSync(join(operationsCwd, ".git"));
 const recorder = createSmokeRecorder();
@@ -43,6 +45,12 @@ const smokeExtensionConfig = {
   recall: {
     ...DEFAULT_CONFIG.recall,
     budget: "low" as const,
+  },
+  import: {
+    ...DEFAULT_CONFIG.import,
+    qualityProfile: "strict" as const,
+    toolResults: "summary" as const,
+    toolResultSummaryMaxChars: 120,
   },
 };
 const adapter = createHindsightClient(smokeExtensionConfig);
@@ -254,9 +262,31 @@ try {
       }),
       JSON.stringify({
         type: "message",
-        id: "leaf",
+        id: "kept-tool",
         parentId: "root",
         timestamp: "2026-05-03T00:00:02.000Z",
+        message: {
+          role: "toolResult",
+          name: "bash",
+          content: `Strict import kept lightweight tool marker: ${importKeptToolMarker}`,
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        id: "noise-tool",
+        parentId: "kept-tool",
+        timestamp: "2026-05-03T00:00:03.000Z",
+        message: {
+          role: "toolResult",
+          name: "process",
+          content: `Refreshing smoke watcher status; strict import should drop ${importNoiseMarker}`,
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        id: "leaf",
+        parentId: "noise-tool",
+        timestamp: "2026-05-03T00:00:04.000Z",
         message: { role: "assistant", content: `Imported marker acknowledged: ${importMarker}` },
       }),
     ].join("\n") + "\n",
@@ -269,12 +299,27 @@ try {
     bank: "project",
     dryRun: true,
   });
-  if (importDryRun.retained || importDryRun.documents.length !== 1) {
+  const importDryRunDocument = importDryRun.documents[0];
+  if (importDryRun.retained || importDryRun.documents.length !== 1 || !importDryRunDocument) {
     throw new Error("import dry-run did not preview exactly one unwritten document");
+  }
+  if (
+    importDryRunDocument.importMode !== "curated" ||
+    importDryRunDocument.importQualityProfile !== "strict" ||
+    importDryRunDocument.projectedMessageCount !== 3 ||
+    importDryRunDocument.droppedToolResultCount !== 1 ||
+    importDryRunDocument.classificationReasonCounts?.["process-noise"] !== 1
+  ) {
+    throw new Error(
+      `strict import dry-run metrics were unexpected: ${JSON.stringify(importDryRunDocument).slice(0, 1000)}`,
+    );
   }
   recorder.step("import_dry_run_ok", {
     documentCount: importDryRun.documents.length,
     messageCount: importDryRun.messageCount,
+    importQualityProfile: importDryRunDocument.importQualityProfile,
+    projectedMessageCount: importDryRunDocument.projectedMessageCount,
+    droppedToolResultCount: importDryRunDocument.droppedToolResultCount,
   });
 
   const importResult = await operations.importSession({
@@ -284,28 +329,52 @@ try {
     dryRun: false,
   });
   const importedDocument = importResult.documents[0];
-  if (!importResult.retained || !importedDocument || importedDocument.status !== "completed") {
-    throw new Error("import smoke did not complete a retained document");
+  if (
+    !importResult.retained ||
+    !importedDocument ||
+    importedDocument.status !== "completed" ||
+    importedDocument.importQualityProfile !== "strict" ||
+    importedDocument.droppedToolResultCount !== 1
+  ) {
+    throw new Error("strict import smoke did not complete expected retained document");
   }
   recorder.step("import_ok", {
     documentId: importedDocument.documentId,
     messageCount: importResult.messageCount,
+    importQualityProfile: importedDocument.importQualityProfile,
+    droppedToolResultCount: importedDocument.droppedToolResultCount,
   });
 
   const importRecall = await retry(
     async () => operations.recall(operationsCwd, importMarker, "project"),
-    (result) => JSON.stringify(result).includes(importMarker),
+    (result) => {
+      const text = JSON.stringify(result);
+      return (
+        text.includes(importMarker) &&
+        text.includes(importKeptToolMarker) &&
+        !text.includes(importNoiseMarker)
+      );
+    },
     {
       attempts: config.attempts,
       delayMs: 2000,
       onWait: ({ attempt, delayMs }) => recorder.step("import_recall_wait", { attempt, delayMs }),
       failureMessage: ({ attempts, preview }) =>
-        `import recall did not contain retained marker after ${attempts} attempts: ${preview}`,
+        `strict import recall did not contain kept markers without dropped noise after ${attempts} attempts: ${preview}`,
     },
   );
+  const importRecallText = JSON.stringify(importRecall);
   recorder.step("import_recall_ok", {
-    containsMarker: JSON.stringify(importRecall).includes(importMarker),
+    containsMarker: importRecallText.includes(importMarker),
+    containsKeptToolMarker: importRecallText.includes(importKeptToolMarker),
+    containsNoiseMarker: importRecallText.includes(importNoiseMarker),
   });
+  if (!importRecallText.includes(importKeptToolMarker)) {
+    throw new Error("strict import recall did not contain kept lightweight tool marker");
+  }
+  if (importRecallText.includes(importNoiseMarker)) {
+    throw new Error("strict import recall contained dropped process-noise marker");
+  }
 
   recorder.step("success", {
     bankId: config.bankId,
@@ -313,6 +382,8 @@ try {
     adapterMarker,
     operationsMarker,
     importMarker,
+    importKeptToolMarker,
+    importNoiseMarker,
   });
   succeeded = true;
 } catch (error) {
