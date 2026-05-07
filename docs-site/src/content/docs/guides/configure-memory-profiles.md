@@ -3,15 +3,16 @@ title: "Configure memory profiles"
 description: Choose a memory scope and map it to Pi Hindsight configuration.
 ---
 
-Use the narrowest memory route that fits the repository. Start with `project-only` unless you intentionally want cross-project user memory.
+Use the narrowest memory route that fits the repository. Start with **Project Only** for strict isolation or **Project + User** for personal coding with durable cross-repo preferences.
 
 ## Choose a profile
 
-| Profile          | Recall reads                                  | Automatic retain writes | Best for                                   |
-| ---------------- | --------------------------------------------- | ----------------------- | ------------------------------------------ |
-| `project-only`   | Project Bank                                  | Project Bank            | client work, sensitive repos, shared repos |
-| `project+global` | Project Bank plus configured Global/User Bank | Project Bank            | personal coding with durable preferences   |
-| `global-only`    | Global/User Bank                              | disabled by default     | intentional user-only memory               |
+| Profile        | Recall reads                | Automatic retain writes | Best for                                   |
+| -------------- | --------------------------- | ----------------------- | ------------------------------------------ |
+| Project + User | Project Bank plus User Bank | Project Bank            | personal coding with durable preferences   |
+| Project Only   | Project Bank                | Project Bank            | client work, sensitive repos, shared repos |
+| User Only      | User Bank                   | user-memory policy      | intentional user-only memory               |
+| Recall Only    | configured memory banks     | disabled                | cautious adoption and read-only sessions   |
 
 ## Configure through `/hindsight`
 
@@ -19,8 +20,8 @@ Use the narrowest memory route that fits the repository. Start with `project-onl
 2. Open guided setup if prompted, or rerun it from the TUI.
 3. Set the Hindsight base URL.
 4. Choose the memory profile.
-5. Confirm the project and user/global bank IDs.
-6. Save the project config when the profile should travel with the repo.
+5. Confirm the project and/or user bank IDs.
+6. Review whether setup will write project config, global Pi config, or both.
 
 ## Configure by file
 
@@ -55,8 +56,8 @@ Pin a human-chosen Project Bank when stability matters:
 Run `/hindsight` and confirm:
 
 - expected profile is active
-- expected Project Bank is selected
-- Global/User Bank only appears when explicitly configured
+- expected Project Bank is selected only when project memory is intended
+- User Bank appears only when explicitly configured
 - automatic retain is enabled only where expected
 - retain queue path is visible
 

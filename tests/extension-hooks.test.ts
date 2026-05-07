@@ -494,6 +494,50 @@ describe("extension hooks", () => {
     expect(mocked.client.retain.mock.calls[0]?.[0]).toBe("global-luxus");
   });
 
+  it("routes User Only automatic retain to the user bank", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({
+        banks: {
+          project: { enabled: false },
+          user: { enabled: true, bankId: "user-luxus" },
+        },
+        retain: { enabled: true },
+        userRetain: { mode: "router" },
+      }),
+    );
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const { createMemoryLifecycle } = await import("../extensions/memory-lifecycle.js");
+    const lifecycle = createMemoryLifecycle(cwd);
+    await lifecycle.initialize(ctx);
+    mocked.client.retain.mockClear();
+    const result = await lifecycle.retain(
+      {
+        messages: [
+          { role: "user", content: "Kai prefers terse replies across projects", timestamp: 1 },
+          {
+            role: "assistant",
+            content: "I will remember this durable user preference.",
+            timestamp: 2,
+          },
+        ],
+      } as any,
+      ctx,
+    );
+
+    expect(result).toMatchObject({ queued: true });
+    expect(mocked.client.retain).toHaveBeenCalledTimes(1);
+    expect(mocked.client.retain.mock.calls[0]?.[0]).toBe("user-luxus");
+  });
+
   it("skips automatic retain when router mode classifies content as skip", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
     mkdirSync(join(cwd, ".git"));

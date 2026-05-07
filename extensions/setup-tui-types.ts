@@ -12,7 +12,7 @@ export type SetupActionId =
 
 export type SetupStep = "config" | "profile" | "banks" | "template" | "review" | "done";
 
-export type SetupProfileChoice = "project-only" | "project-global" | "global-only";
+export type SetupProfileChoice = "project-user" | "project-only" | "user-only" | "recall-only";
 
 export type SetupTemplateChoice =
   | "none"

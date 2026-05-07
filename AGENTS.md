@@ -18,7 +18,7 @@ The extension must be:
 
 1. Official Hindsight docs and API behavior
 2. Official Pi `pi-mono` extension/session/package docs
-3. This repository’s PRD and coding plan
+3. This repository’s PRD, ADRs, GitHub issues, and current docs
 4. Public reference repos only as implementation inspiration
 5. User notes/gists only as hypotheses, never as authority
 

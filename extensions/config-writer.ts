@@ -8,7 +8,7 @@ import { validEnvVarName } from "./config.js";
 import { resetPathsForConfigKeys, type ConfigResetKey } from "./config-field-paths.js";
 import { parseJsonWithComments } from "./config-json.js";
 
-export type MemoryProfile = "project-only" | "project+global" | "global-only";
+export type MemoryProfile = "project-only" | "project+global" | "global-only" | "recall-only";
 
 export type ConfigScope = "project" | "global";
 
@@ -154,19 +154,32 @@ export function buildProjectConfigPatch(input: ProjectConfigPatchInput): Record<
     };
   }
   if (input.memoryProfile) {
-    const globalBankId = input.globalBankId || DEFAULT_GLOBAL_BANK_ID;
+    const globalBankId = input.globalBankId?.trim();
+    const userBankPatch = { enabled: true, ...(globalBankId ? { bankId: globalBankId } : {}) };
     if (input.memoryProfile === "project-only") {
       patch.banks = { project: { enabled: true }, user: { enabled: false } };
+      patch.userRetain = { mode: "explicit-only" };
+      patch.recall = { enabled: true };
+      patch.retain = { enabled: true };
     } else if (input.memoryProfile === "project+global") {
       patch.banks = {
         project: { enabled: true },
-        user: { enabled: true, bankId: globalBankId },
+        user: userBankPatch,
       };
-    } else {
+      patch.userRetain = { mode: "explicit-only" };
+      patch.recall = { enabled: true };
+      patch.retain = { enabled: true };
+    } else if (input.memoryProfile === "global-only") {
       patch.banks = {
         project: { enabled: false },
-        user: { enabled: true, bankId: globalBankId },
+        user: userBankPatch,
       };
+      patch.userRetain = { mode: "router" };
+      patch.recall = { enabled: true };
+      patch.retain = { enabled: true };
+    } else {
+      patch.recall = { enabled: true };
+      patch.retain = { enabled: false };
     }
   }
   if (input.projectBankId && input.memoryProfile !== "global-only") {

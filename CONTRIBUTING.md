@@ -21,7 +21,7 @@ Use this order when implementation choices conflict:
 
 1. Official Hindsight docs and API behavior.
 2. Official Pi extension, session, and package docs.
-3. This repository's PRDs, ADRs, and coding plans.
+3. This repository's PRDs, ADRs, GitHub issues, and current docs.
 4. Public reference repos as implementation inspiration only.
 5. User notes and gists as hypotheses only.
 

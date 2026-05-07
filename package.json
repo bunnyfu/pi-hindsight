@@ -23,8 +23,6 @@
     "CHANGELOG.md",
     "docs/adr",
     "docs/hindsight-core-functions.md",
-    "docs/pr-roadmap.md",
-    "docs/post-mvp-roadmap.md",
     "docs/risky-memory-modes.md",
     "docs/next-opt-out-design.md",
     "docs/surface-reference.md",

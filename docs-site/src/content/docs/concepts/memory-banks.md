@@ -17,25 +17,29 @@ A **Project Bank** is selected for the current repository. It stores repository-
 
 Project recall is scoped with repository tags so unrelated project memories do not leak in. In Git worktrees, Pi Hindsight resolves the main Git worktree root so linked worktrees of the same repository share the same Project Bank.
 
-## Global Bank / User Bank
+## User Bank
 
-A **Global Bank** is an optional cross-project bank for durable user-level memory such as:
+A **User Bank** is an optional cross-project bank for durable user-level memory such as:
 
 - stable preferences
 - recurring workflows
 - coding habits
 - assistant collaboration style
 
-The user-facing UI may call this **User** memory where that is clearer. The tool alias `global` remains supported for compatibility.
+Guided setup configures the User Bank once in global Pi config for profiles that use user memory. Repository config then chooses whether the current project participates in user memory.
 
-Automatic Global Bank writes are disabled by default. Use explicit Retain or intentionally enable Router Mode when cross-project writes are desired.
+Automatic User Bank writes are disabled unless a setup profile or routing mode intentionally enables them. Use explicit retain when you want to write user memory manually.
+
+## Legacy global naming
+
+Older config, tool aliases, and some internal fields may still say **global**. In user-facing docs, **User Bank** is the same cross-project memory concept. The `global` alias remains supported for compatibility.
 
 ## Bank Alias
 
 A **Bank Alias** is a stable name that resolves to a real Hindsight bank ID:
 
 - `project` resolves to the selected Project Bank.
-- `global` resolves to the configured Global/User Bank.
+- `global` resolves to the configured User Bank.
 
 Aliases are useful in tools and documentation when the exact bank ID is not important.
 

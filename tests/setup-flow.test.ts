@@ -104,9 +104,9 @@ describe("setup flow state", () => {
 
     const profiled = applySetupIntent(tabs(), started.state, {
       type: "chooseProfile",
-      profile: "project-global",
+      profile: "project-user",
     });
-    expect(profiled.state).toMatchObject({ step: "banks", profileChoice: "project-global" });
+    expect(profiled.state).toMatchObject({ step: "banks", profileChoice: "project-user" });
 
     const templated = applySetupIntent(
       tabs(),
