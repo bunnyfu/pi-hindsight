@@ -7,7 +7,7 @@ import { expandObservationScopes } from "./observation-scopes.js";
 import { retainDurably } from "./retain-durable.js";
 import { appendRetainReceipt, listRetainReceipts } from "./retain-receipts.js";
 import { getEffectiveSessionMemoryMode, readSessionMemoryMeta } from "./session-memory-meta.js";
-import type { ResolvedConfig, UpdateMode } from "./types.js";
+import type { HindsightObservationScopes, ResolvedConfig, UpdateMode } from "./types.js";
 
 const RESERVED_EXPLICIT_RETAIN_METADATA_KEYS = new Set([
   "cwd",
@@ -40,7 +40,8 @@ export function createRetainOperations(deps: MemoryOperationsDeps) {
       timestamp?: string;
       metadata?: Record<string, string>;
       updateMode?: UpdateMode;
-      observationScopes?: string[][];
+      observationScopes?: HindsightObservationScopes;
+      documentTags?: string[];
       async?: boolean;
     }) {
       const meta = await readSessionMemoryMeta(args.cwd, args.sessionFile);
@@ -90,7 +91,8 @@ export function createRetainOperations(deps: MemoryOperationsDeps) {
         },
         ...(args.timestamp ? { timestamp: args.timestamp } : {}),
         source: "tool",
-        ...(observationScopes.length ? { observationScopes } : {}),
+        ...(hasObservationScopes(observationScopes) ? { observationScopes } : {}),
+        ...(args.documentTags?.length ? { documentTags: args.documentTags } : {}),
         ...(args.entities?.length ? { entities: args.entities } : {}),
         ...(args.async !== undefined ? { async: args.async } : {}),
         ...(capabilities ? { capabilities } : {}),
@@ -120,4 +122,8 @@ export function createRetainOperations(deps: MemoryOperationsDeps) {
       return flushRetain(cwd, deps.getConfig(), deps.getClient());
     },
   };
+}
+
+function hasObservationScopes(scopes: HindsightObservationScopes): boolean {
+  return typeof scopes === "string" ? scopes.length > 0 : scopes.length > 0;
 }

@@ -1,7 +1,7 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
 import type { HindsightLikeClient, RetainJob } from "./types.js";
-import { deliverRetainJob, redactQueueError } from "./queue-delivery.js";
+import { deliverRetainJob, operationIdsFromResponse, redactQueueError } from "./queue-delivery.js";
 import { JsonlQueueStore, type JsonlQueueFileSummary } from "./jsonl-queue-store.js";
 import {
   RETAIN_QUEUE_LOCK,
@@ -116,6 +116,7 @@ export interface FlushRetainQueueResult {
   remaining: number;
   deadLettered: number;
   malformed: number;
+  operationIds?: string[];
 }
 
 function isRetainJob(value: unknown): value is RetainJob {
@@ -178,6 +179,7 @@ export async function flushRetainQueue(
     const jobs = parsed.jobs;
     const remaining: RetainJob[] = [];
     const deadLetteredJobs: RetainJob[] = [];
+    const operationIds: string[] = [];
     let sent = 0;
     for (const [index, job] of jobs.entries()) {
       if (index >= maxJobs || Date.now() - started >= maxElapsedMs) {
@@ -185,7 +187,8 @@ export async function flushRetainQueue(
         break;
       }
       try {
-        await deliverRetainJob(client, job);
+        const response = await deliverRetainJob(client, job);
+        operationIds.push(...operationIdsFromResponse(response));
         sent += 1;
       } catch (error) {
         const errorMessage = redactQueueError(error);
@@ -218,6 +221,7 @@ export async function flushRetainQueue(
       remaining: remaining.length,
       deadLettered: appendedDeadLetterJobs,
       malformed: parsed.malformedLines.length,
+      ...(operationIds.length ? { operationIds: [...new Set(operationIds)] } : {}),
     };
   });
 }

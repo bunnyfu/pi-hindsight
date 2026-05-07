@@ -94,17 +94,30 @@ Additional tools:
 - `hindsight_route_memory`
 - `hindsight_retain_receipts`
 - `hindsight_delete_document`
+- `hindsight_list_operations`
+- `hindsight_cancel_operation`
+- `hindsight_retry_operation`
+- `hindsight_list_memories`
+- `hindsight_get_memory`
+- `hindsight_get_chunk`
+- `hindsight_get_memory_history`
+- `hindsight_delete_memory_observations`
 
 Tool notes:
 
 - `hindsight_recall` accepts `queryTimestamp` plus advanced one-off controls: `types`, `budget`, `maxTokens` (including `0`), `includeChunks`, `recallChunksMaxTokens`, `includeSourceFacts`, `maxSourceFactsTokens`, `includeEntities`, and `trace`.
-- `hindsight_retain` and `hindsight_retain_global` accept explicit Hindsight retain options: `entities`, `documentId`, `timestamp`, `metadata`, `updateMode`, `observationScopes`, and `async`.
+- `hindsight_retain` and `hindsight_retain_global` accept explicit Hindsight retain options: `entities`, `documentId`, `timestamp` (including literal `unset`), `metadata`, `updateMode`, `observationScopes`, `documentTags`, and `async`. `observationScopes` accepts `per_tag`, `combined`, `all_combinations`, or explicit string groups. Hindsight supports `documentTags` for compatibility, but upstream marks it deprecated; prefer normal `tags` unless document-level interop requires it.
+- For `updateMode: "append"`, use a stable `documentId` when continuing a known document. If omitted, pi-hindsight still uses its deterministic explicit-retain document ID; repeated calls only append together when content/context/session produce the same ID.
+- Async retain responses include Hindsight operation IDs when the server returns them; use `hindsight_list_operations`, `hindsight_cancel_operation`, and `hindsight_retry_operation` to inspect or manage those jobs.
 - Caller `metadata` is merged with pi-hindsight provenance, but reserved provenance keys such as `cwd`, `pi_session_file`, `source`, and `retainSource` are set by pi-hindsight and cannot be overridden.
 - `hindsight_reflect` accepts `responseSchema` for structured reflection output plus `budget`, `maxTokens` (including `0`), `includeFacts`, and `includeToolCalls` when supported by Hindsight.
 - Omit `bank` or pass `project` for the selected project bank.
 - Pass `global` for the configured global bank.
 - `hindsight_retain_global` refuses to write if global memory is disabled or missing a bank ID.
 - `hindsight_delete_document` requires exact bank, exact document ID, and `confirm: true`.
+- `hindsight_cancel_operation` requires exact operation ID and `confirm: true`; it is intended for pending operations.
+- `hindsight_delete_memory_observations` requires exact memory ID and `confirm: true`. Bank-wide memory clear/delete-all is intentionally not exposed.
+- Memory inspection tools use current documented REST endpoints: list memory units, fetch a memory, fetch a chunk by ID, fetch memory history when the server supports it, and delete observations for one memory when supported.
 
 ## Receipts and deletion
 

@@ -31,6 +31,13 @@ export type ExportBankTemplateToolResult = Awaited<
 export type GetBankConfigToolResult = Awaited<ReturnType<MemoryOperations["getBankConfig"]>>;
 export type ResetBankConfigToolResult = Awaited<ReturnType<MemoryOperations["resetBankConfig"]>>;
 export type RetainReceiptListResult = Awaited<ReturnType<MemoryOperations["listRetainReceipts"]>>;
+export type ListOperationsToolResult = Awaited<ReturnType<MemoryOperations["listOperations"]>>;
+export type OperationToolResult =
+  | Awaited<ReturnType<MemoryOperations["cancelOperation"]>>
+  | Awaited<ReturnType<MemoryOperations["retryOperation"]>>;
+export type ListMemoriesToolResult = Awaited<ReturnType<MemoryOperations["listMemories"]>>;
+export type MemoryToolResult = Awaited<ReturnType<MemoryOperations["getMemory"]>>;
+export type ChunkToolResult = Awaited<ReturnType<MemoryOperations["getChunk"]>>;
 
 export function retainToolResponse(result: RetainToolResult): ToolTextResponse<RetainToolResult> {
   const deadLetterStatus = result.deadLettered
@@ -40,7 +47,10 @@ export function retainToolResponse(result: RetainToolResult): ToolTextResponse<R
     result.remaining > 0
       ? `Queued for ${result.bankId}; ${result.remaining} job${result.remaining === 1 ? "" : "s"} pending.${deadLetterStatus}`
       : `Retained in ${result.bankId} as ${result.documentId}.${deadLetterStatus}`;
-  return { content: [{ type: "text", text }], details: result };
+  const operationText = result.operationIds?.length
+    ? ` Operation IDs: ${result.operationIds.join(", ")}.`
+    : "";
+  return { content: [{ type: "text", text: `${text}${operationText}` }], details: result };
 }
 
 export function routeMemoryToolResponse(
@@ -221,6 +231,135 @@ export function deleteDirectiveToolResponse(
         ].join("\n"),
       },
     ],
+    details: result,
+  };
+}
+
+function objectItems(result: unknown): unknown[] {
+  if (!result || typeof result !== "object" || Array.isArray(result)) return [];
+  const record = result as Record<string, unknown>;
+  if (Array.isArray(record.items)) return record.items;
+  if (Array.isArray(record.memories)) return record.memories;
+  if (Array.isArray(record.operations)) return record.operations;
+  return [];
+}
+
+function textField(record: Record<string, unknown>, keys: string[], fallback = "unknown"): string {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return fallback;
+}
+
+function numberField(record: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "number") return value;
+    if (Array.isArray(value)) return value.length;
+  }
+  return undefined;
+}
+
+function payloadSummary(value: unknown): string {
+  if (!value || typeof value !== "object") return "payload unavailable";
+  const record = value as Record<string, unknown>;
+  const payload = record.payload ?? record.request ?? record.input;
+  if (!payload || typeof payload !== "object") return "payload unavailable";
+  return (
+    Object.keys(payload as Record<string, unknown>)
+      .slice(0, 8)
+      .join(", ") || "payload empty"
+  );
+}
+
+function operationLabel(value: unknown): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return JSON.stringify(value);
+  const record = value as Record<string, unknown>;
+  const documentIds = record.document_ids ?? record.documentIds ?? record.document_id;
+  const docs = Array.isArray(documentIds)
+    ? documentIds.join(",")
+    : typeof documentIds === "string"
+      ? documentIds
+      : "unknown";
+  const items = numberField(record, ["items_count", "itemsCount", "item_count", "items"]);
+  const error = textField(record, ["error", "error_message", "message"], "none");
+  const created = textField(record, ["created_at", "createdAt"], "unknown-created");
+  const updated = textField(
+    record,
+    ["updated_at", "updatedAt", "completed_at", "completedAt"],
+    "unknown-updated",
+  );
+  return `${textField(record, ["id", "operation_id", "operationId"])} · ${textField(record, ["status"])} · ${textField(record, ["task_type", "taskType", "type"])} · docs=${docs} · items=${items ?? "unknown"} · error=${error} · ${created}→${updated} · ${payloadSummary(value)}`;
+}
+
+export function listOperationsToolResponse(
+  result: ListOperationsToolResult,
+): ToolTextResponse<ListOperationsToolResult> {
+  const items = objectItems(result.result);
+  return {
+    content: [
+      {
+        type: "text",
+        text: [
+          `Operations in ${result.bankId}: ${items.length}`,
+          ...items.map(operationLabel),
+        ].join("\n"),
+      },
+    ],
+    details: result,
+  };
+}
+
+export function operationToolResponse(
+  verb: "Cancelled" | "Retried",
+  result: OperationToolResult,
+): ToolTextResponse<OperationToolResult> {
+  return {
+    content: [
+      {
+        type: "text",
+        text: [
+          `${verb} operation ${result.operationId} in ${result.bankId}.`,
+          operationLabel(result.result),
+          JSON.stringify(result.result, null, 2),
+        ].join("\n"),
+      },
+    ],
+    details: result,
+  };
+}
+
+function memoryLabel(value: unknown): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return JSON.stringify(value);
+  const record = value as Record<string, unknown>;
+  const text = textField(record, ["content", "text", "summary"], "").slice(0, 120);
+  return `${textField(record, ["id", "memory_id", "memoryId"])} · ${textField(record, ["type", "fact_type", "factType"])} · ${text}`;
+}
+
+export function listMemoriesToolResponse(
+  result: ListMemoriesToolResult,
+): ToolTextResponse<ListMemoriesToolResult> {
+  const items = objectItems(result.result);
+  return {
+    content: [
+      {
+        type: "text",
+        text: [`Memories in ${result.bankId}: ${items.length}`, ...items.map(memoryLabel)].join(
+          "\n",
+        ),
+      },
+    ],
+    details: result,
+  };
+}
+
+export function jsonToolResponse<T extends { result: unknown }>(
+  heading: string,
+  result: T,
+): ToolTextResponse<T> {
+  return {
+    content: [{ type: "text", text: [heading, JSON.stringify(result.result, null, 2)].join("\n") }],
     details: result,
   };
 }

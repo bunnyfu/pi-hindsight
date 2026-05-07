@@ -1,6 +1,7 @@
 import type {
   HindsightCapabilities,
   HindsightLikeClient,
+  HindsightObservationScopes,
   ResolvedConfig,
   RetainJob,
   UpdateMode,
@@ -23,7 +24,8 @@ export interface RetainDurablyArgs {
   metadata?: Record<string, string>;
   source: DurableRetainSource;
   timestamp?: string;
-  observationScopes?: string[][];
+  observationScopes?: HindsightObservationScopes;
+  documentTags?: string[];
   entities?: RetainJob["item"]["entities"];
   async?: boolean;
   capabilities?: HindsightCapabilities;
@@ -38,6 +40,7 @@ export interface RetainDurablyResult {
   documentId: string;
   queueJobId: string;
   updateMode: UpdateMode;
+  operationIds?: string[];
 }
 
 export function buildDurableRetainJob(args: Omit<RetainDurablyArgs, "client">): RetainJob {

@@ -18,7 +18,11 @@ import {
   getBankTemplateSchemaToolResponse,
   getDirectiveToolResponse,
   importToolResponse,
+  jsonToolResponse,
   listDirectivesToolResponse,
+  listMemoriesToolResponse,
+  listOperationsToolResponse,
+  operationToolResponse,
   resetBankConfigToolResponse,
   retainReceiptListToolResponse,
   retainToolResponse,
@@ -91,6 +95,17 @@ const retainUpdateModeSchema = Type.Union([Type.Literal("append"), Type.Literal(
   description: "Optional Hindsight update mode for this explicit retain call.",
 });
 
+const observationScopesSchema = Type.Unsafe<import("./types.js").HindsightObservationScopes>({
+  ...Type.Union([
+    Type.Literal("per_tag"),
+    Type.Literal("combined"),
+    Type.Literal("all_combinations"),
+    Type.Array(Type.Array(Type.String())),
+  ]),
+  description:
+    "Optional Hindsight observation scopes. Use per_tag, combined, all_combinations, or explicit string groups. When provided, overrides configured default observation scopes for this retain call.",
+});
+
 function explicitRetainOptionParameters() {
   return {
     documentId: Type.Optional(
@@ -112,10 +127,10 @@ function explicitRetainOptionParameters() {
       }),
     ),
     updateMode: Type.Optional(retainUpdateModeSchema),
-    observationScopes: Type.Optional(
-      Type.Array(Type.Array(Type.String()), {
-        description:
-          "Optional Hindsight observation scopes as string groups. When provided, overrides configured default observation scopes for this retain call.",
+    observationScopes: Type.Optional(observationScopesSchema),
+    documentTags: Type.Optional(
+      Type.Array(Type.String(), {
+        description: "Optional Hindsight document_tags for this retained document when supported.",
       }),
     ),
     async: Type.Optional(
@@ -132,7 +147,8 @@ type ExplicitRetainOptionParams = {
   timestamp?: string;
   metadata?: Record<string, string>;
   updateMode?: import("./types.js").UpdateMode;
-  observationScopes?: string[][];
+  observationScopes?: import("./types.js").HindsightObservationScopes;
+  documentTags?: string[];
   async?: boolean;
 };
 
@@ -145,6 +161,7 @@ function explicitRetainOptions(params: ExplicitRetainOptionParams) {
     ...(params.observationScopes !== undefined
       ? { observationScopes: params.observationScopes }
       : {}),
+    ...(params.documentTags !== undefined ? { documentTags: params.documentTags } : {}),
     ...(params.async !== undefined ? { async: params.async } : {}),
   };
 }
@@ -392,6 +409,179 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
           documentId: params.documentId,
         });
         return deleteDocumentToolResponse(result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_list_operations",
+      label: "Hindsight List Operations",
+      description: "List Hindsight async operations for a bank with supported server filters.",
+      parameters: Type.Object({
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+        status: Type.Optional(Type.String({ description: "Optional operation status filter." })),
+        taskType: Type.Optional(Type.String({ description: "Optional task type filter." })),
+        limit: Type.Optional(Type.Number({ description: "Maximum operations to return." })),
+        offset: Type.Optional(Type.Number({ description: "Pagination offset." })),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.listOperations({
+          ...(params.bank ? { bank: params.bank } : {}),
+          options: {
+            ...(params.status
+              ? { status: params.status as import("./types.js").OperationStatus }
+              : {}),
+            ...(params.taskType ? { taskType: params.taskType } : {}),
+            ...(params.limit !== undefined ? { limit: params.limit } : {}),
+            ...(params.offset !== undefined ? { offset: params.offset } : {}),
+          },
+        });
+        return listOperationsToolResponse(result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_cancel_operation",
+      label: "Hindsight Cancel Operation",
+      description: "Cancel a pending Hindsight async operation. Requires confirm=true.",
+      parameters: Type.Object({
+        operationId: Type.String({ description: "Hindsight operation ID." }),
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+        confirm: Type.Literal(true, {
+          description: "Required destructive-action confirmation. Must be true.",
+        }),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.cancelOperation({
+          operationId: params.operationId,
+          ...(params.bank ? { bank: params.bank } : {}),
+          confirm: params.confirm,
+        });
+        return operationToolResponse("Cancelled", result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_retry_operation",
+      label: "Hindsight Retry Operation",
+      description: "Retry a failed or cancelled Hindsight async operation.",
+      parameters: Type.Object({
+        operationId: Type.String({ description: "Hindsight operation ID." }),
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.retryOperation({
+          operationId: params.operationId,
+          ...(params.bank ? { bank: params.bank } : {}),
+        });
+        return operationToolResponse("Retried", result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_list_memories",
+      label: "Hindsight List Memories",
+      description: "List raw Hindsight memory units for inspection.",
+      parameters: Type.Object({
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+        type: Type.Optional(Type.String({ description: "Optional memory type filter." })),
+        q: Type.Optional(Type.String({ description: "Optional text query filter." })),
+        limit: Type.Optional(Type.Number({ description: "Maximum memories to return." })),
+        offset: Type.Optional(Type.Number({ description: "Pagination offset." })),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.listMemories({
+          ...(params.bank ? { bank: params.bank } : {}),
+          options: {
+            ...(params.type ? { type: params.type } : {}),
+            ...(params.q ? { q: params.q } : {}),
+            ...(params.limit !== undefined ? { limit: params.limit } : {}),
+            ...(params.offset !== undefined ? { offset: params.offset } : {}),
+          },
+        });
+        return listMemoriesToolResponse(result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_get_memory",
+      label: "Hindsight Get Memory",
+      description: "Fetch a raw Hindsight memory unit by ID.",
+      parameters: Type.Object({
+        memoryId: Type.String({ description: "Hindsight memory ID." }),
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.getMemory({
+          memoryId: params.memoryId,
+          ...(params.bank ? { bank: params.bank } : {}),
+        });
+        return jsonToolResponse(`Memory ${params.memoryId} in ${result.bankId}.`, result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_get_chunk",
+      label: "Hindsight Get Chunk",
+      description: "Fetch a raw Hindsight source chunk by chunk ID.",
+      parameters: Type.Object({
+        chunkId: Type.String({ description: "Hindsight chunk ID." }),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.getChunk({ chunkId: params.chunkId });
+        return jsonToolResponse(`Chunk ${params.chunkId}.`, result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_get_memory_history",
+      label: "Hindsight Get Memory History",
+      description: "Fetch Hindsight memory history by memory ID when server supports it.",
+      parameters: Type.Object({
+        memoryId: Type.String({ description: "Hindsight memory ID." }),
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.getMemoryHistory({
+          memoryId: params.memoryId,
+          ...(params.bank ? { bank: params.bank } : {}),
+        });
+        return jsonToolResponse(`Memory history ${params.memoryId} in ${result.bankId}.`, result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_delete_memory_observations",
+      label: "Hindsight Delete Memory Observations",
+      description:
+        "Delete observations for one Hindsight memory. Destructive; requires exact memory ID and confirm=true.",
+      parameters: Type.Object({
+        memoryId: Type.String({ description: "Hindsight memory ID." }),
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+        confirm: Type.Literal(true, {
+          description: "Required destructive-action confirmation. Must be true.",
+        }),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.deleteMemoryObservations({
+          memoryId: params.memoryId,
+          ...(params.bank ? { bank: params.bank } : {}),
+          confirm: params.confirm,
+        });
+        return jsonToolResponse(`Deleted observations for memory ${params.memoryId}.`, result);
       },
     }),
     defineCatalogTool({

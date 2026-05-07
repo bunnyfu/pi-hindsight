@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   assertHealthResponse,
   assertReflectResponse,
@@ -6,7 +6,9 @@ import {
   bankTemplateExportPath,
   bankTemplateImportPath,
   bankTemplateSchemaPath,
+  chunkItemPath,
   createDirectiveRequestBody,
+  createHindsightRestTransport,
   createMentalModelRequestBody,
   directiveItemPath,
   directivesCollectionPath,
@@ -15,6 +17,14 @@ import {
   mentalModelHistoryPath,
   mentalModelItemPath,
   mentalModelRefreshPath,
+  memoriesCollectionPath,
+  memoryHistoryPath,
+  memoryItemPath,
+  memoryObservationsPath,
+  operationCancelPath,
+  operationItemPath,
+  operationRetryPath,
+  operationsCollectionPath,
   reflectRequestBody,
   updateBankConfigRequestBody,
   updateDirectiveRequestBody,
@@ -22,6 +32,10 @@ import {
 } from "../extensions/client-rest.js";
 
 describe("Hindsight REST transport helpers", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("maps reflect response schema options to Hindsight REST request shape", () => {
     expect(
       reflectRequestBody("query", {
@@ -92,6 +106,39 @@ describe("Hindsight REST transport helpers", () => {
       content: null,
       is_active: true,
     });
+  });
+
+  it("maps operation and memory inspection paths", () => {
+    expect(
+      operationsCollectionPath("bank/id", {
+        status: "failed",
+        taskType: "retain",
+        limit: 25,
+        offset: 50,
+      }),
+    ).toBe("/v1/default/banks/bank%2Fid/operations?status=failed&type=retain&limit=25&offset=50");
+    expect(operationItemPath("bank/id", "op/id")).toBe(
+      "/v1/default/banks/bank%2Fid/operations/op%2Fid",
+    );
+    expect(operationCancelPath("bank/id", "op/id")).toBe(
+      "/v1/default/banks/bank%2Fid/operations/op%2Fid",
+    );
+    expect(operationRetryPath("bank/id", "op/id")).toBe(
+      "/v1/default/banks/bank%2Fid/operations/op%2Fid/retry",
+    );
+    expect(
+      memoriesCollectionPath("bank/id", { type: "observation", q: "needle", limit: 5, offset: 2 }),
+    ).toBe("/v1/default/banks/bank%2Fid/memories/list?type=observation&q=needle&limit=5&offset=2");
+    expect(memoryItemPath("bank/id", "mem/id")).toBe(
+      "/v1/default/banks/bank%2Fid/memories/mem%2Fid",
+    );
+    expect(memoryHistoryPath("bank/id", "mem/id")).toBe(
+      "/v1/default/banks/bank%2Fid/memories/mem%2Fid/history",
+    );
+    expect(memoryObservationsPath("bank/id", "mem/id")).toBe(
+      "/v1/default/banks/bank%2Fid/memories/mem%2Fid/observations",
+    );
+    expect(chunkItemPath("chunk/id")).toBe("/v1/default/chunks/chunk%2Fid");
   });
 
   it("maps mental model paths and query options to Hindsight REST shape", () => {
@@ -169,5 +216,25 @@ describe("Hindsight REST transport helpers", () => {
     expect(assertHealthResponse("ok")).toEqual({});
     expect(assertReflectResponse({ text: "answer" })).toEqual({ text: "answer" });
     expect(() => assertReflectResponse(null)).toThrow("non-object response");
+  });
+
+  it("preserves REST status and body for admin-tool error presentation", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: false,
+        status: 409,
+        json: async () => ({ detail: "operation is not pending" }),
+      })),
+    );
+    const transport = createHindsightRestTransport({
+      hindsight: { baseUrl: "http://hindsight.test/", apiKey: "secret", timeoutMs: 1000 },
+    } as never);
+
+    await expect(transport.request("/v1/default/banks/bank/operations/op")).rejects.toMatchObject({
+      status: 409,
+      body: { detail: "operation is not pending" },
+      message: 'Hindsight request failed with status 409: {"detail":"operation is not pending"}',
+    });
   });
 });
