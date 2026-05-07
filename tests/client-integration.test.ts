@@ -136,6 +136,74 @@ describe("Hindsight client adapter integration", () => {
       if (
         req.method === "GET" &&
         req.url ===
+          "/v1/default/banks/test-bank/documents?q=session&tags=source%3Api&tags_match=all&limit=5&offset=1"
+      ) {
+        sendJson(res, 200, { items: [{ id: "doc-1", tags: ["source:pi"] }] });
+        return;
+      }
+      if (req.method === "GET" && req.url === "/v1/default/banks/test-bank/documents/doc-1") {
+        sendJson(res, 200, { id: "doc-1", content: "doc" });
+        return;
+      }
+      if (req.method === "PATCH" && req.url === "/v1/default/banks/test-bank/documents/doc-1") {
+        sendJson(res, 200, { id: "doc-1", tags: ["updated"] });
+        return;
+      }
+      if (
+        req.method === "GET" &&
+        req.url === "/v1/default/banks/test-bank/entities?limit=5&offset=1"
+      ) {
+        sendJson(res, 200, { items: [{ id: "entity-1", text: "Alice" }] });
+        return;
+      }
+      if (req.method === "GET" && req.url === "/v1/default/banks/test-bank/entities/entity-1") {
+        sendJson(res, 200, { id: "entity-1", text: "Alice" });
+        return;
+      }
+      if (
+        req.method === "POST" &&
+        req.url === "/v1/default/banks/test-bank/entities/entity-1/regenerate"
+      ) {
+        sendJson(res, 202, { operation_id: "entity-op" });
+        return;
+      }
+      if (
+        req.method === "GET" &&
+        req.url ===
+          "/v1/default/banks/test-bank/graph?type=world&q=alice&limit=7&tags=source%3Api&tags_match=any&document_id=doc-1&chunk_id=chunk-1"
+      ) {
+        sendJson(res, 200, { nodes: [{ id: "entity-1" }], edges: [] });
+        return;
+      }
+      if (
+        req.method === "GET" &&
+        req.url === "/v1/default/banks/test-bank/entities/graph?limit=4&min_count=2"
+      ) {
+        sendJson(res, 200, { nodes: [{ id: "entity-1" }] });
+        return;
+      }
+      if (
+        req.method === "GET" &&
+        req.url === "/v1/default/banks/test-bank/tags?q=source&source=memories&limit=5&offset=2"
+      ) {
+        sendJson(res, 200, { items: [{ tag: "source:pi" }] });
+        return;
+      }
+      if (req.method === "PATCH" && req.url === "/v1/default/banks/test-bank") {
+        sendJson(res, 200, { bank_id: "test-bank", name: "Updated" });
+        return;
+      }
+      if (req.method === "PUT" && req.url === "/v1/default/banks/test-bank/profile") {
+        sendJson(res, 200, { disposition: { skepticism: 1, literalism: 2, empathy: 3 } });
+        return;
+      }
+      if (req.method === "POST" && req.url === "/v1/default/banks/test-bank/background") {
+        sendJson(res, 200, { updated: true });
+        return;
+      }
+      if (
+        req.method === "GET" &&
+        req.url ===
           "/v1/default/banks/test-bank/mental-models?tags=source%3Api&tags_match=all&detail=metadata&limit=10&offset=2"
       ) {
         sendJson(res, 200, { items: [{ id: "model-1", name: "Model" }] });
@@ -267,6 +335,49 @@ describe("Hindsight client adapter integration", () => {
       retain_custom_instructions: "Write to db",
     });
     const bankConfigReset = await client.resetBankConfig?.("test-bank");
+    const documents = await client.listDocuments?.("test-bank", {
+      q: "session",
+      tags: ["source:pi"],
+      tagsMatch: "all",
+      limit: 5,
+      offset: 1,
+    });
+    const document = await client.getDocument?.("test-bank", "doc-1");
+    const updatedDocument = await client.updateDocument?.("test-bank", "doc-1", {
+      tags: ["updated"],
+    });
+    const entities = await client.listEntities?.("test-bank", { limit: 5, offset: 1 });
+    const entity = await client.getEntity?.("test-bank", "entity-1");
+    const regeneratedEntity = await client.regenerateEntity?.("test-bank", "entity-1");
+    const graph = await client.getGraph?.("test-bank", {
+      type: "world",
+      q: "alice",
+      limit: 7,
+      tags: ["source:pi"],
+      tagsMatch: "any",
+      documentId: "doc-1",
+      chunkId: "chunk-1",
+    });
+    const entityGraph = await client.getEntityGraph?.("test-bank", { limit: 4, minCount: 2 });
+    const tags = await client.listTags?.("test-bank", {
+      q: "source",
+      source: "memories",
+      limit: 5,
+      offset: 2,
+    });
+    const bankProfileUpdate = await client.updateBankProfile?.("test-bank", {
+      name: "Updated",
+      reflectMission: "Reflect precisely",
+    });
+    const dispositionUpdate = await client.updateBankDisposition?.("test-bank", {
+      skepticism: 1,
+      literalism: 2,
+      empathy: 3,
+    });
+    const backgroundUpdate = await client.addBankBackground?.("test-bank", {
+      content: "Background",
+      updateDisposition: true,
+    });
     const models = await client.listMentalModels?.("test-bank", {
       tags: ["source:pi"],
       tagsMatch: "all",
@@ -322,6 +433,20 @@ describe("Hindsight client adapter integration", () => {
     expect(bankConfig).toEqual({ config: { retain_custom_instructions: "Read from db" } });
     expect(bankConfigUpdate).toEqual({ updated: true });
     expect(bankConfigReset).toEqual({ reset: true });
+    expect(documents).toEqual({ items: [{ id: "doc-1", tags: ["source:pi"] }] });
+    expect(document).toEqual({ id: "doc-1", content: "doc" });
+    expect(updatedDocument).toEqual({ id: "doc-1", tags: ["updated"] });
+    expect(entities).toEqual({ items: [{ id: "entity-1", text: "Alice" }] });
+    expect(entity).toEqual({ id: "entity-1", text: "Alice" });
+    expect(regeneratedEntity).toEqual({ operation_id: "entity-op" });
+    expect(graph).toEqual({ nodes: [{ id: "entity-1" }], edges: [] });
+    expect(entityGraph).toEqual({ nodes: [{ id: "entity-1" }] });
+    expect(tags).toEqual({ items: [{ tag: "source:pi" }] });
+    expect(bankProfileUpdate).toEqual({ bank_id: "test-bank", name: "Updated" });
+    expect(dispositionUpdate).toEqual({
+      disposition: { skepticism: 1, literalism: 2, empathy: 3 },
+    });
+    expect(backgroundUpdate).toEqual({ updated: true });
     expect(models).toEqual({ items: [{ id: "model-1", name: "Model" }] });
     expect(model).toEqual({ id: "model-1", name: "Model", content: "full" });
     expect(createdModel).toEqual({ operation_id: "create-op", status: "queued" });
@@ -348,6 +473,18 @@ describe("Hindsight client adapter integration", () => {
       "GET /v1/default/banks/test-bank/config",
       "PATCH /v1/default/banks/test-bank/config",
       "DELETE /v1/default/banks/test-bank/config",
+      "GET /v1/default/banks/test-bank/documents?q=session&tags=source%3Api&tags_match=all&limit=5&offset=1",
+      "GET /v1/default/banks/test-bank/documents/doc-1",
+      "PATCH /v1/default/banks/test-bank/documents/doc-1",
+      "GET /v1/default/banks/test-bank/entities?limit=5&offset=1",
+      "GET /v1/default/banks/test-bank/entities/entity-1",
+      "POST /v1/default/banks/test-bank/entities/entity-1/regenerate",
+      "GET /v1/default/banks/test-bank/graph?type=world&q=alice&limit=7&tags=source%3Api&tags_match=any&document_id=doc-1&chunk_id=chunk-1",
+      "GET /v1/default/banks/test-bank/entities/graph?limit=4&min_count=2",
+      "GET /v1/default/banks/test-bank/tags?q=source&source=memories&limit=5&offset=2",
+      "PATCH /v1/default/banks/test-bank",
+      "PUT /v1/default/banks/test-bank/profile",
+      "POST /v1/default/banks/test-bank/background",
       "GET /v1/default/banks/test-bank/mental-models?tags=source%3Api&tags_match=all&detail=metadata&limit=10&offset=2",
       "GET /v1/default/banks/test-bank/mental-models/model-1?detail=full",
       "POST /v1/default/banks/test-bank/mental-models",
@@ -418,12 +555,21 @@ describe("Hindsight client adapter integration", () => {
     expect(requests[15]?.body).toEqual({
       updates: { retain_custom_instructions: "Write to db" },
     });
-    expect(requests[19]?.body).toEqual({
+    expect(requests[19]?.body).toEqual({ tags: ["updated"] });
+    expect(requests[26]?.body).toEqual({
+      name: "Updated",
+      reflect_mission: "Reflect precisely",
+    });
+    expect(requests[27]?.body).toEqual({
+      disposition: { skepticism: 1, literalism: 2, empathy: 3 },
+    });
+    expect(requests[28]?.body).toEqual({ content: "Background", update_disposition: true });
+    expect(requests[31]?.body).toEqual({
       name: "Model",
       source_query: "What should recur?",
       tags: ["source:pi"],
       max_tokens: 256,
     });
-    expect(requests[20]?.body).toEqual({ source_query: "Updated query", tags: null });
+    expect(requests[32]?.body).toEqual({ source_query: "Updated query", tags: null });
   });
 });

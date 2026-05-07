@@ -20,6 +20,9 @@ export type HindsightTagGroup =
 export type MentalModelDetail = "metadata" | "content" | "full";
 export type MentalModelTagsMatch = "any" | "all" | "exact";
 export type OperationStatus = "pending" | "processing" | "completed" | "failed" | "cancelled";
+export type GraphFactType = "world" | "experience" | "opinion";
+export type DocumentTagsMatch = "any" | "all" | "any_strict" | "all_strict";
+export type TagSource = "memories" | "mental_models";
 export type HindsightObservationScopes = "per_tag" | "combined" | "all_combinations" | string[][];
 export type StatusStyle = "off" | "text" | "emoji" | "nerdfont";
 export type StatusDetail = "minimal" | "project" | "activity" | "verbose";
@@ -280,6 +283,65 @@ export interface ListMemoriesOptions {
   offset?: number;
 }
 
+export interface ListDocumentsOptions {
+  q?: string;
+  tags?: string[];
+  tagsMatch?: DocumentTagsMatch;
+  limit?: number;
+  offset?: number;
+}
+
+export interface UpdateDocumentRequest {
+  tags?: string[] | null;
+}
+
+export interface ListEntitiesOptions {
+  limit?: number;
+  offset?: number;
+}
+
+export interface GetGraphOptions {
+  type?: string;
+  q?: string;
+  limit?: number;
+  tags?: string[];
+  tagsMatch?: string;
+  documentId?: string;
+  chunkId?: string;
+}
+
+export interface GetEntityGraphOptions {
+  limit?: number;
+  minCount?: number;
+}
+
+export interface ListTagsOptions {
+  q?: string;
+  source?: TagSource;
+  limit?: number;
+  offset?: number;
+}
+
+export interface DispositionTraits {
+  skepticism: number;
+  literalism: number;
+  empathy: number;
+}
+
+export interface UpdateBankProfileRequest {
+  name?: string | null;
+  mission?: string | null;
+  background?: string | null;
+  reflectMission?: string | null;
+  retainMission?: string | null;
+  observationsMission?: string | null;
+}
+
+export interface AddBankBackgroundRequest {
+  content: string;
+  updateDisposition?: boolean;
+}
+
 export interface HindsightLikeClient {
   retain(
     bankId: string,
@@ -375,7 +437,23 @@ export interface HindsightLikeClient {
   updateBankConfig?(bankId: string, updates: Record<string, unknown>): Promise<unknown>;
   resetBankConfig?(bankId: string): Promise<unknown>;
   health?(): Promise<unknown>;
+  listDocuments?(bankId: string, options?: ListDocumentsOptions): Promise<unknown>;
+  getDocument?(bankId: string, documentId: string): Promise<unknown>;
+  updateDocument?(
+    bankId: string,
+    documentId: string,
+    request: UpdateDocumentRequest,
+  ): Promise<unknown>;
   deleteDocument?(bankId: string, documentId: string): Promise<unknown>;
+  listEntities?(bankId: string, options?: ListEntitiesOptions): Promise<unknown>;
+  getEntity?(bankId: string, entityId: string): Promise<unknown>;
+  regenerateEntity?(bankId: string, entityId: string): Promise<unknown>;
+  getGraph?(bankId: string, options?: GetGraphOptions): Promise<unknown>;
+  getEntityGraph?(bankId: string, options?: GetEntityGraphOptions): Promise<unknown>;
+  listTags?(bankId: string, options?: ListTagsOptions): Promise<unknown>;
+  updateBankProfile?(bankId: string, request: UpdateBankProfileRequest): Promise<unknown>;
+  updateBankDisposition?(bankId: string, disposition: DispositionTraits): Promise<unknown>;
+  addBankBackground?(bankId: string, request: AddBankBackgroundRequest): Promise<unknown>;
   importBankTemplate?(
     bankId: string,
     manifest: BankTemplateManifest,

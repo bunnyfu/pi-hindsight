@@ -42,6 +42,19 @@ function client(): HindsightLikeClient {
     getChunk: async () => ({ id: "chunk" }),
     getMemoryHistory: async () => ({ items: [] }),
     deleteMemoryObservations: async () => ({ deleted: true }),
+    listDocuments: async () => ({ items: [] }),
+    getDocument: async () => ({ id: "document" }),
+    updateDocument: async () => ({ id: "document", tags: [] }),
+    listEntities: async () => ({ items: [] }),
+    getEntity: async () => ({ id: "entity" }),
+    regenerateEntity: async () => ({ id: "entity", status: "queued" }),
+    getGraph: async () => ({ nodes: [], edges: [] }),
+    getEntityGraph: async () => ({ nodes: [], edges: [] }),
+    listTags: async () => ({ items: [] }),
+    getBankProfile: async () => ({ id: "bank" }),
+    updateBankProfile: async () => ({ id: "bank" }),
+    updateBankDisposition: async () => ({ id: "bank", disposition: {} }),
+    addBankBackground: async () => ({ id: "bank", background: "added" }),
   };
 }
 
@@ -433,6 +446,58 @@ describe("operation catalog", () => {
           calls.push({ method: "deleteMemoryObservations", bank, memoryId });
           return { deleted: true };
         },
+        listDocuments: async (bank, options) => {
+          calls.push({ method: "listDocuments", bank, options });
+          return { items: [{ id: "doc-1", tags: ["source:pi"] }] };
+        },
+        getDocument: async (bank, documentId) => {
+          calls.push({ method: "getDocument", bank, documentId });
+          return { id: documentId };
+        },
+        updateDocument: async (bank, documentId, request) => {
+          calls.push({ method: "updateDocument", bank, documentId, request });
+          return { id: documentId, tags: request.tags };
+        },
+        listEntities: async (bank, options) => {
+          calls.push({ method: "listEntities", bank, options });
+          return { items: [{ id: "entity-1", text: "Alice" }] };
+        },
+        getEntity: async (bank, entityId) => {
+          calls.push({ method: "getEntity", bank, entityId });
+          return { id: entityId };
+        },
+        regenerateEntity: async (bank, entityId) => {
+          calls.push({ method: "regenerateEntity", bank, entityId });
+          return { id: entityId, status: "queued" };
+        },
+        getGraph: async (bank, options) => {
+          calls.push({ method: "getGraph", bank, options });
+          return { nodes: [], edges: [] };
+        },
+        getEntityGraph: async (bank, options) => {
+          calls.push({ method: "getEntityGraph", bank, options });
+          return { nodes: [], edges: [] };
+        },
+        listTags: async (bank, options) => {
+          calls.push({ method: "listTags", bank, options });
+          return { items: [{ tag: "source:pi", count: 1 }] };
+        },
+        getBankProfile: async (bank) => {
+          calls.push({ method: "getBankProfile", bank });
+          return { id: bank };
+        },
+        updateBankProfile: async (bank, request) => {
+          calls.push({ method: "updateBankProfile", bank, request });
+          return { id: bank, ...request };
+        },
+        updateBankDisposition: async (bank, disposition) => {
+          calls.push({ method: "updateBankDisposition", bank, disposition });
+          return { id: bank, disposition };
+        },
+        addBankBackground: async (bank, request) => {
+          calls.push({ method: "addBankBackground", bank, request });
+          return { id: bank, ...request };
+        },
       }),
       getConfig: () => DEFAULT_CONFIG,
       getProjectBankId: () => "project-bank",
@@ -495,6 +560,97 @@ describe("operation catalog", () => {
       () => undefined,
       ctx,
     );
+    await requireTool(catalog, "hindsight_list_documents").execute(
+      "call",
+      { tags: ["source:pi"], tagsMatch: "all_strict", limit: 2, offset: 1 },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_get_document").execute(
+      "call",
+      { documentId: "doc-1" },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_update_document_tags").execute(
+      "call",
+      { documentId: "doc-1", tags: ["source:pi", "repo:x"], confirm: true },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_list_entities").execute(
+      "call",
+      { limit: 3, offset: 0 },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_get_entity").execute(
+      "call",
+      { entityId: "entity-1" },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_regenerate_entity").execute(
+      "call",
+      { entityId: "entity-1", confirm: true },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_get_graph").execute(
+      "call",
+      { type: "world", q: "Alice", limit: 4, tags: ["source:pi"], tagsMatch: "any_strict" },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_get_entity_graph").execute(
+      "call",
+      { limit: 5, minCount: 2 },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_list_tags").execute(
+      "call",
+      { source: "memories", limit: 6 },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_get_bank_profile").execute(
+      "call",
+      {},
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_update_bank_profile").execute(
+      "call",
+      { reflectMission: "Use evidence", confirm: true },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_update_bank_disposition").execute(
+      "call",
+      { skepticism: 3, literalism: 4, empathy: 5, confirm: true },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
+    await requireTool(catalog, "hindsight_add_bank_background").execute(
+      "call",
+      { content: "Project background", updateDisposition: false, confirm: true },
+      new AbortController().signal,
+      () => undefined,
+      ctx,
+    );
 
     expect(calls).toEqual([
       {
@@ -513,6 +669,53 @@ describe("operation catalog", () => {
       { method: "getChunk", chunkId: "chunk-1" },
       { method: "getMemoryHistory", bank: "project-bank", memoryId: "mem-1" },
       { method: "deleteMemoryObservations", bank: "project-bank", memoryId: "mem-1" },
+      {
+        method: "listDocuments",
+        bank: "project-bank",
+        options: { tags: ["source:pi"], tagsMatch: "all_strict", limit: 2, offset: 1 },
+      },
+      { method: "getDocument", bank: "project-bank", documentId: "doc-1" },
+      {
+        method: "updateDocument",
+        bank: "project-bank",
+        documentId: "doc-1",
+        request: { tags: ["source:pi", "repo:x"] },
+      },
+      { method: "listEntities", bank: "project-bank", options: { limit: 3, offset: 0 } },
+      { method: "getEntity", bank: "project-bank", entityId: "entity-1" },
+      { method: "regenerateEntity", bank: "project-bank", entityId: "entity-1" },
+      {
+        method: "getGraph",
+        bank: "project-bank",
+        options: {
+          type: "world",
+          q: "Alice",
+          limit: 4,
+          tags: ["source:pi"],
+          tagsMatch: "any_strict",
+        },
+      },
+      { method: "getEntityGraph", bank: "project-bank", options: { limit: 5, minCount: 2 } },
+      { method: "listTags", bank: "project-bank", options: { source: "memories", limit: 6 } },
+      { method: "getBankProfile", bank: "project-bank" },
+      { method: "getBankProfile", bank: "project-bank" },
+      {
+        method: "updateBankProfile",
+        bank: "project-bank",
+        request: { reflectMission: "Use evidence" },
+      },
+      { method: "getBankProfile", bank: "project-bank" },
+      {
+        method: "updateBankDisposition",
+        bank: "project-bank",
+        disposition: { skepticism: 3, literalism: 4, empathy: 5 },
+      },
+      { method: "getBankProfile", bank: "project-bank" },
+      {
+        method: "addBankBackground",
+        bank: "project-bank",
+        request: { content: "Project background", updateDisposition: false },
+      },
     ]);
   });
 
@@ -553,6 +756,15 @@ describe("operation catalog", () => {
       "hindsight_retain_receipts",
       "hindsight_route_memory",
       "hindsight_delete_document",
+      "hindsight_list_documents",
+      "hindsight_get_document",
+      "hindsight_update_document_tags",
+      "hindsight_list_entities",
+      "hindsight_get_entity",
+      "hindsight_regenerate_entity",
+      "hindsight_get_graph",
+      "hindsight_get_entity_graph",
+      "hindsight_list_tags",
       "hindsight_list_operations",
       "hindsight_cancel_operation",
       "hindsight_retry_operation",
@@ -563,6 +775,10 @@ describe("operation catalog", () => {
       "hindsight_delete_memory_observations",
       "hindsight_configure",
       "hindsight_get_bank_config",
+      "hindsight_get_bank_profile",
+      "hindsight_update_bank_profile",
+      "hindsight_update_bank_disposition",
+      "hindsight_add_bank_background",
       "hindsight_reset_bank_config",
       "hindsight_list_directives",
       "hindsight_get_directive",

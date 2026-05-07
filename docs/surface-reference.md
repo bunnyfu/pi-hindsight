@@ -90,6 +90,105 @@ Delete a specific Hindsight document and all memories extracted from it. Destruc
 | `documentId` | string  | yes      | Exact Hindsight document ID to delete.        |
 | `confirm`    | boolean | yes      | Must be true to confirm destructive deletion. |
 
+### `hindsight_list_documents`
+
+List Hindsight documents for compact inspection with supported filters.
+
+| Parameter   | Type                                   | Required | Description                                 |
+| ----------- | -------------------------------------- | -------- | ------------------------------------------- |
+| `bank`      | string                                 | no       | Optional bank id. Defaults to project bank. |
+| `q`         | string                                 | no       | Optional text query filter.                 |
+| `tags`      | array<string>                          | no       | Optional tag filter.                        |
+| `tagsMatch` | any \| all \| any_strict \| all_strict | no       |                                             |
+| `limit`     | number                                 | no       | Maximum documents to return.                |
+| `offset`    | number                                 | no       | Pagination offset.                          |
+
+### `hindsight_get_document`
+
+Fetch one Hindsight document by ID for inspection.
+
+| Parameter    | Type   | Required | Description                                 |
+| ------------ | ------ | -------- | ------------------------------------------- |
+| `documentId` | string | yes      | Exact Hindsight document ID.                |
+| `bank`       | string | no       | Optional bank id. Defaults to project bank. |
+
+### `hindsight_update_document_tags`
+
+Replace document tags for one Hindsight document. Requires confirm=true.
+
+| Parameter    | Type          | Required | Description                                   |
+| ------------ | ------------- | -------- | --------------------------------------------- |
+| `documentId` | string        | yes      | Exact Hindsight document ID.                  |
+| `tags`       | array<string> | yes      | Replacement tag set.                          |
+| `bank`       | string        | no       | Optional bank id. Defaults to project bank.   |
+| `confirm`    | true          | yes      | Required mutation confirmation. Must be true. |
+
+### `hindsight_list_entities`
+
+List Hindsight entities for compact inspection.
+
+| Parameter | Type   | Required | Description                                 |
+| --------- | ------ | -------- | ------------------------------------------- |
+| `bank`    | string | no       | Optional bank id. Defaults to project bank. |
+| `limit`   | number | no       | Maximum entities to return.                 |
+| `offset`  | number | no       | Pagination offset.                          |
+
+### `hindsight_get_entity`
+
+Fetch one Hindsight entity by ID.
+
+| Parameter  | Type   | Required | Description                                 |
+| ---------- | ------ | -------- | ------------------------------------------- |
+| `entityId` | string | yes      | Hindsight entity ID.                        |
+| `bank`     | string | no       | Optional bank id. Defaults to project bank. |
+
+### `hindsight_regenerate_entity`
+
+Regenerate observations for one Hindsight entity. Expensive mutation; requires confirm=true.
+
+| Parameter  | Type   | Required | Description                                   |
+| ---------- | ------ | -------- | --------------------------------------------- |
+| `entityId` | string | yes      | Hindsight entity ID.                          |
+| `bank`     | string | no       | Optional bank id. Defaults to project bank.   |
+| `confirm`  | true   | yes      | Required mutation confirmation. Must be true. |
+
+### `hindsight_get_graph`
+
+Explore Hindsight graph with supported filters.
+
+| Parameter    | Type                                   | Required | Description                                                                        |
+| ------------ | -------------------------------------- | -------- | ---------------------------------------------------------------------------------- |
+| `bank`       | string                                 | no       | Optional bank id. Defaults to project bank.                                        |
+| `type`       | world \| experience \| opinion         | no       | Optional graph fact type filter. Hindsight supports world, experience, or opinion. |
+| `q`          | string                                 | no       | Optional text query filter.                                                        |
+| `limit`      | number                                 | no       | Maximum graph items to return.                                                     |
+| `tags`       | array<string>                          | no       | Optional tag filter.                                                               |
+| `tagsMatch`  | any \| all \| any_strict \| all_strict | no       |                                                                                    |
+| `documentId` | string                                 | no       | Optional document ID filter.                                                       |
+| `chunkId`    | string                                 | no       | Optional chunk ID filter.                                                          |
+
+### `hindsight_get_entity_graph`
+
+Fetch Hindsight entity graph summary when server supports it.
+
+| Parameter  | Type   | Required | Description                                 |
+| ---------- | ------ | -------- | ------------------------------------------- |
+| `bank`     | string | no       | Optional bank id. Defaults to project bank. |
+| `limit`    | number | no       | Maximum graph items to return.              |
+| `minCount` | number | no       | Minimum entity count filter.                |
+
+### `hindsight_list_tags`
+
+List Hindsight tags for compact inspection.
+
+| Parameter | Type                      | Required | Description                                 |
+| --------- | ------------------------- | -------- | ------------------------------------------- |
+| `bank`    | string                    | no       | Optional bank id. Defaults to project bank. |
+| `q`       | string                    | no       | Optional tag text filter.                   |
+| `source`  | memories \| mental_models | no       |                                             |
+| `limit`   | number                    | no       | Maximum tags to return.                     |
+| `offset`  | number                    | no       | Pagination offset.                          |
+
 ### `hindsight_list_operations`
 
 List Hindsight async operations for a bank with supported server filters.
@@ -189,6 +288,52 @@ Read resolved Hindsight bank config and override counts for a selected bank.
 | Parameter | Type   | Required | Description                                 |
 | --------- | ------ | -------- | ------------------------------------------- |
 | `bank`    | string | no       | Optional bank id. Defaults to project bank. |
+
+### `hindsight_get_bank_profile`
+
+Read Hindsight bank profile/background/disposition.
+
+| Parameter | Type   | Required | Description                                 |
+| --------- | ------ | -------- | ------------------------------------------- |
+| `bank`    | string | no       | Optional bank id. Defaults to project bank. |
+
+### `hindsight_update_bank_profile`
+
+Patch supported Hindsight bank profile fields. Requires confirm=true.
+
+| Parameter             | Type           | Required | Description                                         |
+| --------------------- | -------------- | -------- | --------------------------------------------------- |
+| `bank`                | string         | no       | Optional bank id. Defaults to project bank.         |
+| `name`                | string \| null | no       |                                                     |
+| `mission`             | string \| null | no       |                                                     |
+| `background`          | string \| null | no       |                                                     |
+| `reflectMission`      | string \| null | no       |                                                     |
+| `retainMission`       | string \| null | no       |                                                     |
+| `observationsMission` | string \| null | no       |                                                     |
+| `confirm`             | true           | yes      | Required admin mutation confirmation. Must be true. |
+
+### `hindsight_update_bank_disposition`
+
+Update bank disposition traits. Requires confirm=true.
+
+| Parameter    | Type    | Required | Description                                         |
+| ------------ | ------- | -------- | --------------------------------------------------- |
+| `bank`       | string  | no       | Optional bank id. Defaults to project bank.         |
+| `skepticism` | integer | yes      |                                                     |
+| `literalism` | integer | yes      |                                                     |
+| `empathy`    | integer | yes      |                                                     |
+| `confirm`    | true    | yes      | Required admin mutation confirmation. Must be true. |
+
+### `hindsight_add_bank_background`
+
+Append bank background. Optional disposition update; requires confirm=true.
+
+| Parameter           | Type    | Required | Description                                          |
+| ------------------- | ------- | -------- | ---------------------------------------------------- |
+| `bank`              | string  | no       | Optional bank id. Defaults to project bank.          |
+| `content`           | string  | yes      | Background text to append.                           |
+| `updateDisposition` | boolean | no       | Ask Hindsight to update disposition from background. |
+| `confirm`           | true    | yes      | Required admin mutation confirmation. Must be true.  |
 
 ### `hindsight_reset_bank_config`
 
