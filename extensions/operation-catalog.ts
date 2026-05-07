@@ -9,19 +9,26 @@ import { getSessionFile } from "./session.js";
 import { runHindsightSetupTui } from "./setup-tui.js";
 import {
   configureToolResponse,
+  bankProfileToolResponse,
   createDirectiveToolResponse,
   deleteDirectiveToolResponse,
   deleteDocumentToolResponse,
+  documentToolResponse,
+  entityToolResponse,
   exportBankTemplateToolResponse,
   gatewayImportToolResponse,
   getBankConfigToolResponse,
   getBankTemplateSchemaToolResponse,
   getDirectiveToolResponse,
+  graphToolResponse,
   importToolResponse,
   jsonToolResponse,
   listDirectivesToolResponse,
+  listDocumentsToolResponse,
+  listEntitiesToolResponse,
   listMemoriesToolResponse,
   listOperationsToolResponse,
+  listTagsToolResponse,
   operationToolResponse,
   resetBankConfigToolResponse,
   retainReceiptListToolResponse,
@@ -412,6 +419,235 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
       },
     }),
     defineCatalogTool({
+      name: "hindsight_list_documents",
+      label: "Hindsight List Documents",
+      description: "List Hindsight documents for compact inspection with supported filters.",
+      parameters: Type.Object({
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+        q: Type.Optional(Type.String({ description: "Optional text query filter." })),
+        tags: Type.Optional(Type.Array(Type.String(), { description: "Optional tag filter." })),
+        tagsMatch: Type.Optional(tagMatchSchema),
+        limit: Type.Optional(Type.Number({ description: "Maximum documents to return." })),
+        offset: Type.Optional(Type.Number({ description: "Pagination offset." })),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.listDocuments({
+          ...(params.bank ? { bank: params.bank } : {}),
+          options: {
+            ...(params.q ? { q: params.q } : {}),
+            ...(params.tags ? { tags: params.tags } : {}),
+            ...(params.tagsMatch ? { tagsMatch: params.tagsMatch } : {}),
+            ...(params.limit !== undefined ? { limit: params.limit } : {}),
+            ...(params.offset !== undefined ? { offset: params.offset } : {}),
+          },
+        });
+        return listDocumentsToolResponse(result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_get_document",
+      label: "Hindsight Get Document",
+      description: "Fetch one Hindsight document by ID for inspection.",
+      parameters: Type.Object({
+        documentId: Type.String({ description: "Exact Hindsight document ID." }),
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.getDocument({
+          documentId: params.documentId,
+          ...(params.bank ? { bank: params.bank } : {}),
+        });
+        return documentToolResponse(`Document ${params.documentId} in ${result.bankId}.`, result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_update_document_tags",
+      label: "Hindsight Update Document Tags",
+      description: "Replace document tags for one Hindsight document. Requires confirm=true.",
+      parameters: Type.Object({
+        documentId: Type.String({ description: "Exact Hindsight document ID." }),
+        tags: Type.Array(Type.String(), { description: "Replacement tag set." }),
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+        confirm: Type.Literal(true, {
+          description: "Required mutation confirmation. Must be true.",
+        }),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.updateDocumentTags({
+          documentId: params.documentId,
+          request: { tags: params.tags },
+          ...(params.bank ? { bank: params.bank } : {}),
+          confirm: params.confirm,
+        });
+        return documentToolResponse(`Updated document ${params.documentId} tags.`, result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_list_entities",
+      label: "Hindsight List Entities",
+      description: "List Hindsight entities for compact inspection.",
+      parameters: Type.Object({
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+        limit: Type.Optional(Type.Number({ description: "Maximum entities to return." })),
+        offset: Type.Optional(Type.Number({ description: "Pagination offset." })),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.listEntities({
+          ...(params.bank ? { bank: params.bank } : {}),
+          options: {
+            ...(params.limit !== undefined ? { limit: params.limit } : {}),
+            ...(params.offset !== undefined ? { offset: params.offset } : {}),
+          },
+        });
+        return listEntitiesToolResponse(result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_get_entity",
+      label: "Hindsight Get Entity",
+      description: "Fetch one Hindsight entity by ID.",
+      parameters: Type.Object({
+        entityId: Type.String({ description: "Hindsight entity ID." }),
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.getEntity({
+          entityId: params.entityId,
+          ...(params.bank ? { bank: params.bank } : {}),
+        });
+        return entityToolResponse(`Entity ${params.entityId} in ${result.bankId}.`, result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_regenerate_entity",
+      label: "Hindsight Regenerate Entity",
+      description:
+        "Regenerate observations for one Hindsight entity. Expensive mutation; requires confirm=true.",
+      parameters: Type.Object({
+        entityId: Type.String({ description: "Hindsight entity ID." }),
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+        confirm: Type.Literal(true, {
+          description: "Required mutation confirmation. Must be true.",
+        }),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.regenerateEntity({
+          entityId: params.entityId,
+          ...(params.bank ? { bank: params.bank } : {}),
+          confirm: params.confirm,
+        });
+        return entityToolResponse(`Regenerated entity ${params.entityId}.`, result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_get_graph",
+      label: "Hindsight Get Graph",
+      description: "Explore Hindsight graph with supported filters.",
+      parameters: Type.Object({
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+        type: Type.Optional(
+          Type.Union([Type.Literal("world"), Type.Literal("experience"), Type.Literal("opinion")], {
+            description:
+              "Optional graph fact type filter. Hindsight supports world, experience, or opinion.",
+          }),
+        ),
+        q: Type.Optional(Type.String({ description: "Optional text query filter." })),
+        limit: Type.Optional(Type.Number({ description: "Maximum graph items to return." })),
+        tags: Type.Optional(Type.Array(Type.String(), { description: "Optional tag filter." })),
+        tagsMatch: Type.Optional(tagMatchSchema),
+        documentId: Type.Optional(Type.String({ description: "Optional document ID filter." })),
+        chunkId: Type.Optional(Type.String({ description: "Optional chunk ID filter." })),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.getGraph({
+          ...(params.bank ? { bank: params.bank } : {}),
+          options: {
+            ...(params.type ? { type: params.type } : {}),
+            ...(params.q ? { q: params.q } : {}),
+            ...(params.limit !== undefined ? { limit: params.limit } : {}),
+            ...(params.tags ? { tags: params.tags } : {}),
+            ...(params.tagsMatch ? { tagsMatch: params.tagsMatch } : {}),
+            ...(params.documentId ? { documentId: params.documentId } : {}),
+            ...(params.chunkId ? { chunkId: params.chunkId } : {}),
+          },
+        });
+        return graphToolResponse(`Graph in ${result.bankId}.`, result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_get_entity_graph",
+      label: "Hindsight Get Entity Graph",
+      description: "Fetch Hindsight entity graph summary when server supports it.",
+      parameters: Type.Object({
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+        limit: Type.Optional(Type.Number({ description: "Maximum graph items to return." })),
+        minCount: Type.Optional(Type.Number({ description: "Minimum entity count filter." })),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.getEntityGraph({
+          ...(params.bank ? { bank: params.bank } : {}),
+          options: {
+            ...(params.limit !== undefined ? { limit: params.limit } : {}),
+            ...(params.minCount !== undefined ? { minCount: params.minCount } : {}),
+          },
+        });
+        return graphToolResponse(`Entity graph in ${result.bankId}.`, result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_list_tags",
+      label: "Hindsight List Tags",
+      description: "List Hindsight tags for compact inspection.",
+      parameters: Type.Object({
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+        q: Type.Optional(Type.String({ description: "Optional tag text filter." })),
+        source: Type.Optional(
+          Type.Union([Type.Literal("memories"), Type.Literal("mental_models")]),
+        ),
+        limit: Type.Optional(Type.Number({ description: "Maximum tags to return." })),
+        offset: Type.Optional(Type.Number({ description: "Pagination offset." })),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.listTags({
+          ...(params.bank ? { bank: params.bank } : {}),
+          options: {
+            ...(params.q ? { q: params.q } : {}),
+            ...(params.source ? { source: params.source } : {}),
+            ...(params.limit !== undefined ? { limit: params.limit } : {}),
+            ...(params.offset !== undefined ? { offset: params.offset } : {}),
+          },
+        });
+        return listTagsToolResponse(result);
+      },
+    }),
+    defineCatalogTool({
       name: "hindsight_list_operations",
       label: "Hindsight List Operations",
       description: "List Hindsight async operations for a bank with supported server filters.",
@@ -630,6 +866,120 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
         useCwd(ctx.cwd);
         const result = await operations.getBankConfig(params.bank ? { bank: params.bank } : {});
         return getBankConfigToolResponse(result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_get_bank_profile",
+      label: "Hindsight Get Bank Profile",
+      description: "Read Hindsight bank profile/background/disposition.",
+      parameters: Type.Object({
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.getBankProfile(params.bank ? { bank: params.bank } : {});
+        return bankProfileToolResponse(`Bank profile ${result.bankId}.`, result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_update_bank_profile",
+      label: "Hindsight Update Bank Profile",
+      description: "Patch supported Hindsight bank profile fields. Requires confirm=true.",
+      parameters: Type.Object({
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+        name: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+        mission: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+        background: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+        reflectMission: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+        retainMission: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+        observationsMission: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+        confirm: Type.Literal(true, {
+          description: "Required admin mutation confirmation. Must be true.",
+        }),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.updateBankProfile({
+          ...(params.bank ? { bank: params.bank } : {}),
+          request: {
+            ...(params.name !== undefined ? { name: params.name } : {}),
+            ...(params.mission !== undefined ? { mission: params.mission } : {}),
+            ...(params.background !== undefined ? { background: params.background } : {}),
+            ...(params.reflectMission !== undefined
+              ? { reflectMission: params.reflectMission }
+              : {}),
+            ...(params.retainMission !== undefined ? { retainMission: params.retainMission } : {}),
+            ...(params.observationsMission !== undefined
+              ? { observationsMission: params.observationsMission }
+              : {}),
+          },
+          confirm: params.confirm,
+        });
+        return bankProfileToolResponse(`Updated bank profile ${result.bankId}.`, result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_update_bank_disposition",
+      label: "Hindsight Update Bank Disposition",
+      description: "Update bank disposition traits. Requires confirm=true.",
+      parameters: Type.Object({
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+        skepticism: Type.Integer({ minimum: 1, maximum: 5 }),
+        literalism: Type.Integer({ minimum: 1, maximum: 5 }),
+        empathy: Type.Integer({ minimum: 1, maximum: 5 }),
+        confirm: Type.Literal(true, {
+          description: "Required admin mutation confirmation. Must be true.",
+        }),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.updateBankDisposition({
+          ...(params.bank ? { bank: params.bank } : {}),
+          disposition: {
+            skepticism: params.skepticism,
+            literalism: params.literalism,
+            empathy: params.empathy,
+          },
+          confirm: params.confirm,
+        });
+        return bankProfileToolResponse(`Updated bank disposition ${result.bankId}.`, result);
+      },
+    }),
+    defineCatalogTool({
+      name: "hindsight_add_bank_background",
+      label: "Hindsight Add Bank Background",
+      description: "Append bank background. Optional disposition update; requires confirm=true.",
+      parameters: Type.Object({
+        bank: Type.Optional(
+          Type.String({ description: "Optional bank id. Defaults to project bank." }),
+        ),
+        content: Type.String({ description: "Background text to append." }),
+        updateDisposition: Type.Optional(
+          Type.Boolean({ description: "Ask Hindsight to update disposition from background." }),
+        ),
+        confirm: Type.Literal(true, {
+          description: "Required admin mutation confirmation. Must be true.",
+        }),
+      }),
+      async execute(_id, params, _signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        const result = await operations.addBankBackground({
+          ...(params.bank ? { bank: params.bank } : {}),
+          request: {
+            content: params.content,
+            ...(params.updateDisposition !== undefined
+              ? { updateDisposition: params.updateDisposition }
+              : {}),
+          },
+          confirm: params.confirm,
+        });
+        return bankProfileToolResponse(`Added bank background ${result.bankId}.`, result);
       },
     }),
     defineCatalogTool({

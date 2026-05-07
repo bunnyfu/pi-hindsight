@@ -5,6 +5,8 @@ import {
   assertHealthResponse,
   assertReflectResponse,
   bankConfigPath,
+  bankBackgroundPath,
+  bankProfilePath,
   bankTemplateExportPath,
   bankTemplateImportPath,
   bankTemplateSchemaPath,
@@ -12,9 +14,16 @@ import {
   createDirectiveRequestBody,
   createHindsightRestTransport,
   createMentalModelRequestBody,
+  documentItemPath,
+  documentsCollectionPath,
   directiveItemPath,
   directivesCollectionPath,
   encodeBankPath,
+  entitiesCollectionPath,
+  entityGraphPath,
+  entityItemPath,
+  entityRegeneratePath,
+  graphPath,
   memoriesCollectionPath,
   memoryHistoryPath,
   memoryItemPath,
@@ -27,8 +36,11 @@ import {
   operationRetryPath,
   operationsCollectionPath,
   reflectRequestBody,
+  tagsCollectionPath,
   updateBankConfigRequestBody,
+  updateBankProfileRequestBody,
   updateDirectiveRequestBody,
+  updateDocumentRequestBody,
   updateMentalModelRequestBody,
 } from "./client-rest.js";
 import { withTimeout } from "./timeout.js";
@@ -141,6 +153,35 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
       withTimeout("hindsight getBankConfig", timeoutMs, (signal) =>
         rest.request(bankConfigPath(bankId), { signal }),
       ),
+    updateBankProfile: (bankId, request) =>
+      withTimeout("hindsight updateBankProfile", timeoutMs, (signal) =>
+        rest.request(encodeBankPath(bankId, ""), {
+          method: "PATCH",
+          signal,
+          body: JSON.stringify(updateBankProfileRequestBody(request)),
+        }),
+      ),
+    updateBankDisposition: (bankId, disposition) =>
+      withTimeout("hindsight updateBankDisposition", timeoutMs, (signal) =>
+        rest.request(bankProfilePath(bankId), {
+          method: "PUT",
+          signal,
+          body: JSON.stringify({ disposition }),
+        }),
+      ),
+    addBankBackground: (bankId, request) =>
+      withTimeout("hindsight addBankBackground", timeoutMs, (signal) =>
+        rest.request(bankBackgroundPath(bankId), {
+          method: "POST",
+          signal,
+          body: JSON.stringify({
+            content: request.content,
+            ...(request.updateDisposition !== undefined
+              ? { update_disposition: request.updateDisposition }
+              : {}),
+          }),
+        }),
+      ),
     updateBankConfig: (bankId, updates) =>
       withTimeout("hindsight updateBankConfig", timeoutMs, (signal) =>
         rest.request(bankConfigPath(bankId), {
@@ -157,12 +198,49 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
       withTimeout("hindsight health", timeoutMs, async (signal) =>
         assertHealthResponse(await rest.request("/health", { signal })),
       ),
+    listDocuments: (bankId, options) =>
+      withTimeout("hindsight listDocuments", timeoutMs, (signal) =>
+        rest.request(documentsCollectionPath(bankId, options), { signal }),
+      ),
+    getDocument: (bankId, documentId) =>
+      withTimeout("hindsight getDocument", timeoutMs, (signal) =>
+        rest.request(documentItemPath(bankId, documentId), { signal }),
+      ),
+    updateDocument: (bankId, documentId, request) =>
+      withTimeout("hindsight updateDocument", timeoutMs, (signal) =>
+        rest.request(documentItemPath(bankId, documentId), {
+          method: "PATCH",
+          signal,
+          body: JSON.stringify(updateDocumentRequestBody(request)),
+        }),
+      ),
     deleteDocument: (bankId, documentId) =>
       withTimeout("hindsight deleteDocument", timeoutMs, (signal) =>
-        rest.request(`${encodeBankPath(bankId, "/documents")}/${encodeURIComponent(documentId)}`, {
-          method: "DELETE",
-          signal,
-        }),
+        rest.request(documentItemPath(bankId, documentId), { method: "DELETE", signal }),
+      ),
+    listEntities: (bankId, options) =>
+      withTimeout("hindsight listEntities", timeoutMs, (signal) =>
+        rest.request(entitiesCollectionPath(bankId, options), { signal }),
+      ),
+    getEntity: (bankId, entityId) =>
+      withTimeout("hindsight getEntity", timeoutMs, (signal) =>
+        rest.request(entityItemPath(bankId, entityId), { signal }),
+      ),
+    regenerateEntity: (bankId, entityId) =>
+      withTimeout("hindsight regenerateEntity", timeoutMs, (signal) =>
+        rest.request(entityRegeneratePath(bankId, entityId), { method: "POST", signal }),
+      ),
+    getGraph: (bankId, options) =>
+      withTimeout("hindsight getGraph", timeoutMs, (signal) =>
+        rest.request(graphPath(bankId, options), { signal }),
+      ),
+    getEntityGraph: (bankId, options) =>
+      withTimeout("hindsight getEntityGraph", timeoutMs, (signal) =>
+        rest.request(entityGraphPath(bankId, options), { signal }),
+      ),
+    listTags: (bankId, options) =>
+      withTimeout("hindsight listTags", timeoutMs, (signal) =>
+        rest.request(tagsCollectionPath(bankId, options), { signal }),
       ),
     // The installed high-level SDK does not export bank-template helpers. Its generated
     // import helper also exposes no typed body because the server endpoint accepts raw JSON.

@@ -3,11 +3,18 @@ import {
   createDirectiveToolResponse,
   deleteDirectiveToolResponse,
   exportBankTemplateToolResponse,
+  bankProfileToolResponse,
+  documentToolResponse,
+  entityToolResponse,
+  graphToolResponse,
   getBankTemplateSchemaToolResponse,
   getDirectiveToolResponse,
   listMemoriesToolResponse,
   listDirectivesToolResponse,
+  listDocumentsToolResponse,
+  listEntitiesToolResponse,
   listOperationsToolResponse,
+  listTagsToolResponse,
   operationToolResponse,
   updateDirectiveToolResponse,
 } from "../extensions/tool-presenters.js";
@@ -22,6 +29,7 @@ describe("tool presenters", () => {
         ],
       },
     });
+
     expect(list.content[0]?.text).toContain("Directives in bank: 1");
     expect(list.content[0]?.text).toContain("Rule (directive-1) · inactive · priority 3");
 
@@ -50,6 +58,66 @@ describe("tool presenters", () => {
         result: { deleted: true },
       }).content[0]?.text,
     ).toContain("Deleted directive directive-2 in bank.");
+  });
+
+  it("presents document/entity/graph/tag/profile inspection compactly", () => {
+    const documents = listDocumentsToolResponse({
+      bankId: "bank",
+      result: {
+        items: [
+          {
+            id: "doc-1",
+            tags: ["source:pi"],
+            document_metadata: { cwd: "/repo" },
+            memory_unit_count: 2,
+            created_at: "now",
+          },
+        ],
+      },
+    });
+    expect(documents.content[0]?.text).toContain("Documents in bank: 1");
+    expect(documents.content[0]?.text).toContain("doc-1 · tags=source:pi · metadata=cwd");
+    expect(documents.content[0]?.text).toContain("memories=2");
+
+    expect(
+      documentToolResponse("Document doc-1.", {
+        bankId: "bank",
+        documentId: "doc-1",
+        result: { id: "doc-1" },
+      }).content[0]?.text,
+    ).toContain("Document doc-1.");
+
+    expect(
+      listEntitiesToolResponse({
+        bankId: "bank",
+        result: {
+          items: [{ id: "entity-1", canonical_name: "Alice", type: "person", mention_count: 3 }],
+        },
+      }).content[0]?.text,
+    ).toContain("entity-1 · Alice · person · count=3");
+    expect(
+      entityToolResponse("Entity entity-1.", {
+        bankId: "bank",
+        entityId: "entity-1",
+        result: { id: "entity-1" },
+      }).content[0]?.text,
+    ).toContain("Entity entity-1.");
+    expect(
+      graphToolResponse("Graph.", {
+        bankId: "bank",
+        result: { nodes: [{ id: "n1" }], edges: [] },
+      }).content[0]?.text,
+    ).toContain("nodes=1; edges=0");
+    expect(
+      listTagsToolResponse({
+        bankId: "bank",
+        result: { items: [{ tag: "source:pi", count: 4 }] },
+      }).content[0]?.text,
+    ).toContain("source:pi · count=4");
+    expect(
+      bankProfileToolResponse("Profile.", { bankId: "bank", result: { id: "bank" } }).content[0]
+        ?.text,
+    ).toContain("Profile.");
   });
 
   it("presents operation and memory inspection summaries", () => {

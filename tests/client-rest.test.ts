@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   assertHealthResponse,
   assertReflectResponse,
+  bankBackgroundPath,
   bankConfigPath,
+  bankProfilePath,
   bankTemplateExportPath,
   bankTemplateImportPath,
   bankTemplateSchemaPath,
@@ -10,9 +12,16 @@ import {
   createDirectiveRequestBody,
   createHindsightRestTransport,
   createMentalModelRequestBody,
+  documentItemPath,
+  documentsCollectionPath,
   directiveItemPath,
   directivesCollectionPath,
   encodeBankPath,
+  entitiesCollectionPath,
+  entityGraphPath,
+  entityItemPath,
+  entityRegeneratePath,
+  graphPath,
   mentalModelCollectionPath,
   mentalModelHistoryPath,
   mentalModelItemPath,
@@ -26,8 +35,11 @@ import {
   operationRetryPath,
   operationsCollectionPath,
   reflectRequestBody,
+  tagsCollectionPath,
   updateBankConfigRequestBody,
+  updateBankProfileRequestBody,
   updateDirectiveRequestBody,
+  updateDocumentRequestBody,
   updateMentalModelRequestBody,
 } from "../extensions/client-rest.js";
 
@@ -139,6 +151,60 @@ describe("Hindsight REST transport helpers", () => {
       "/v1/default/banks/bank%2Fid/memories/mem%2Fid/observations",
     );
     expect(chunkItemPath("chunk/id")).toBe("/v1/default/chunks/chunk%2Fid");
+  });
+
+  it("maps document/entity/graph/tag/bank profile REST helpers", () => {
+    expect(
+      documentsCollectionPath("bank/id", {
+        q: "needle",
+        tags: ["source:pi", "repo:x"],
+        tagsMatch: "all_strict",
+        limit: 10,
+        offset: 5,
+      }),
+    ).toBe(
+      "/v1/default/banks/bank%2Fid/documents?q=needle&tags=source%3Api&tags=repo%3Ax&tags_match=all_strict&limit=10&offset=5",
+    );
+    expect(documentItemPath("bank/id", "doc/id")).toBe(
+      "/v1/default/banks/bank%2Fid/documents/doc%2Fid",
+    );
+    expect(updateDocumentRequestBody({ tags: ["one"] })).toEqual({ tags: ["one"] });
+    expect(entitiesCollectionPath("bank/id", { limit: 3, offset: 2 })).toBe(
+      "/v1/default/banks/bank%2Fid/entities?limit=3&offset=2",
+    );
+    expect(entityItemPath("bank/id", "entity/id")).toBe(
+      "/v1/default/banks/bank%2Fid/entities/entity%2Fid",
+    );
+    expect(entityRegeneratePath("bank/id", "entity/id")).toBe(
+      "/v1/default/banks/bank%2Fid/entities/entity%2Fid/regenerate",
+    );
+    expect(
+      graphPath("bank/id", {
+        type: "person",
+        q: "alice",
+        limit: 7,
+        tags: ["source:pi"],
+        tagsMatch: "any_strict",
+        documentId: "doc/id",
+        chunkId: "chunk/id",
+      }),
+    ).toBe(
+      "/v1/default/banks/bank%2Fid/graph?type=person&q=alice&limit=7&tags=source%3Api&tags_match=any_strict&document_id=doc%2Fid&chunk_id=chunk%2Fid",
+    );
+    expect(entityGraphPath("bank/id", { limit: 9, minCount: 2 })).toBe(
+      "/v1/default/banks/bank%2Fid/entities/graph?limit=9&min_count=2",
+    );
+    expect(tagsCollectionPath("bank/id", { q: "source", source: "memories", limit: 4 })).toBe(
+      "/v1/default/banks/bank%2Fid/tags?q=source&source=memories&limit=4",
+    );
+    expect(bankProfilePath("bank/id")).toBe("/v1/default/banks/bank%2Fid/profile");
+    expect(bankBackgroundPath("bank/id")).toBe("/v1/default/banks/bank%2Fid/background");
+    expect(
+      updateBankProfileRequestBody({ reflectMission: "Reflect", retainMission: null }),
+    ).toEqual({
+      reflect_mission: "Reflect",
+      retain_mission: null,
+    });
   });
 
   it("maps mental model paths and query options to Hindsight REST shape", () => {

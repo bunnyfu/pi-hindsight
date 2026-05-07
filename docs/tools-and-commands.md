@@ -32,7 +32,7 @@ The `hindsight_configure` tool can write config from agents. Prefer `/hindsight`
 /hindsight:import-project-sessions
 ```
 
-Use dry-run before non-dry-run imports. See [`importing-sessions.md`](importing-sessions.md).
+Use dry-run before non-dry-run imports. See [`import-controls.md`](import-controls.md) and [`importing-sessions.md`](importing-sessions.md).
 
 ## Queue and snapshots
 
@@ -78,6 +78,10 @@ Additional tools:
 
 - `hindsight_configure`
 - `hindsight_get_bank_config`
+- `hindsight_get_bank_profile`
+- `hindsight_update_bank_profile`
+- `hindsight_update_bank_disposition`
+- `hindsight_add_bank_background`
 - `hindsight_reset_bank_config`
 - `hindsight_list_directives`
 - `hindsight_get_directive`
@@ -92,6 +96,15 @@ Additional tools:
 - `hindsight_route_memory`
 - `hindsight_retain_receipts`
 - `hindsight_delete_document`
+- `hindsight_list_documents`
+- `hindsight_get_document`
+- `hindsight_update_document_tags`
+- `hindsight_list_entities`
+- `hindsight_get_entity`
+- `hindsight_regenerate_entity`
+- `hindsight_get_graph`
+- `hindsight_get_entity_graph`
+- `hindsight_list_tags`
 - `hindsight_list_operations`
 - `hindsight_cancel_operation`
 - `hindsight_retry_operation`
@@ -113,6 +126,9 @@ Tool notes:
 - Pass `global` for the configured global bank.
 - `hindsight_retain_global` refuses to write if global memory is disabled or missing a bank ID.
 - `hindsight_delete_document` requires exact bank, exact document ID, and `confirm: true`.
+- Document/entity/graph/tag inspection tools present compact IDs, tags, metadata/provenance keys, timestamps, and counts when Hindsight returns them. They do not print giant source payloads by default beyond bounded JSON detail.
+- `hindsight_update_document_tags`, `hindsight_regenerate_entity`, `hindsight_update_bank_profile`, `hindsight_update_bank_disposition`, and `hindsight_add_bank_background` are admin mutations and require `confirm: true`.
+- Bank profile/background/disposition tools only call current supported Hindsight endpoints. They do not expose bank-wide destructive operations. Roll back profile/disposition/background changes by reapplying the previous values from the returned `before` profile or the Hindsight web UI.
 - `hindsight_cancel_operation` requires exact operation ID and `confirm: true`; it is intended for pending operations.
 - `hindsight_delete_memory_observations` requires exact memory ID and `confirm: true`. Bank-wide memory clear/delete-all is intentionally not exposed.
 - Memory inspection tools use current documented REST endpoints: list memory units, fetch a memory, fetch a chunk by ID, fetch memory history when the server supports it, and delete observations for one memory when supported.

@@ -38,6 +38,27 @@ export type OperationToolResult =
 export type ListMemoriesToolResult = Awaited<ReturnType<MemoryOperations["listMemories"]>>;
 export type MemoryToolResult = Awaited<ReturnType<MemoryOperations["getMemory"]>>;
 export type ChunkToolResult = Awaited<ReturnType<MemoryOperations["getChunk"]>>;
+export type ListDocumentsToolResult = Awaited<ReturnType<MemoryOperations["listDocuments"]>>;
+export type DocumentToolResult = Awaited<ReturnType<MemoryOperations["getDocument"]>>;
+export type UpdateDocumentTagsToolResult = Awaited<
+  ReturnType<MemoryOperations["updateDocumentTags"]>
+>;
+export type ListEntitiesToolResult = Awaited<ReturnType<MemoryOperations["listEntities"]>>;
+export type EntityToolResult = Awaited<ReturnType<MemoryOperations["getEntity"]>>;
+export type RegenerateEntityToolResult = Awaited<ReturnType<MemoryOperations["regenerateEntity"]>>;
+export type GraphToolResult = Awaited<ReturnType<MemoryOperations["getGraph"]>>;
+export type EntityGraphToolResult = Awaited<ReturnType<MemoryOperations["getEntityGraph"]>>;
+export type ListTagsToolResult = Awaited<ReturnType<MemoryOperations["listTags"]>>;
+export type BankProfileToolResult = Awaited<ReturnType<MemoryOperations["getBankProfile"]>>;
+export type UpdateBankProfileToolResult = Awaited<
+  ReturnType<MemoryOperations["updateBankProfile"]>
+>;
+export type UpdateBankDispositionToolResult = Awaited<
+  ReturnType<MemoryOperations["updateBankDisposition"]>
+>;
+export type AddBankBackgroundToolResult = Awaited<
+  ReturnType<MemoryOperations["addBankBackground"]>
+>;
 
 export function retainToolResponse(result: RetainToolResult): ToolTextResponse<RetainToolResult> {
   const deadLetterStatus = result.deadLettered
@@ -337,6 +358,72 @@ function memoryLabel(value: unknown): string {
   return `${textField(record, ["id", "memory_id", "memoryId"])} · ${textField(record, ["type", "fact_type", "factType"])} · ${text}`;
 }
 
+function arrayField(record: Record<string, unknown>, keys: string[]): string[] {
+  for (const key of keys) {
+    const value = record[key];
+    if (Array.isArray(value)) return value.map(String);
+  }
+  return [];
+}
+
+function nestedRecord(value: unknown): Record<string, unknown> | undefined {
+  if (value && typeof value === "object" && !Array.isArray(value))
+    return value as Record<string, unknown>;
+  return undefined;
+}
+
+function documentLabel(value: unknown): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return JSON.stringify(value);
+  const record = value as Record<string, unknown>;
+  const metadata =
+    nestedRecord(record.document_metadata) ??
+    nestedRecord(record.documentMetadata) ??
+    nestedRecord(record.metadata) ??
+    nestedRecord(record.provenance);
+  const metadataKeys = metadata ? Object.keys(metadata).slice(0, 6).join(",") : "none";
+  const tags = arrayField(record, ["tags", "document_tags", "documentTags"]);
+  const counts = [
+    numberField(record, ["item_count", "itemCount", "items", "chunks"]),
+    numberField(record, [
+      "memory_unit_count",
+      "memoryUnitCount",
+      "memory_count",
+      "memoryCount",
+      "memories",
+    ]),
+  ];
+  return `${textField(record, ["id", "document_id", "documentId"])} · tags=${tags.join(",") || "none"} · metadata=${metadataKeys} · items=${counts[0] ?? "?"} · memories=${counts[1] ?? "?"} · ${textField(record, ["created_at", "createdAt"], "unknown-created")}→${textField(record, ["updated_at", "updatedAt"], "unknown-updated")}`;
+}
+
+function entityLabel(value: unknown): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return JSON.stringify(value);
+  const record = value as Record<string, unknown>;
+  return `${textField(record, ["id", "entity_id", "entityId"])} · ${textField(record, ["canonical_name", "canonicalName", "text", "name", "label"])} · ${textField(record, ["type", "entity_type", "entityType"])} · count=${numberField(record, ["mention_count", "mentionCount", "count", "memory_count", "memories"]) ?? "?"}`;
+}
+
+function graphSummary(result: unknown): string[] {
+  if (!result || typeof result !== "object" || Array.isArray(result))
+    return [JSON.stringify(result)];
+  const record = result as Record<string, unknown>;
+  const nodes = Array.isArray(record.nodes)
+    ? record.nodes.length
+    : numberField(record, ["node_count", "nodeCount"]);
+  const edges = Array.isArray(record.edges)
+    ? record.edges.length
+    : numberField(record, ["edge_count", "edgeCount"]);
+  return [
+    `nodes=${nodes ?? "?"}; edges=${edges ?? "?"}`,
+    JSON.stringify(result, null, 2).slice(0, 4000),
+  ];
+}
+
+function tagLabel(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return JSON.stringify(value);
+  const record = value as Record<string, unknown>;
+  return `${textField(record, ["tag", "name", "id"])} · count=${numberField(record, ["count", "memory_count", "document_count"]) ?? "?"}`;
+}
+
 export function listMemoriesToolResponse(
   result: ListMemoriesToolResult,
 ): ToolTextResponse<ListMemoriesToolResult> {
@@ -348,6 +435,127 @@ export function listMemoriesToolResponse(
         text: [`Memories in ${result.bankId}: ${items.length}`, ...items.map(memoryLabel)].join(
           "\n",
         ),
+      },
+    ],
+    details: result,
+  };
+}
+
+export function listDocumentsToolResponse(
+  result: ListDocumentsToolResult,
+): ToolTextResponse<ListDocumentsToolResult> {
+  const items = objectItems(result.result);
+  return {
+    content: [
+      {
+        type: "text",
+        text: [`Documents in ${result.bankId}: ${items.length}`, ...items.map(documentLabel)].join(
+          "\n",
+        ),
+      },
+    ],
+    details: result,
+  };
+}
+
+export function documentToolResponse(
+  heading: string,
+  result: DocumentToolResult | UpdateDocumentTagsToolResult,
+): ToolTextResponse<DocumentToolResult | UpdateDocumentTagsToolResult> {
+  return {
+    content: [
+      {
+        type: "text",
+        text: [
+          heading,
+          documentLabel(result.result),
+          JSON.stringify(result.result, null, 2).slice(0, 4000),
+        ].join("\n"),
+      },
+    ],
+    details: result,
+  };
+}
+
+export function listEntitiesToolResponse(
+  result: ListEntitiesToolResult,
+): ToolTextResponse<ListEntitiesToolResult> {
+  const items = objectItems(result.result);
+  return {
+    content: [
+      {
+        type: "text",
+        text: [`Entities in ${result.bankId}: ${items.length}`, ...items.map(entityLabel)].join(
+          "\n",
+        ),
+      },
+    ],
+    details: result,
+  };
+}
+
+export function entityToolResponse(
+  heading: string,
+  result: EntityToolResult | RegenerateEntityToolResult,
+): ToolTextResponse<EntityToolResult | RegenerateEntityToolResult> {
+  return {
+    content: [
+      {
+        type: "text",
+        text: [
+          heading,
+          entityLabel(result.result),
+          JSON.stringify(result.result, null, 2).slice(0, 4000),
+        ].join("\n"),
+      },
+    ],
+    details: result,
+  };
+}
+
+export function graphToolResponse(
+  heading: string,
+  result: GraphToolResult | EntityGraphToolResult,
+): ToolTextResponse<GraphToolResult | EntityGraphToolResult> {
+  return {
+    content: [{ type: "text", text: [heading, ...graphSummary(result.result)].join("\n") }],
+    details: result,
+  };
+}
+
+export function listTagsToolResponse(
+  result: ListTagsToolResult,
+): ToolTextResponse<ListTagsToolResult> {
+  const items = objectItems(result.result);
+  return {
+    content: [
+      {
+        type: "text",
+        text: [`Tags in ${result.bankId}: ${items.length}`, ...items.map(tagLabel)].join("\n"),
+      },
+    ],
+    details: result,
+  };
+}
+
+export function bankProfileToolResponse(
+  heading: string,
+  result:
+    | BankProfileToolResult
+    | UpdateBankProfileToolResult
+    | UpdateBankDispositionToolResult
+    | AddBankBackgroundToolResult,
+): ToolTextResponse<
+  | BankProfileToolResult
+  | UpdateBankProfileToolResult
+  | UpdateBankDispositionToolResult
+  | AddBankBackgroundToolResult
+> {
+  return {
+    content: [
+      {
+        type: "text",
+        text: [heading, JSON.stringify(result.result, null, 2).slice(0, 4000)].join("\n"),
       },
     ],
     details: result,

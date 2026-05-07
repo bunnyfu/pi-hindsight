@@ -5,11 +5,13 @@ import {
   importMemorySession,
 } from "./import-operations.js";
 import { createBankConfigOperations } from "./bank-config-operations.js";
+import { createBankProfileOperations } from "./memory-bank-profile-operations.js";
 import { createBankTemplateOperations } from "./bank-template-operations.js";
 import { createAdminOperations } from "./memory-admin-operations.js";
 import { createConfigOperations } from "./memory-config-operations.js";
 import { createDirectiveOperations } from "./memory-directive-operations.js";
 import { createDocumentOperations } from "./memory-document-operations.js";
+import { createExplorationOperations } from "./memory-exploration-operations.js";
 import { createMentalModelOperations } from "./memory-mental-model-operations.js";
 import { createRecallOperations } from "./memory-recall-operations.js";
 import { createRetainOperations } from "./memory-retain-operations.js";
@@ -58,9 +60,11 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
     ...createRecallOperations(deps),
     ...createRetainOperations(deps),
     ...createDocumentOperations(deps),
+    ...createExplorationOperations(deps),
     ...createRoutingOperations(deps),
     ...createConfigOperations(deps),
     ...createBankConfigOperations(deps),
+    ...createBankProfileOperations(deps),
     ...createBankTemplateOperations(deps),
     ...createDirectiveOperations(deps),
     ...createMentalModelOperations(deps),

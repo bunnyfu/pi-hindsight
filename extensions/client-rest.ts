@@ -1,13 +1,20 @@
 import type {
   CreateDirectiveRequest,
   CreateMentalModelRequest,
+  GetEntityGraphOptions,
+  GetGraphOptions,
   GetMentalModelOptions,
+  ListDocumentsOptions,
+  ListEntitiesOptions,
   ListMemoriesOptions,
   ListDirectivesOptions,
   ListMentalModelsOptions,
   ListOperationsOptions,
+  ListTagsOptions,
   ResolvedConfig,
+  UpdateBankProfileRequest,
   UpdateDirectiveRequest,
+  UpdateDocumentRequest,
   UpdateMentalModelRequest,
 } from "./types.js";
 
@@ -180,8 +187,97 @@ export function memoryObservationsPath(bankId: string, memoryId: string): string
   return `${memoryItemPath(bankId, memoryId)}/observations`;
 }
 
+export function documentsCollectionPath(
+  bankId: string,
+  options: ListDocumentsOptions = {},
+): string {
+  const params = new URLSearchParams();
+  if (options.q) params.set("q", options.q);
+  for (const tag of options.tags ?? []) params.append("tags", tag);
+  if (options.tagsMatch) params.set("tags_match", options.tagsMatch);
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  if (options.offset !== undefined) params.set("offset", String(options.offset));
+  return appendQuery(encodeBankPath(bankId, "/documents"), params);
+}
+
+export function documentItemPath(bankId: string, documentId: string): string {
+  return `${encodeBankPath(bankId, "/documents")}/${encodeURIComponent(documentId)}`;
+}
+
+export function updateDocumentRequestBody(request: UpdateDocumentRequest): Record<string, unknown> {
+  return {
+    ...(request.tags !== undefined ? { tags: request.tags } : {}),
+  };
+}
+
+export function entitiesCollectionPath(bankId: string, options: ListEntitiesOptions = {}): string {
+  const params = new URLSearchParams();
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  if (options.offset !== undefined) params.set("offset", String(options.offset));
+  return appendQuery(encodeBankPath(bankId, "/entities"), params);
+}
+
+export function entityItemPath(bankId: string, entityId: string): string {
+  return `${encodeBankPath(bankId, "/entities")}/${encodeURIComponent(entityId)}`;
+}
+
+export function entityRegeneratePath(bankId: string, entityId: string): string {
+  return `${entityItemPath(bankId, entityId)}/regenerate`;
+}
+
+export function graphPath(bankId: string, options: GetGraphOptions = {}): string {
+  const params = new URLSearchParams();
+  if (options.type) params.set("type", options.type);
+  if (options.q) params.set("q", options.q);
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  for (const tag of options.tags ?? []) params.append("tags", tag);
+  if (options.tagsMatch) params.set("tags_match", options.tagsMatch);
+  if (options.documentId) params.set("document_id", options.documentId);
+  if (options.chunkId) params.set("chunk_id", options.chunkId);
+  return appendQuery(encodeBankPath(bankId, "/graph"), params);
+}
+
+export function entityGraphPath(bankId: string, options: GetEntityGraphOptions = {}): string {
+  const params = new URLSearchParams();
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  if (options.minCount !== undefined) params.set("min_count", String(options.minCount));
+  return appendQuery(encodeBankPath(bankId, "/entities/graph"), params);
+}
+
+export function tagsCollectionPath(bankId: string, options: ListTagsOptions = {}): string {
+  const params = new URLSearchParams();
+  if (options.q) params.set("q", options.q);
+  if (options.source) params.set("source", options.source);
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  if (options.offset !== undefined) params.set("offset", String(options.offset));
+  return appendQuery(encodeBankPath(bankId, "/tags"), params);
+}
+
 export function bankConfigPath(bankId: string): string {
   return encodeBankPath(bankId, "/config");
+}
+
+export function bankProfilePath(bankId: string): string {
+  return encodeBankPath(bankId, "/profile");
+}
+
+export function bankBackgroundPath(bankId: string): string {
+  return encodeBankPath(bankId, "/background");
+}
+
+export function updateBankProfileRequestBody(
+  request: UpdateBankProfileRequest,
+): Record<string, unknown> {
+  return {
+    ...(request.name !== undefined ? { name: request.name } : {}),
+    ...(request.mission !== undefined ? { mission: request.mission } : {}),
+    ...(request.background !== undefined ? { background: request.background } : {}),
+    ...(request.reflectMission !== undefined ? { reflect_mission: request.reflectMission } : {}),
+    ...(request.retainMission !== undefined ? { retain_mission: request.retainMission } : {}),
+    ...(request.observationsMission !== undefined
+      ? { observations_mission: request.observationsMission }
+      : {}),
+  };
 }
 
 export function directivesCollectionPath(
