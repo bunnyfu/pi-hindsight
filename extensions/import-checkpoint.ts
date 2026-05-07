@@ -19,6 +19,7 @@ export interface ImportCheckpointDocument {
   chunkIndex?: number;
   messageRange?: { start: number; end: number };
   status: ImportDocumentStatus;
+  skipReason?: "already-imported" | "empty-curated-projection";
   updatedAt: string;
   error?: string;
 }
@@ -92,6 +93,10 @@ function isUpdateMode(value: unknown): value is UpdateMode {
   return value === "append" || value === "replace";
 }
 
+function isSkipReason(value: unknown): value is ImportCheckpointDocument["skipReason"] {
+  return value === "already-imported" || value === "empty-curated-projection";
+}
+
 function isMessageRange(value: unknown): value is { start: number; end: number } {
   return isPlainRecord(value) && typeof value.start === "number" && typeof value.end === "number";
 }
@@ -129,6 +134,7 @@ function isImportCheckpointDocument(value: unknown): value is ImportCheckpointDo
       value.status === "completed" ||
       value.status === "failed" ||
       value.status === "skipped") &&
+    (value.skipReason === undefined || isSkipReason(value.skipReason)) &&
     typeof value.updatedAt === "string" &&
     (value.error === undefined || typeof value.error === "string")
   );

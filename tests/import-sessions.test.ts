@@ -184,6 +184,102 @@ describe("Pi session import", () => {
     });
   });
 
+  it("skips curated import documents with zero projected messages after noise filtering", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-empty-curated-"));
+    mkdirSync(join(dir, ".git"));
+    const sessionFile = join(dir, "session.jsonl");
+    writeFileSync(
+      sessionFile,
+      [
+        JSON.stringify({ type: "session", id: "session-empty-curated", cwd: dir }),
+        JSON.stringify({
+          type: "message",
+          id: "tool1",
+          parentId: null,
+          message: { role: "toolResult", name: "read", content: "successful output only" },
+        }),
+      ].join("\n"),
+    );
+    const retain = vi.fn(async () => undefined);
+
+    const result = await importPiSession({
+      sessionFile,
+      bankId: "bank",
+      config: DEFAULT_CONFIG,
+      client: { retain, recall: async () => [], reflect: async () => ({}) },
+    });
+    const checkpoint = await readImportCheckpoint(result.checkpointPath);
+    const manifest = await readImportManifest(result.manifestPath);
+
+    expect(retain).not.toHaveBeenCalled();
+    expect(result.documents).toHaveLength(1);
+    expect(result.documents[0]).toMatchObject({
+      documentId:
+        "pi-import:session-empty-curated:leaf:tool1:turns-12-bytes-80000:curated-turns-v1:chunk-0-0-0",
+      rawMessageCount: 1,
+      messageCount: 1,
+      projectedMessageCount: 0,
+      droppedToolResultCount: 1,
+      importMode: "curated",
+      status: "skipped",
+      skipReason: "empty-curated-projection",
+      wouldWrite: false,
+    });
+    expect(checkpoint?.documents[result.documents[0]!.documentId]).toMatchObject({
+      documentId: result.documents[0]!.documentId,
+      messageCount: 1,
+      importMode: "curated",
+      projectionVersion: "curated-turns-v1",
+      status: "skipped",
+      skipReason: "empty-curated-projection",
+    });
+    expect(manifest.imports).toEqual({});
+  });
+
+  it("preserves explicit raw and forensic empty-source imports", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-empty-raw-"));
+    mkdirSync(join(dir, ".git"));
+    const sessionFile = join(dir, "session.jsonl");
+    writeFileSync(
+      sessionFile,
+      JSON.stringify({ type: "session", id: "session-empty-source", cwd: dir }),
+    );
+    const rawRetain = vi.fn(async () => undefined);
+    const forensicRetain = vi.fn(async () => undefined);
+
+    const raw = await importPiSession({
+      sessionFile,
+      bankId: "bank",
+      config: { ...DEFAULT_CONFIG, import: { ...DEFAULT_CONFIG.import, mode: "raw" } },
+      client: { retain: rawRetain, recall: async () => [], reflect: async () => ({}) },
+    });
+    const forensic = await importPiSession({
+      sessionFile,
+      bankId: "bank",
+      config: { ...DEFAULT_CONFIG, import: { ...DEFAULT_CONFIG.import, mode: "forensic" } },
+      client: { retain: forensicRetain, recall: async () => [], reflect: async () => ({}) },
+    });
+
+    expect(rawRetain).toHaveBeenCalledTimes(1);
+    expect(forensicRetain).toHaveBeenCalledTimes(1);
+    expect(raw.documents[0]).toMatchObject({
+      rawMessageCount: 0,
+      projectedMessageCount: 0,
+      importMode: "raw",
+      status: "completed",
+      wouldWrite: true,
+    });
+    expect(raw.documents[0]).not.toHaveProperty("skipReason");
+    expect(forensic.documents[0]).toMatchObject({
+      rawMessageCount: 0,
+      projectedMessageCount: 0,
+      importMode: "forensic",
+      status: "completed",
+      wouldWrite: true,
+    });
+    expect(forensic.documents[0]).not.toHaveProperty("skipReason");
+  });
+
   it("chunks curated import documents by user turns with deterministic IDs and checkpoint metadata", async () => {
     const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-import-chunks-"));
     mkdirSync(join(dir, ".git"));

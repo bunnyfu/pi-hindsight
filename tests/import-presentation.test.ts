@@ -80,6 +80,28 @@ describe("import presentation", () => {
     );
   });
 
+  it("renders skip reasons for skipped empty curated documents", () => {
+    expect(
+      importDocumentSummary({
+        documents: [
+          {
+            updateMode: "replace",
+            status: "skipped",
+            rawMessageCount: 0,
+            projectedMessageCount: 0,
+            rawBytes: 0,
+            projectedBytes: 0,
+            droppedToolResultCount: 0,
+            keptToolErrorCount: 0,
+            estimatedChunkCount: 1,
+            importMode: "curated",
+            skipReason: "empty-curated-projection",
+          },
+        ],
+      }),
+    ).toContain("skipReasons=empty-curated-projection");
+  });
+
   it("aggregates complete dropped-tool totals before slicing preview output", () => {
     const documents = [0, 1].map((chunk) => ({
       updateMode: "replace",

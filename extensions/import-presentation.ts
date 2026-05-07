@@ -18,6 +18,7 @@ export type ImportDocumentSummaryResult = {
     estimatedChunkCount?: number;
     importMode?: "curated" | "raw" | "forensic";
     importQualityProfile?: "compatible" | "strict";
+    skipReason?: "already-imported" | "empty-curated-projection";
   }[];
   malformedLineCount?: number;
 };
@@ -160,12 +161,15 @@ function importDocumentQualitySummary(result: ImportDocumentSummaryResult): stri
   );
   const reasonCounts = formatReasonCounts(summedReasonCounts);
   const topDroppedTools = formatTopDroppedTools(result.documents);
+  const skipReasons = [
+    ...new Set(result.documents.map((document) => document.skipReason).filter(Boolean)),
+  ].join(",");
   const forensicWarning = importModes.includes("forensic")
     ? "; WARNING forensic mode preserves recalled memory blocks for audit-only use"
     : "";
   const qualityDetails = `${keptSignals ? `; keptSignals=${keptSignals}` : ""}${droppedNoise ? `; droppedNoise=${droppedNoise}` : ""}${reasonCounts ? `; reasons=${reasonCounts}` : ""}${topDroppedTools ? `; topDroppedTools=${topDroppedTools}` : ""}`;
-  return rawMessages || droppedToolResults || rawBytes || projectedBytes
-    ? `; mode=${importModes || "unknown"}${importProfiles ? `; profile=${importProfiles}` : ""}; projected=${projectedMessages}/${rawMessages || projectedMessages} messages; droppedToolResults=${droppedToolResults}; keptToolErrors=${keptErrors}; estimatedChunks=${estimatedChunks}; bytes=${projectedBytes}/${rawBytes}${qualityDetails}${forensicWarning}`
+  return rawMessages || droppedToolResults || rawBytes || projectedBytes || skipReasons
+    ? `; mode=${importModes || "unknown"}${importProfiles ? `; profile=${importProfiles}` : ""}; projected=${projectedMessages}/${rawMessages || projectedMessages} messages; droppedToolResults=${droppedToolResults}; keptToolErrors=${keptErrors}; estimatedChunks=${estimatedChunks}; bytes=${projectedBytes}/${rawBytes}${qualityDetails}${skipReasons ? `; skipReasons=${skipReasons}` : ""}${forensicWarning}`
     : "";
 }
 
