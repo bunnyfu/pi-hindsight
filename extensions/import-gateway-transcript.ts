@@ -200,6 +200,7 @@ export async function importGatewayTranscript(args: {
     ],
     metadata: {
       source_file: args.sourceFile,
+      imported: "true",
       source: "gateway-transcript",
       ...(channel ? { channel } : {}),
       ...(sessionId ? { session_id: sessionId } : {}),

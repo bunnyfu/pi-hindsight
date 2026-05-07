@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../extensions/config.js";
+import { readRetainQueue, resolveQueuePath } from "../extensions/queue.js";
 import {
   importGatewayTranscript,
   parseGatewayTranscriptJsonl,
@@ -152,10 +153,119 @@ describe("gateway transcript import", () => {
       metadata: expect.objectContaining({
         source: "pi-hindsight",
         retainSource: "import",
+        imported: "true",
         source_file: sourceFile,
         channel: "sms",
       }),
     });
+  });
+
+  it("queues gateway imports with import identity metadata for retry dedupe", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-gateway-queued-identity-"));
+    mkdirSync(join(dir, ".git"));
+    const sourceFile = join(dir, "gateway.jsonl");
+    writeFileSync(
+      sourceFile,
+      [
+        JSON.stringify({ type: "user_message", content: "remember identity", channel: "sms" }),
+        JSON.stringify({ type: "assistant_reply", content: "Stored." }),
+      ].join("\n"),
+    );
+    const queuePath = resolveQueuePath(dir, DEFAULT_CONFIG.retain.queuePath);
+
+    await expect(
+      importGatewayTranscript({
+        sourceFile,
+        cwd: dir,
+        bankId: "user-bank",
+        config: DEFAULT_CONFIG,
+        client: {
+          retain: async () => {
+            throw new Error("offline");
+          },
+          recall: async () => [],
+          reflect: async () => ({}),
+        },
+      }),
+    ).rejects.toThrow(/queued/);
+
+    const queued = await readRetainQueue(queuePath);
+    expect(queued).toHaveLength(1);
+    expect(queued[0]).toMatchObject({
+      bankId: "user-bank",
+      updateMode: "replace",
+      item: {
+        metadata: expect.objectContaining({
+          source: "pi-hindsight",
+          retainSource: "import",
+          imported: "true",
+          source_file: sourceFile,
+          channel: "sms",
+          content_hash: expect.any(String),
+        }),
+        tags: expect.arrayContaining(["source:gateway", "import:gateway", "imported:true"]),
+      },
+    });
+  });
+
+  it("drops stale queued gateway import jobs before retrying changed content", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-gateway-stale-queue-"));
+    mkdirSync(join(dir, ".git"));
+    const sourceFile = join(dir, "gateway.jsonl");
+    const writeGateway = (middleContent: string) =>
+      writeFileSync(
+        sourceFile,
+        [
+          JSON.stringify({ type: "user_message", content: "same first", channel: "sms" }),
+          JSON.stringify({ type: "assistant_reply", content: middleContent }),
+          JSON.stringify({ type: "process_end", output: "same last" }),
+        ].join("\n"),
+      );
+    writeGateway("OLD_MIDDLE");
+    const queuePath = resolveQueuePath(dir, DEFAULT_CONFIG.retain.queuePath);
+
+    await expect(
+      importGatewayTranscript({
+        sourceFile,
+        cwd: dir,
+        bankId: "user-bank",
+        config: DEFAULT_CONFIG,
+        client: {
+          retain: async () => {
+            throw new Error("offline");
+          },
+          recall: async () => [],
+          reflect: async () => ({}),
+        },
+      }),
+    ).rejects.toThrow(/queued/);
+    const oldQueued = await readRetainQueue(queuePath);
+    expect(oldQueued[0]?.item.content).toContain("OLD_MIDDLE");
+
+    writeGateway("NEW_MIDDLE");
+    const calls: unknown[][] = [];
+    const result = await importGatewayTranscript({
+      sourceFile,
+      cwd: dir,
+      bankId: "user-bank",
+      config: DEFAULT_CONFIG,
+      client: {
+        retain: async (...args: unknown[]) => {
+          calls.push(args);
+        },
+        recall: async () => [],
+        reflect: async () => ({}),
+      },
+    });
+
+    expect(result.retained).toBe(true);
+    expect(calls).toHaveLength(1);
+    const retainedContent = calls[0]?.[1] as string;
+    const retainedOptions = calls[0]?.[2] as { metadata: Record<string, string> };
+    expect(retainedContent).toContain("NEW_MIDDLE");
+    expect(retainedContent).not.toContain("OLD_MIDDLE");
+    expect(retainedOptions.metadata.content_hash).toBe(result.contentHash);
+    await expect(readRetainQueue(queuePath)).resolves.toEqual([]);
   });
 
   it("defaults operation imports to configured user bank", async () => {
