@@ -77,7 +77,10 @@ export function reflectRequestBody(
   options: {
     context?: string;
     budget?: string;
+    maxTokens?: number;
     responseSchema?: unknown;
+    includeFacts?: boolean;
+    includeToolCalls?: boolean;
     factTypes?: Array<"world" | "experience" | "observation">;
     excludeMentalModels?: boolean;
     excludeMentalModelIds?: string[];
@@ -90,7 +93,20 @@ export function reflectRequestBody(
     query,
     ...(options.context ? { context: options.context } : {}),
     budget: options.budget ?? "low",
+    ...(options.maxTokens !== undefined ? { max_tokens: options.maxTokens } : {}),
     ...(options.responseSchema ? { response_schema: options.responseSchema } : {}),
+    ...(options.includeFacts !== undefined || options.includeToolCalls !== undefined
+      ? {
+          include: {
+            ...(options.includeFacts !== undefined
+              ? { facts: options.includeFacts ? {} : null }
+              : {}),
+            ...(options.includeToolCalls !== undefined
+              ? { tool_calls: options.includeToolCalls ? {} : null }
+              : {}),
+          },
+        }
+      : {}),
     ...(options.factTypes ? { fact_types: options.factTypes } : {}),
     ...(options.excludeMentalModels !== undefined
       ? { exclude_mental_models: options.excludeMentalModels }

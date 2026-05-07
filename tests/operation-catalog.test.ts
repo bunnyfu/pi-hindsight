@@ -7,6 +7,8 @@ import { createOperationCatalog } from "../extensions/operation-catalog.js";
 import type { HindsightLikeClient, ResolvedConfig } from "../extensions/types.js";
 
 type RetainOptions = Parameters<HindsightLikeClient["retain"]>[2];
+type RecallOptions = Parameters<HindsightLikeClient["recall"]>[2];
+type ReflectOptions = Parameters<HindsightLikeClient["reflect"]>[2];
 
 type JsonSchema = {
   type?: string;
@@ -15,6 +17,7 @@ type JsonSchema = {
   items?: JsonSchema;
   anyOf?: JsonSchema[];
   const?: unknown;
+  minimum?: number;
 };
 
 function client(): HindsightLikeClient {
@@ -147,6 +150,7 @@ describe("operation catalog", () => {
       getConfig: () => DEFAULT_CONFIG,
       getProjectBankId: () => "project-bank",
     });
+
     const tool = requireTool(catalog, "hindsight_retain");
 
     await tool.execute(
@@ -177,6 +181,129 @@ describe("operation catalog", () => {
         expect.stringMatching(/^repo:/),
         expect.stringMatching(/^session:/),
       ]),
+    );
+  });
+
+  it("exposes and maps advanced explicit recall controls", async () => {
+    const recall = vi.fn(async (_bankId: string, _query: string, _options?: RecallOptions) => ({
+      ok: true,
+    }));
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-catalog-"));
+    const catalog = createOperationCatalog({
+      getClient: () => ({ ...client(), recall }),
+      getConfig: () => DEFAULT_CONFIG,
+      getProjectBankId: () => "project-bank",
+    });
+    const tool = requireTool(catalog, "hindsight_recall");
+    const properties = (tool.parameters as JsonSchema).properties ?? {};
+
+    expect(properties.types?.items?.anyOf?.map((schema) => schema.const)).toEqual([
+      "world",
+      "experience",
+      "observation",
+    ]);
+    expect(properties.budget?.anyOf?.map((schema) => schema.const)).toEqual(["low", "mid", "high"]);
+    expect(properties.maxTokens?.type).toBe("integer");
+    expect(properties.maxTokens?.minimum).toBe(0);
+    expect(properties.includeChunks?.type).toBe("boolean");
+    expect(properties.recallChunksMaxTokens?.type).toBe("integer");
+    expect(properties.includeSourceFacts?.type).toBe("boolean");
+    expect(properties.maxSourceFactsTokens?.type).toBe("integer");
+    expect(properties.includeEntities?.type).toBe("boolean");
+    expect(properties.trace?.type).toBe("boolean");
+
+    await tool.execute(
+      "call",
+      {
+        query: "find source context",
+        types: ["world", "observation"],
+        budget: "high",
+        maxTokens: 0,
+        includeChunks: true,
+        recallChunksMaxTokens: 512,
+        includeSourceFacts: true,
+        maxSourceFactsTokens: 256,
+        includeEntities: true,
+        trace: true,
+        tags: ["caller:tag"],
+      },
+      new AbortController().signal,
+      () => undefined,
+      { cwd, sessionManager: {} } as never,
+    );
+
+    expect(recall).toHaveBeenCalledWith(
+      "project-bank",
+      "find source context",
+      expect.objectContaining({
+        types: ["world", "observation"],
+        budget: "high",
+        maxTokens: 0,
+        includeChunks: true,
+        maxChunkTokens: 512,
+        includeSourceFacts: true,
+        maxSourceFactsTokens: 256,
+        includeEntities: true,
+        trace: true,
+        tagGroups: expect.arrayContaining([
+          expect.objectContaining({
+            tags: expect.arrayContaining([expect.stringMatching(/^repo:/)]),
+          }),
+          { tags: ["caller:tag"], match: "any_strict" },
+        ]),
+      }),
+    );
+  });
+
+  it("exposes and maps low-risk explicit reflect controls", async () => {
+    const reflect = vi.fn(async (_bankId: string, _query: string, _options?: ReflectOptions) => ({
+      ok: true,
+    }));
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-catalog-"));
+    const catalog = createOperationCatalog({
+      getClient: () => ({ ...client(), reflect }),
+      getConfig: () => DEFAULT_CONFIG,
+      getProjectBankId: () => "project-bank",
+    });
+    const tool = requireTool(catalog, "hindsight_reflect");
+    const properties = (tool.parameters as JsonSchema).properties ?? {};
+
+    expect(properties.budget?.anyOf?.map((schema) => schema.const)).toEqual(["low", "mid", "high"]);
+    expect(properties.maxTokens?.type).toBe("integer");
+    expect(properties.maxTokens?.minimum).toBe(0);
+    expect(properties.includeFacts?.type).toBe("boolean");
+    expect(properties.includeToolCalls?.type).toBe("boolean");
+
+    await tool.execute(
+      "call",
+      {
+        query: "synthesize",
+        budget: "mid",
+        maxTokens: 0,
+        includeFacts: true,
+        includeToolCalls: true,
+        tags: ["caller:tag"],
+      },
+      new AbortController().signal,
+      () => undefined,
+      { cwd, sessionManager: {} } as never,
+    );
+
+    expect(reflect).toHaveBeenCalledWith(
+      "project-bank",
+      "synthesize",
+      expect.objectContaining({
+        budget: "mid",
+        maxTokens: 0,
+        includeFacts: true,
+        includeToolCalls: true,
+        tagGroups: expect.arrayContaining([
+          expect.objectContaining({
+            tags: expect.arrayContaining([expect.stringMatching(/^repo:/)]),
+          }),
+          { tags: ["caller:tag"], match: "any_strict" },
+        ]),
+      }),
     );
   });
 

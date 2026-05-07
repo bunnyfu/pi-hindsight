@@ -229,7 +229,10 @@ describe("Hindsight client adapter integration", () => {
     });
     const reflection = await client.reflect("test-bank", "query", {
       budget: "low",
+      maxTokens: 0,
       responseSchema: { type: "object", properties: { answer: { type: "string" } } },
+      includeFacts: true,
+      includeToolCalls: false,
       tagGroups: [{ tags: ["source:pi"], match: "any_strict" }],
     });
     const templateDryRun = await client.importBankTemplate?.(
@@ -395,7 +398,9 @@ describe("Hindsight client adapter integration", () => {
     expect(requests[5]?.body).toMatchObject({
       query: "query",
       budget: "low",
+      max_tokens: 0,
       response_schema: { type: "object", properties: { answer: { type: "string" } } },
+      include: { facts: {}, tool_calls: null },
       tag_groups: [{ tags: ["source:pi"], match: "any_strict" }],
     });
     expect(requests[6]?.body).toEqual({

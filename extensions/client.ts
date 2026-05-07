@@ -53,8 +53,12 @@ async function reflect(
   },
   signal: AbortSignal,
 ): Promise<unknown> {
-  if (!args.options?.responseSchema)
-    return args.raw.reflect(args.bankId, args.query, { ...args.options, signal });
+  const needsRestShim =
+    args.options?.responseSchema ||
+    args.options?.maxTokens !== undefined ||
+    args.options?.includeFacts !== undefined ||
+    args.options?.includeToolCalls !== undefined;
+  if (!needsRestShim) return args.raw.reflect(args.bankId, args.query, { ...args.options, signal });
   const response = await args.rest.request(encodeBankPath(args.bankId, "/reflect"), {
     method: "POST",
     signal,

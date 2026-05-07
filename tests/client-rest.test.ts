@@ -27,7 +27,10 @@ describe("Hindsight REST transport helpers", () => {
       reflectRequestBody("query", {
         context: "ctx",
         budget: "mid",
+        maxTokens: 0,
         responseSchema: { type: "object" },
+        includeFacts: true,
+        includeToolCalls: false,
         tags: ["source:pi"],
         tagsMatch: "any_strict",
       }),
@@ -35,7 +38,9 @@ describe("Hindsight REST transport helpers", () => {
       query: "query",
       context: "ctx",
       budget: "mid",
+      max_tokens: 0,
       response_schema: { type: "object" },
+      include: { facts: {}, tool_calls: null },
       tags: ["source:pi"],
       tags_match: "any_strict",
     });

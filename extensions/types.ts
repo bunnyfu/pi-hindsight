@@ -327,7 +327,10 @@ export interface HindsightLikeClient {
     options?: {
       context?: string;
       budget?: Budget;
+      maxTokens?: number;
       responseSchema?: Record<string, unknown>;
+      includeFacts?: boolean;
+      includeToolCalls?: boolean;
       factTypes?: Array<"world" | "experience" | "observation">;
       excludeMentalModels?: boolean;
       excludeMentalModelIds?: string[];

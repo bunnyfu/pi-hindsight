@@ -7,6 +7,8 @@ import { getEffectiveSessionMemoryMode, readSessionMemoryMeta } from "./session-
 import type { HindsightTagGroup, ResolvedConfig, TagsMatch } from "./types.js";
 
 interface ExplicitRecallFilters {
+  budget?: import("./types.js").Budget;
+  maxTokens?: number;
   queryTimestamp?: string;
   types?: string[];
   trace?: boolean;
@@ -23,6 +25,8 @@ interface ExplicitRecallFilters {
 }
 
 interface ExplicitReflectFilters extends Omit<ExplicitRecallFilters, "queryTimestamp" | "types"> {
+  includeFacts?: boolean;
+  includeToolCalls?: boolean;
   factTypes?: Array<"world" | "experience" | "observation">;
   excludeMentalModels?: boolean;
   excludeMentalModelIds?: string[];
@@ -76,8 +80,8 @@ export function createRecallOperations(deps: MemoryOperationsDeps) {
       });
       const scopeTags = recallTagsForBank(cwd, config, deps.getProjectBankId(), bankId);
       const result = await deps.getClient().recall(bankId, query, {
-        budget: config.recall.budget,
-        maxTokens: config.recall.maxTokens,
+        budget: filters.budget ?? config.recall.budget,
+        maxTokens: filters.maxTokens ?? config.recall.maxTokens,
         ...(filters.queryTimestamp || config.recall.queryTimestamp
           ? { queryTimestamp: filters.queryTimestamp ?? config.recall.queryTimestamp }
           : {}),
@@ -120,8 +124,13 @@ export function createRecallOperations(deps: MemoryOperationsDeps) {
       const scopeTags = recallTagsForBank(cwd, config, deps.getProjectBankId(), bankId);
       const result = await deps.getClient().reflect(bankId, query, {
         ...(context ? { context } : {}),
-        budget: config.recall.budget,
+        budget: filters.budget ?? config.recall.budget,
+        ...(filters.maxTokens !== undefined ? { maxTokens: filters.maxTokens } : {}),
         ...(responseSchema ? { responseSchema } : {}),
+        ...(filters.includeFacts !== undefined ? { includeFacts: filters.includeFacts } : {}),
+        ...(filters.includeToolCalls !== undefined
+          ? { includeToolCalls: filters.includeToolCalls }
+          : {}),
         ...(filters.factTypes ? { factTypes: filters.factTypes } : {}),
         ...(filters.excludeMentalModels !== undefined
           ? { excludeMentalModels: filters.excludeMentalModels }
