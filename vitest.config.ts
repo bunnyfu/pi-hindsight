@@ -39,6 +39,36 @@ export default defineConfig({
           functions: 100,
           lines: 90,
         },
+        "extensions/import-checkpoint.ts": {
+          statements: 95,
+          branches: 80,
+          functions: 100,
+          lines: 95,
+        },
+        "extensions/import-delivery.ts": {
+          statements: 95,
+          branches: 85,
+          functions: 100,
+          lines: 95,
+        },
+        "extensions/import-execution.ts": {
+          statements: 95,
+          branches: 80,
+          functions: 100,
+          lines: 95,
+        },
+        "extensions/import-gateway-transcript.ts": {
+          statements: 90,
+          branches: 70,
+          functions: 100,
+          lines: 90,
+        },
+        "extensions/import-manifest.ts": {
+          statements: 85,
+          branches: 75,
+          functions: 85,
+          lines: 85,
+        },
         "extensions/import-parser.ts": {
           statements: 80,
           branches: 70,
