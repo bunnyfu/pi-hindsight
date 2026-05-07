@@ -64,7 +64,7 @@ Pi Hindsight distinguishes local Pi behavior from bank-owned Hindsight settings.
 
 Mission text and mental models remain Hindsight bank settings, not normal Pi JSON config.
 
-Use these tools for bank-owned settings:
+Use these public tools for bank-owned settings. Explicit bank-template import is guided-setup/internal today, not a public tool:
 
 - `hindsight_get_bank_config`
 - `hindsight_reset_bank_config`

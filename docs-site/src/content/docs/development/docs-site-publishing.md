@@ -38,6 +38,8 @@ Keep `base` set to `/pi-hindsight` unless the repository moves to a root-domain 
 
 `.github/workflows/docs-pages.yml` runs on pushes to `main` that touch docs-site inputs and on manual `workflow_dispatch`.
 
+The path filter is intentionally narrow because pull requests do not publish and the normal Check workflow already runs `npm run docs:check`. Keep docs-site duplicates only when they are part of the published site, and include every source that can change generated or duplicated site output in the Pages path filter: `docs-site/**`, `astro.config.mjs`, package manifests, docs check/generator scripts, and this workflow. If a future PR starts generating site pages from root Markdown, add those root paths to `.github/workflows/docs-pages.yml` in the same PR.
+
 The workflow:
 
 1. enables/configures GitHub Pages for the repository,

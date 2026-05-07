@@ -19,10 +19,14 @@ The queue supports:
 
 - in-process mutex
 - filesystem lock directory for cross-process safety
-- stale-lock detection
+- stale-lock detection based on owner heartbeat file `mtime`
 - malformed-line quarantine
 - dead-letter rollover after exhausted retries
 - diagnostics that summarize state without logging raw retained content
+
+## Lock heartbeat
+
+Each active filesystem queue lock records an owner token and updates a heartbeat file inside the lock directory. Stale-lock cleanup checks the heartbeat file modification time, not only the lock directory age. If the owning Pi process dies or stops refreshing the heartbeat long enough to pass the stale threshold, another process may claim cleanup, remove the stale lock, and continue queue work. Ownerless lock directories fall back to directory `mtime` staleness.
 
 ## Flush paths
 

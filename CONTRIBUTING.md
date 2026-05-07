@@ -89,7 +89,7 @@ Before implementation starts, link the change to a GitHub issue. Keep each branc
 
 Use Conventional Commits for final commit subjects because release automation, changelog generation, and release notes consume them as source of truth. Issue #195 tracks release-automation alignment, so commit subjects and PR release-impact notes must stay useful for generated changelogs. Keep commits small and logical: one reviewed behavior/docs/workflow change per commit unless splitting would create noise. Clean up noisy WIP commits before review when the workflow allows it. Never bypass Git hooks or checks with `--no-verify` or equivalent flags.
 
-Every PR must complete the repository PR template. The template is intentionally machine-checkable: linked issue, focused scope, verification, exactly one release-impact choice, risk and rollback/revert path, follow-ups, and agent checklist. If a check was skipped, the PR must say why. If follow-up work remains, link a GitHub issue. Do not leave placeholder PR text such as `TODO`, `TBD`, or naked template bullets.
+Every PR must complete the repository PR template. The PR body gate is intentionally machine-checkable for linked issue, focused scope, verification, exactly one release-impact choice, risk and rollback/revert path, follow-ups, and agent checklist. The `Memory invariants`, `Guidance sync`, and `Notes` sections remain human-review-only guardrails today; reviewers and agents must still complete them when they apply, but `scripts/check-pr-body.mjs` does not enforce their checkboxes or content. If a check was skipped, the PR must say why. If follow-up work remains, link a GitHub issue. Do not leave placeholder PR text such as `TODO`, `TBD`, or naked template bullets.
 
 ## Memory invariants
 
