@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import { redactError } from "./sanitize.js";
 import {
   parseBankTemplateManifestJson,
   summarizeBankTemplateImportResult,
@@ -223,7 +224,7 @@ export async function editTemplateManifestForSetup(args: {
     try {
       manifest = updateBankTemplateField(manifest, field.id, value);
     } catch (error) {
-      args.ctx.ui.notify(error instanceof Error ? error.message : String(error), "warning");
+      args.ctx.ui.notify(redactError(error), "warning");
     }
   }
 }
@@ -428,7 +429,7 @@ async function maybeOfferMentalModelRefreshForSetup(args: {
       });
       refreshed.push(`${model.name}: ${operationSummary(result.result)}`);
     } catch (error) {
-      failed.push(`${model.name}: ${error instanceof Error ? error.message : String(error)}`);
+      failed.push(`${model.name}: ${redactError(error)}`);
     }
   }
   if (refreshed.length) {

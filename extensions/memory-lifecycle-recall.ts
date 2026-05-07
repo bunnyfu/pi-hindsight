@@ -1,5 +1,6 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { recallForContext } from "./recall.js";
+import { redactError } from "./sanitize.js";
 import { writeLastRecallSnapshot } from "./recall-visibility.js";
 import { selectMemoryScopes } from "./memory-scope.js";
 import { getEffectiveSessionMemoryMode, readSessionMemoryMeta } from "./session-memory-meta.js";
@@ -111,7 +112,7 @@ export function createRecallTurnPolicy(deps: RecallTurnPolicyDeps): RecallTurnPo
           } catch (error) {
             deps.notify(
               runtime,
-              `Hindsight last recall snapshot write failed: ${(error as Error).message}`,
+              `Hindsight last recall snapshot write failed: ${redactError(error)}`,
               "warning",
             );
           }

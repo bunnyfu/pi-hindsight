@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../extensions/config.js";
 import { registerCommands } from "../extensions/commands.js";
+import { maintenanceCommandOperations } from "../extensions/command-maintenance.js";
 import { readSessionMemoryMeta, setSessionMemoryMode } from "../extensions/session-memory-meta.js";
 import type { HindsightLikeClient } from "../extensions/types.js";
 
@@ -155,6 +156,26 @@ describe("hindsight commands", () => {
       expect.stringContaining("Hindsight last recall snapshot unreadable"),
       "warning",
     );
+  });
+
+  it("redacts secrets from unreadable last recall snapshot errors", async () => {
+    const [operation] = maintenanceCommandOperations({
+      lastRecall: async () => {
+        throw new Error("failed to read api_key=supersecret123456");
+      },
+    } as never);
+    const ctx = {
+      cwd: mkdtempSync(join(tmpdir(), "pi-hindsight-commands-")),
+      ui: { notify: vi.fn(), setStatus: vi.fn() },
+      sessionManager: {},
+    };
+
+    await operation?.spec.handler("", ctx as never);
+
+    const message = ctx.ui.notify.mock.calls[0]?.[0] as string;
+    expect(message).toContain("Hindsight last recall snapshot unreadable");
+    expect(message).toContain("api_key=[REDACTED]");
+    expect(message).not.toContain("supersecret123456");
   });
 
   it("reports last recall snapshot summary", async () => {

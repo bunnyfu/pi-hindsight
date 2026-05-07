@@ -17,6 +17,7 @@ import type {
   UpdateDocumentRequest,
   UpdateMentalModelRequest,
 } from "./types.js";
+import { redactError } from "./sanitize.js";
 
 export interface HindsightRestTransport {
   request(path: string, init?: RequestInit): Promise<unknown>;
@@ -69,9 +70,8 @@ export function createHindsightRestTransport(config: ResolvedConfig): HindsightR
       const response = await fetch(`${baseUrl(config)}${path}`, { ...init, headers });
       const body = (await response.json().catch(() => undefined)) as unknown;
       if (!response.ok) {
-        const error = new Error(
-          `Hindsight request failed with status ${response.status}: ${JSON.stringify(body)}`,
-        ) as HindsightRestError;
+        const rawMessage = `Hindsight request failed with status ${response.status}: ${JSON.stringify(body)}`;
+        const error = new Error(redactError(rawMessage)) as HindsightRestError;
         error.status = response.status;
         error.body = body;
         throw error;
