@@ -1,4 +1,5 @@
 import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import { redactError } from "./sanitize.js";
 import type { FieldId } from "./config-editing-model.js";
 import { createMemoryOperations, type MemoryOperationsDeps } from "./memory-operation-service.js";
 import { flushRetainQueueNotifyLevel, formatFlushRetainQueueResult } from "./flush-presenter.js";
@@ -89,7 +90,7 @@ export async function runHindsightSetupTui(
       } else
         await handleFieldEdit({ fieldId: action as FieldId, ctx, deps, config, projectBankId });
     } catch (error) {
-      ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
+      ctx.ui.notify(redactError(error), "error");
     }
   }
 }

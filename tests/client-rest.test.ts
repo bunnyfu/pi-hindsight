@@ -303,4 +303,25 @@ describe("Hindsight REST transport helpers", () => {
       message: 'Hindsight request failed with status 409: {"detail":"operation is not pending"}',
     });
   });
+
+  it("redacts secrets from REST error messages while preserving structured body", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: false,
+        status: 401,
+        json: async () => ({ detail: "authorization: Bearer sk-testsecret1234567890" }),
+      })),
+    );
+    const transport = createHindsightRestTransport({
+      hindsight: { baseUrl: "http://hindsight.test/", apiKey: "secret", timeoutMs: 1000 },
+    } as never);
+
+    await expect(transport.request("/v1/default/banks/bank/profile")).rejects.toMatchObject({
+      status: 401,
+      body: { detail: "authorization: Bearer sk-testsecret1234567890" },
+      message:
+        'Hindsight request failed with status 401: {"detail":"authorization: [REDACTED] [REDACTED]"}',
+    });
+  });
 });

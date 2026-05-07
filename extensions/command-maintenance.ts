@@ -9,6 +9,7 @@ import {
   sessionFile,
 } from "./command-utils.js";
 import { flushRetainQueueNotifyLevel, formatFlushRetainQueueResult } from "./flush-presenter.js";
+import { redactError } from "./sanitize.js";
 
 type Operations = ReturnType<typeof createMemoryOperations>;
 
@@ -56,7 +57,7 @@ export function maintenanceCommandOperations(operations: Operations): CommandOpe
             );
           } catch (error) {
             ctx.ui.notify(
-              `Hindsight last recall snapshot unreadable: ${(error as Error).message}`,
+              `Hindsight last recall snapshot unreadable: ${redactError(error)}`,
               "warning",
             );
           }
