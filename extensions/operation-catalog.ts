@@ -35,6 +35,14 @@ const tagMatchSchema = Type.Union([
   Type.Literal("all_strict"),
 ]);
 
+const budgetSchema = Type.Union([Type.Literal("low"), Type.Literal("mid"), Type.Literal("high")]);
+
+const recallTypeSchema = Type.Union([
+  Type.Literal("world"),
+  Type.Literal("experience"),
+  Type.Literal("observation"),
+]);
+
 const tagGroupJsonSchema = {
   $id: "HindsightTagGroup",
   anyOf: [
@@ -170,8 +178,50 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
         bank: Type.Optional(
           Type.String({ description: "Optional bank id. Defaults to project bank." }),
         ),
+        types: Type.Optional(
+          Type.Array(recallTypeSchema, {
+            description: "Optional Hindsight fact types to retrieve.",
+          }),
+        ),
+        budget: Type.Optional(
+          Type.Unsafe<import("./types.js").Budget>({
+            ...budgetSchema,
+            description: "Optional Hindsight recall budget override for this tool call.",
+          }),
+        ),
+        maxTokens: Type.Optional(
+          Type.Integer({
+            minimum: 0,
+            description:
+              "Optional Hindsight recall token cap override for this tool call. Use 0 for metadata/source-only recall when supported by Hindsight.",
+          }),
+        ),
         queryTimestamp: Type.Optional(
           Type.String({ description: "Optional ISO timestamp for time-scoped recall." }),
+        ),
+        includeChunks: Type.Optional(
+          Type.Boolean({ description: "Ask Hindsight to include source chunks when supported." }),
+        ),
+        recallChunksMaxTokens: Type.Optional(
+          Type.Integer({
+            minimum: 0,
+            description: "Optional token cap for included recall chunks.",
+          }),
+        ),
+        includeSourceFacts: Type.Optional(
+          Type.Boolean({ description: "Ask Hindsight to include source facts when supported." }),
+        ),
+        maxSourceFactsTokens: Type.Optional(
+          Type.Integer({
+            minimum: 0,
+            description: "Optional token cap for included source facts.",
+          }),
+        ),
+        includeEntities: Type.Optional(
+          Type.Boolean({ description: "Ask Hindsight to include entities when supported." }),
+        ),
+        trace: Type.Optional(
+          Type.Boolean({ description: "Ask Hindsight to include recall trace/debug data." }),
         ),
         tags: Type.Optional(Type.Array(Type.String(), { description: "Additional tag filter." })),
         tagsMatch: Type.Optional(tagMatchSchema),
@@ -188,7 +238,24 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
           params.bank,
           sessionFile,
           {
+            ...(params.types ? { types: params.types } : {}),
+            ...(params.budget ? { budget: params.budget } : {}),
+            ...(params.maxTokens !== undefined ? { maxTokens: params.maxTokens } : {}),
             ...(params.queryTimestamp ? { queryTimestamp: params.queryTimestamp } : {}),
+            ...(params.includeChunks !== undefined ? { includeChunks: params.includeChunks } : {}),
+            ...(params.recallChunksMaxTokens !== undefined
+              ? { maxChunkTokens: params.recallChunksMaxTokens }
+              : {}),
+            ...(params.includeSourceFacts !== undefined
+              ? { includeSourceFacts: params.includeSourceFacts }
+              : {}),
+            ...(params.maxSourceFactsTokens !== undefined
+              ? { maxSourceFactsTokens: params.maxSourceFactsTokens }
+              : {}),
+            ...(params.includeEntities !== undefined
+              ? { includeEntities: params.includeEntities }
+              : {}),
+            ...(params.trace !== undefined ? { trace: params.trace } : {}),
             ...(params.tags ? { tags: params.tags } : {}),
             ...(params.tagsMatch ? { tagsMatch: params.tagsMatch } : {}),
             ...(params.tagGroups
@@ -645,7 +712,27 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
         query: Type.String(),
         context: Type.Optional(Type.String()),
         bank: Type.Optional(Type.String()),
+        budget: Type.Optional(
+          Type.Unsafe<import("./types.js").Budget>({
+            ...budgetSchema,
+            description: "Optional Hindsight reflect budget override for this tool call.",
+          }),
+        ),
+        maxTokens: Type.Optional(
+          Type.Integer({
+            minimum: 0,
+            description: "Optional Hindsight reflect token cap override for this tool call.",
+          }),
+        ),
         responseSchema: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+        includeFacts: Type.Optional(
+          Type.Boolean({ description: "Ask Hindsight reflect to include facts when supported." }),
+        ),
+        includeToolCalls: Type.Optional(
+          Type.Boolean({
+            description: "Ask Hindsight reflect to include tool-call trace data when supported.",
+          }),
+        ),
         tags: Type.Optional(Type.Array(Type.String(), { description: "Additional tag filter." })),
         tagsMatch: Type.Optional(tagMatchSchema),
         tagGroups: tagGroupsSchema(
@@ -661,6 +748,12 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
           params.bank,
           params.responseSchema,
           {
+            ...(params.budget ? { budget: params.budget } : {}),
+            ...(params.maxTokens !== undefined ? { maxTokens: params.maxTokens } : {}),
+            ...(params.includeFacts !== undefined ? { includeFacts: params.includeFacts } : {}),
+            ...(params.includeToolCalls !== undefined
+              ? { includeToolCalls: params.includeToolCalls }
+              : {}),
             ...(params.tags ? { tags: params.tags } : {}),
             ...(params.tagsMatch ? { tagsMatch: params.tagsMatch } : {}),
             ...(params.tagGroups
