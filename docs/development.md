@@ -20,6 +20,7 @@ npm run check
 
 This runs:
 
+- docs checks with `docs:check`: generated surface-reference freshness, generated code-map freshness, internal docs links/sidebar routes, packaged Markdown links, GitHub Pages base-prefixed docs links, and docs-site build
 - formatting with `oxfmt`
 - type-aware linting with `oxlint`
 - `tsgo` typecheck
