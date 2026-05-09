@@ -5,14 +5,14 @@ import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../extensions/config.js";
 import { readRetainQueue, resolveQueuePath } from "../extensions/queue.js";
 import {
-  importGatewayTranscript,
-  parseGatewayTranscriptJsonl,
-} from "../extensions/import-gateway-transcript.js";
-import { importMemoryGatewayTranscript } from "../extensions/import-operations.js";
+  importChatTranscript,
+  parseChatTranscriptJsonl,
+} from "../extensions/import-chat-transcript.js";
+import { importMemoryChatTranscript } from "../extensions/import-operations.js";
 
-describe("gateway transcript import", () => {
-  it("parses high-signal gateway transcript events and drops stream noise", () => {
-    const parsed = parseGatewayTranscriptJsonl(
+describe("chat transcript import", () => {
+  it("parses high-signal chat transcript events and drops stream noise", () => {
+    const parsed = parseChatTranscriptJsonl(
       [
         JSON.stringify({ type: "user_message", content: "hi", channel: "telegram" }),
         JSON.stringify({ type: "message_update", content: "partial" }),
@@ -36,10 +36,10 @@ describe("gateway transcript import", () => {
     expect(parsed.malformedLineCount).toBe(1);
   });
 
-  it("dry-runs gateway transcript import with user-memory provenance metrics", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-gateway-"));
+  it("dry-runs chat transcript import with user-memory provenance metrics", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-chat-"));
     mkdirSync(join(dir, ".git"));
-    const sourceFile = join(dir, "gateway.jsonl");
+    const sourceFile = join(dir, "chat.jsonl");
     writeFileSync(
       sourceFile,
       [
@@ -56,7 +56,7 @@ describe("gateway transcript import", () => {
       ].join("\n"),
     );
 
-    const result = await importGatewayTranscript({
+    const result = await importChatTranscript({
       sourceFile,
       cwd: dir,
       bankId: "user-bank",
@@ -79,10 +79,10 @@ describe("gateway transcript import", () => {
     expect(result.documentId).toMatch(/^pi-gateway-import:/);
   });
 
-  it("skips noise-only gateway transcript without writing", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-gateway-empty-"));
+  it("skips noise-only chat transcript without writing", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-chat-empty-"));
     mkdirSync(join(dir, ".git"));
-    const sourceFile = join(dir, "gateway.jsonl");
+    const sourceFile = join(dir, "chat.jsonl");
     writeFileSync(
       sourceFile,
       [
@@ -91,12 +91,14 @@ describe("gateway transcript import", () => {
       ].join("\n"),
     );
     const calls: unknown[][] = [];
+    const progress: unknown[] = [];
 
-    const result = await importGatewayTranscript({
+    const result = await importChatTranscript({
       sourceFile,
       cwd: dir,
       bankId: "user-bank",
       config: DEFAULT_CONFIG,
+      onProgress: (event) => progress.push(event),
       client: {
         retain: async (...args: unknown[]) => {
           calls.push(args);
@@ -109,17 +111,17 @@ describe("gateway transcript import", () => {
     expect(result).toMatchObject({
       retained: false,
       skipped: true,
-      skipReason: "No high-signal gateway events found.",
+      skipReason: "No high-signal chat transcript events found.",
       keptEventCount: 0,
       droppedEventCount: 2,
     });
     expect(calls).toEqual([]);
   });
 
-  it("imports gateway transcript using replace mode and gateway tags", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-gateway-retain-"));
+  it("imports chat transcript using replace mode and chat tags", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-chat-retain-"));
     mkdirSync(join(dir, ".git"));
-    const sourceFile = join(dir, "gateway.jsonl");
+    const sourceFile = join(dir, "chat.jsonl");
     writeFileSync(
       sourceFile,
       [
@@ -128,12 +130,14 @@ describe("gateway transcript import", () => {
       ].join("\n"),
     );
     const calls: unknown[][] = [];
+    const progress: unknown[] = [];
 
-    const result = await importGatewayTranscript({
+    const result = await importChatTranscript({
       sourceFile,
       cwd: dir,
       bankId: "user-bank",
       config: DEFAULT_CONFIG,
+      onProgress: (event) => progress.push(event),
       client: {
         retain: async (...args: unknown[]) => {
           calls.push(args);
@@ -144,12 +148,25 @@ describe("gateway transcript import", () => {
     });
 
     expect(result.retained).toBe(true);
+    expect(progress).toEqual([
+      expect.objectContaining({ phase: "reading", message: expect.stringContaining(sourceFile) }),
+      expect.objectContaining({
+        phase: "planning",
+        message: expect.stringContaining("2 kept events"),
+      }),
+      expect.objectContaining({
+        phase: "retaining",
+        message: expect.stringContaining(result.documentId),
+        current: 1,
+        total: 1,
+      }),
+    ]);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.[0]).toBe("user-bank");
     expect(calls[0]?.[2]).toMatchObject({
       documentId: result.documentId,
       updateMode: "replace",
-      tags: expect.arrayContaining(["source:gateway", "import:gateway", "channel:sms"]),
+      tags: expect.arrayContaining(["source:chat", "import:chat", "channel:sms"]),
       metadata: expect.objectContaining({
         source: "pi-hindsight",
         retainSource: "import",
@@ -160,10 +177,10 @@ describe("gateway transcript import", () => {
     });
   });
 
-  it("queues gateway imports with import identity metadata for retry dedupe", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-gateway-queued-identity-"));
+  it("queues chat transcript imports with import identity metadata for retry dedupe", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-chat-queued-identity-"));
     mkdirSync(join(dir, ".git"));
-    const sourceFile = join(dir, "gateway.jsonl");
+    const sourceFile = join(dir, "chat.jsonl");
     writeFileSync(
       sourceFile,
       [
@@ -174,7 +191,7 @@ describe("gateway transcript import", () => {
     const queuePath = resolveQueuePath(dir, DEFAULT_CONFIG.retain.queuePath);
 
     await expect(
-      importGatewayTranscript({
+      importChatTranscript({
         sourceFile,
         cwd: dir,
         bankId: "user-bank",
@@ -203,16 +220,16 @@ describe("gateway transcript import", () => {
           channel: "sms",
           content_hash: expect.any(String),
         }),
-        tags: expect.arrayContaining(["source:gateway", "import:gateway", "imported:true"]),
+        tags: expect.arrayContaining(["source:chat", "import:chat", "imported:true"]),
       },
     });
   });
 
-  it("drops stale queued gateway import jobs before retrying changed content", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-gateway-stale-queue-"));
+  it("drops stale queued chat transcript import jobs before retrying changed content", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-chat-stale-queue-"));
     mkdirSync(join(dir, ".git"));
-    const sourceFile = join(dir, "gateway.jsonl");
-    const writeGateway = (middleContent: string) =>
+    const sourceFile = join(dir, "chat.jsonl");
+    const writeChat = (middleContent: string) =>
       writeFileSync(
         sourceFile,
         [
@@ -221,11 +238,11 @@ describe("gateway transcript import", () => {
           JSON.stringify({ type: "process_end", output: "same last" }),
         ].join("\n"),
       );
-    writeGateway("OLD_MIDDLE");
+    writeChat("OLD_MIDDLE");
     const queuePath = resolveQueuePath(dir, DEFAULT_CONFIG.retain.queuePath);
 
     await expect(
-      importGatewayTranscript({
+      importChatTranscript({
         sourceFile,
         cwd: dir,
         bankId: "user-bank",
@@ -242,9 +259,9 @@ describe("gateway transcript import", () => {
     const oldQueued = await readRetainQueue(queuePath);
     expect(oldQueued[0]?.item.content).toContain("OLD_MIDDLE");
 
-    writeGateway("NEW_MIDDLE");
+    writeChat("NEW_MIDDLE");
     const calls: unknown[][] = [];
-    const result = await importGatewayTranscript({
+    const result = await importChatTranscript({
       sourceFile,
       cwd: dir,
       bankId: "user-bank",
@@ -269,12 +286,12 @@ describe("gateway transcript import", () => {
   });
 
   it("defaults operation imports to configured user bank", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-gateway-operation-"));
+    const dir = mkdtempSync(join(tmpdir(), "pi-hindsight-chat-operation-"));
     mkdirSync(join(dir, ".git"));
-    const sourceFile = join(dir, "gateway.jsonl");
+    const sourceFile = join(dir, "chat.jsonl");
     writeFileSync(sourceFile, JSON.stringify({ type: "user_message", content: "save user pref" }));
 
-    const result = await importMemoryGatewayTranscript(
+    const result = await importMemoryChatTranscript(
       { sourceFile, cwd: dir, dryRun: true },
       {
         getClient: () => ({
