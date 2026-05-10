@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@vectorize-io/hindsight-client", () => ({
-  HindsightClient: vi.fn((options) => {
+  HindsightClient: vi.fn(function (options) {
     mocks.constructor(options);
     return {
       retain: mocks.retain,

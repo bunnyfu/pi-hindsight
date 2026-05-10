@@ -206,9 +206,7 @@ export function documentItemPath(bankId: string, documentId: string): string {
 }
 
 export function updateDocumentRequestBody(request: UpdateDocumentRequest): Record<string, unknown> {
-  return {
-    ...(request.tags !== undefined ? { tags: request.tags } : {}),
-  };
+  return request.tags !== undefined ? { tags: request.tags } : {};
 }
 
 export function entitiesCollectionPath(bankId: string, options: ListEntitiesOptions = {}): string {
