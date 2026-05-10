@@ -5,6 +5,7 @@ export interface SmokeConfig {
   bankIsTemporary: boolean;
   attempts: number;
   cleanupTimeoutMs: number;
+  cleanupOnFailure: boolean;
 }
 
 export interface SmokeEntry {
@@ -36,6 +37,7 @@ export function smokeConfig(
     bankIsTemporary: !configuredBankId,
     attempts: Number(env.HINDSIGHT_SMOKE_ATTEMPTS ?? 20),
     cleanupTimeoutMs: Number(env.HINDSIGHT_SMOKE_CLEANUP_TIMEOUT_MS ?? 5000),
+    cleanupOnFailure: env.PI_HINDSIGHT_SMOKE_CLEANUP_ON_FAILURE !== "false",
   };
 }
 
@@ -113,10 +115,10 @@ function cleanupTimeoutSignal(timeoutMs: number) {
   return controller.signal;
 }
 
-type CleanupSmokeConfig = Pick<SmokeConfig, "bankIsTemporary"> &
+type CleanupSmokeConfig = Pick<SmokeConfig, "bankIsTemporary" | "cleanupOnFailure"> &
   Partial<Pick<SmokeConfig, "baseUrl" | "apiKey" | "cleanupTimeoutMs">>;
 
-export async function cleanupSmokeBankOnSuccess({
+export async function cleanupSmokeBank({
   config,
   bankId,
   succeeded,
@@ -137,13 +139,13 @@ export async function cleanupSmokeBankOnSuccess({
     signal: AbortSignal,
   ) => Promise<{ status: number }>;
 }) {
-  if (!succeeded) {
-    recorder.step("cleanup_skipped", { reason: "smoke_failed", bankId });
-    return { cleaned: false, reason: "smoke_failed" };
-  }
   if (!config.bankIsTemporary) {
     recorder.step("cleanup_skipped", { reason: "configured_bank", bankId });
     return { cleaned: false, reason: "configured_bank" };
+  }
+  if (!succeeded && config.cleanupOnFailure === false) {
+    recorder.step("cleanup_skipped", { reason: "smoke_failed_debug", bankId });
+    return { cleaned: false, reason: "smoke_failed_debug" };
   }
   try {
     const result = await deleteBank(

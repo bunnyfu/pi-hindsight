@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
-  cleanupSmokeBankOnSuccess,
+  cleanupSmokeBank,
   createSmokeRecorder,
   envValue,
   logStep,
@@ -46,6 +46,7 @@ describe("smoke helpers", () => {
       bankIsTemporary: false,
       attempts: 3,
       cleanupTimeoutMs: 5000,
+      cleanupOnFailure: true,
     });
   });
 
@@ -125,40 +126,38 @@ describe("smoke helpers", () => {
     ).resolves.toMatchObject({ written: false, error: expect.any(String) });
   });
 
-  it("cleans up temporary smoke bank only after success", async () => {
+  it("cleans up temporary smoke bank after success or failure by default", async () => {
     const recorder = createSmokeRecorder({ now: () => 0, output: () => undefined });
     const deleteBank = vi.fn(async () => ({ status: 204 }));
     await expect(
-      cleanupSmokeBankOnSuccess({
-        config: { bankIsTemporary: true },
-        bankId: "bank",
+      cleanupSmokeBank({
+        config: { bankIsTemporary: true, cleanupOnFailure: true },
+        bankId: "bank-success",
         succeeded: true,
         recorder,
         deleteBank,
       }),
     ).resolves.toEqual({ cleaned: true, status: 204 });
-    expect(deleteBank).toHaveBeenCalledWith(
-      { bankIsTemporary: true },
-      "bank",
-      expect.any(AbortSignal),
-    );
-    expect(recorder.entries().at(-1)).toMatchObject({ step: "cleanup_ok", bankId: "bank" });
+    await expect(
+      cleanupSmokeBank({
+        config: { bankIsTemporary: true, cleanupOnFailure: true },
+        bankId: "bank-failure",
+        succeeded: false,
+        recorder,
+        deleteBank,
+      }),
+    ).resolves.toEqual({ cleaned: true, status: 204 });
+    expect(deleteBank).toHaveBeenCalledTimes(2);
+    expect(recorder.entries().at(-1)).toMatchObject({ step: "cleanup_ok", bankId: "bank-failure" });
   });
 
-  it("keeps smoke artifacts on failure or configured bank", async () => {
+  it("skips cleanup for configured bank regardless of success", async () => {
     const output = vi.fn();
     const recorder = createSmokeRecorder({ now: () => 0, output });
     const deleteBank = vi.fn(async () => ({ status: 204 }));
 
-    await cleanupSmokeBankOnSuccess({
-      config: { bankIsTemporary: true },
-      bankId: "bank",
-      succeeded: false,
-      recorder,
-      deleteBank,
-    });
-    await cleanupSmokeBankOnSuccess({
-      config: { bankIsTemporary: false },
+    await cleanupSmokeBank({
+      config: { bankIsTemporary: false, cleanupOnFailure: true },
       bankId: "bank",
       succeeded: true,
       recorder,
@@ -167,18 +166,34 @@ describe("smoke helpers", () => {
 
     expect(deleteBank).not.toHaveBeenCalled();
     expect(output).toHaveBeenCalledWith(
-      '{"step":"cleanup_skipped","durationMs":0,"reason":"smoke_failed","bankId":"bank"}',
-    );
-    expect(output).toHaveBeenCalledWith(
       '{"step":"cleanup_skipped","durationMs":0,"reason":"configured_bank","bankId":"bank"}',
+    );
+  });
+
+  it("skips cleanup on failure when cleanupOnFailure is false", async () => {
+    const output = vi.fn();
+    const recorder = createSmokeRecorder({ now: () => 0, output });
+    const deleteBank = vi.fn(async () => ({ status: 204 }));
+
+    await cleanupSmokeBank({
+      config: { bankIsTemporary: true, cleanupOnFailure: false },
+      bankId: "bank",
+      succeeded: false,
+      recorder,
+      deleteBank,
+    });
+
+    expect(deleteBank).not.toHaveBeenCalled();
+    expect(output).toHaveBeenCalledWith(
+      '{"step":"cleanup_skipped","durationMs":0,"reason":"smoke_failed_debug","bankId":"bank"}',
     );
   });
 
   it("logs cleanup failures without throwing", async () => {
     const recorder = createSmokeRecorder({ now: () => 0, output: () => undefined });
     await expect(
-      cleanupSmokeBankOnSuccess({
-        config: { bankIsTemporary: true },
+      cleanupSmokeBank({
+        config: { bankIsTemporary: true, cleanupOnFailure: true },
         bankId: "bank",
         succeeded: true,
         recorder,
@@ -196,8 +211,8 @@ describe("smoke helpers", () => {
       expect(signal).toBeInstanceOf(AbortSignal);
       return { status: 204 };
     });
-    await cleanupSmokeBankOnSuccess({
-      config: { bankIsTemporary: true, cleanupTimeoutMs: 1 },
+    await cleanupSmokeBank({
+      config: { bankIsTemporary: true, cleanupOnFailure: true, cleanupTimeoutMs: 1 },
       bankId: "bank",
       succeeded: true,
       recorder,

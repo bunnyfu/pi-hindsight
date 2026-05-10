@@ -9,7 +9,7 @@ import { DEFAULT_CONFIG } from "../extensions/config.js";
 import { createMemoryOperations } from "../extensions/memory-operation-service.js";
 import { operationIdsFromResponse } from "../extensions/queue-delivery.js";
 import {
-  cleanupSmokeBankOnSuccess,
+  cleanupSmokeBank,
   createSmokeRecorder,
   renderSmokeSummary,
   retry,
@@ -741,7 +741,7 @@ try {
   );
   process.exitCode = 1;
 } finally {
-  await cleanupSmokeBankOnSuccess({ config, bankId: config.bankId, succeeded, recorder });
+  await cleanupSmokeBank({ config, bankId: config.bankId, succeeded, recorder });
   const summary = await writeGitHubSummary(renderSmokeSummary(recorder.entries()));
   if (summary.error) recorder.step("summary_failed", { error: summary.error });
 }
