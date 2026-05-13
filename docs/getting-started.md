@@ -24,14 +24,15 @@ Use either:
 
 - [Hindsight Cloud signup](https://ui.hindsight.vectorize.io/signup)
 - [Self-hosted Hindsight installation](https://hindsight.vectorize.io/developer/installation)
+- **Embedded local server (no Docker):** Install [`@vectorize-io/hindsight-all`](https://github.com/vectorize-io/hindsight/tree/main/hindsight-all-npm) and use `HindsightServer` to start a local daemon programmatically. Requires `uv`/`uvx` and Python on the host. Pairs with the existing `@vectorize-io/hindsight-client` used by this extension.
 
-The default self-hosted URL is:
+The default local URL is:
 
 ```text
 http://localhost:8888
 ```
 
-For private local setup, use Hindsight's built-in llama.cpp/local-LLM path.
+For a fully private setup without external LLM API keys, use Hindsight's built-in llama.cpp/local-LLM path.
 
 ## 3. Run `/hindsight`
 

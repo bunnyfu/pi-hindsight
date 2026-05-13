@@ -28,12 +28,13 @@ Local checkout installs are for contributors and test builds. See [Development](
 
 ## Choose a Hindsight server
 
-Use Hindsight Cloud or a self-hosted Hindsight API server:
+Use Hindsight Cloud, a self-hosted Hindsight API server, or an embedded local daemon:
 
 - [Hindsight Cloud signup](https://ui.hindsight.vectorize.io/signup)
 - [Self-hosted Hindsight installation](https://hindsight.vectorize.io/developer/installation)
+- **Embedded (no Docker):** Install [`@vectorize-io/hindsight-all`](https://github.com/vectorize-io/hindsight/tree/main/hindsight-all-npm) and use `HindsightServer` to start a local daemon programmatically. Requires `uv`/`uvx` and Python on the host. Pairs with the existing `@vectorize-io/hindsight-client` used by this extension.
 
-The conventional self-hosted URL is:
+The conventional local URL is:
 
 ```text
 http://localhost:8888
