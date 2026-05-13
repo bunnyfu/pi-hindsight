@@ -113,6 +113,7 @@ export function withRetry(
       let lastError: Error | undefined;
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         if (attempt > 0) {
+          if (init?.signal?.aborted) throw new Error("Request aborted");
           const jitter = Math.random() * baseDelayMs * 0.5;
           const delay = baseDelayMs * Math.pow(2, attempt - 1) + jitter;
           await new Promise((resolve) => setTimeout(resolve, delay));
@@ -120,6 +121,7 @@ export function withRetry(
         try {
           return await transport.request(path, init);
         } catch (error) {
+          if (init?.signal?.aborted) throw new Error("Request aborted");
           if (!isRetryableError(error)) throw error;
           lastError = error as Error;
         }

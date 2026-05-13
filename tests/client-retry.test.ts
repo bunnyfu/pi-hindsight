@@ -93,4 +93,15 @@ describe("Hindsight client retry", () => {
     expect(result).toEqual({ ok: true });
     expect(transport.request).toHaveBeenCalledTimes(2);
   });
+
+  it("does not retry when request is aborted", async () => {
+    const transport = createMockTransport([{ status: 503 }, {}]);
+    const retrying = withRetry(transport, 3, 10);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(retrying.request("/test", { signal: controller.signal })).rejects.toThrow(
+      "Request aborted",
+    );
+    expect(transport.request).toHaveBeenCalledTimes(1);
+  });
 });
