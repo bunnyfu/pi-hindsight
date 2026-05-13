@@ -82,6 +82,45 @@ export function createHindsightRestTransport(config: ResolvedConfig): HindsightR
   };
 }
 
+function isRetryableError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const status = (error as HindsightRestError).status;
+  if (typeof status === "number" && status >= 500) return true;
+  if (error.message.includes("timed out")) return true;
+  if (error.message.includes("fetch failed")) return true;
+  if (error.message.includes("ECONNREFUSED")) return true;
+  if (error.message.includes("ENOTFOUND")) return true;
+  if (error.message.includes("ETIMEDOUT")) return true;
+  if (error.message.includes("ECONNRESET")) return true;
+  return false;
+}
+
+export function withRetry(
+  transport: HindsightRestTransport,
+  maxRetries = 3,
+  baseDelayMs = 1000,
+): HindsightRestTransport {
+  return {
+    async request(path, init) {
+      let lastError: Error | undefined;
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        if (attempt > 0) {
+          const jitter = Math.random() * baseDelayMs * 0.5;
+          const delay = baseDelayMs * Math.pow(2, attempt - 1) + jitter;
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+        try {
+          return await transport.request(path, init);
+        } catch (error) {
+          if (!isRetryableError(error)) throw error;
+          lastError = error as Error;
+        }
+      }
+      throw lastError;
+    },
+  };
+}
+
 export function reflectRequestBody(
   query: string,
   options: {

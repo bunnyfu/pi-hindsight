@@ -19,3 +19,4 @@ tmp/
 # Astro generated docs artifacts
 .astro/
 docs-site/dist/
+.gitnexus

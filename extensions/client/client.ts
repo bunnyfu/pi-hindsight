@@ -16,6 +16,7 @@ import {
   consolidationRecoverPath,
   createDirectiveRequestBody,
   createHindsightRestTransport,
+  withRetry,
   createMentalModelRequestBody,
   documentItemPath,
   documentsCollectionPath,
@@ -117,7 +118,7 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
     ...(config.hindsight.apiKey ? { apiKey: config.hindsight.apiKey } : {}),
     userAgent: PI_HINDSIGHT_USER_AGENT,
   });
-  const rest = createHindsightRestTransport(config);
+  const rest = withRetry(createHindsightRestTransport(config));
   const timeoutMs = config.hindsight.timeoutMs;
   return {
     retain: (bankId, content, options) =>
