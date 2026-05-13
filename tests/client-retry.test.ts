@@ -64,4 +64,33 @@ describe("Hindsight client retry", () => {
     expect(result).toEqual({ ok: true });
     expect(transport.request).toHaveBeenCalledTimes(2);
   });
+
+  it("does not retry non-idempotent POST requests", async () => {
+    const transport = createMockTransport([{ status: 503 }, {}]);
+    const retrying = withRetry(transport, 3, 10);
+    await expect(retrying.request("/test", { method: "POST" })).rejects.toThrow();
+    expect(transport.request).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry non-idempotent PATCH requests", async () => {
+    const transport = createMockTransport([{ status: 503 }, {}]);
+    const retrying = withRetry(transport, 3, 10);
+    await expect(retrying.request("/test", { method: "PATCH" })).rejects.toThrow();
+    expect(transport.request).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry non-idempotent PUT requests", async () => {
+    const transport = createMockTransport([{ status: 503 }, {}]);
+    const retrying = withRetry(transport, 3, 10);
+    await expect(retrying.request("/test", { method: "PUT" })).rejects.toThrow();
+    expect(transport.request).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries idempotent DELETE requests", async () => {
+    const transport = createMockTransport([{ status: 503 }, {}]);
+    const retrying = withRetry(transport, 3, 10);
+    const result = await retrying.request("/test", { method: "DELETE" });
+    expect(result).toEqual({ ok: true });
+    expect(transport.request).toHaveBeenCalledTimes(2);
+  });
 });

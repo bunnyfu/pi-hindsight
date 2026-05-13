@@ -95,6 +95,11 @@ function isRetryableError(error: unknown): boolean {
   return false;
 }
 
+function isIdempotentMethod(init?: RequestInit): boolean {
+  const method = init?.method?.toUpperCase() ?? "GET";
+  return method === "GET" || method === "HEAD" || method === "DELETE";
+}
+
 export function withRetry(
   transport: HindsightRestTransport,
   maxRetries = 3,
@@ -102,6 +107,9 @@ export function withRetry(
 ): HindsightRestTransport {
   return {
     async request(path, init) {
+      if (!isIdempotentMethod(init)) {
+        return await transport.request(path, init);
+      }
       let lastError: Error | undefined;
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         if (attempt > 0) {
