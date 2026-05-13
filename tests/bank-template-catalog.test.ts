@@ -6,7 +6,7 @@ import {
   getBuiltInBankTemplate,
   isBankTemplateProfileId,
   summarizeBankTemplateManifest,
-} from "../extensions/bank-template-catalog.js";
+} from "../extensions/banks/bank-template-catalog.js";
 
 describe("bank template catalog", () => {
   it("defines stable built-in template ids", () => {

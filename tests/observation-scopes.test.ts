@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   expandObservationScopes,
   observationScopePlaceholders,
-} from "../extensions/observation-scopes.js";
+} from "../extensions/lifecycle/observation-scopes.js";
 
 const identity = {
   cwd: "/repo/project",

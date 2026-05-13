@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { buildRetainJob, type RetainJobBuildArgs } from "../extensions/retain-job-builder.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import {
+  buildRetainJob,
+  type RetainJobBuildArgs,
+} from "../extensions/lifecycle/retain-job-builder.js";
 
 function retainJobArgs(overrides: Partial<RetainJobBuildArgs> = {}): RetainJobBuildArgs {
   return {

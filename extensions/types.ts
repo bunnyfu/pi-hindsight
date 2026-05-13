@@ -4,7 +4,7 @@ import type {
   TagGroupNotInput,
   TagGroupOrInput,
 } from "@vectorize-io/hindsight-client";
-import type { BankTemplateManifest } from "./bank-template-catalog.js";
+import type { BankTemplateManifest } from "./banks/bank-template-catalog.js";
 
 export type Budget = "low" | "mid" | "high";
 export type UpdateMode = "append" | "replace";

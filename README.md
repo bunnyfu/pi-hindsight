@@ -38,6 +38,7 @@ For local checkout installs, see [Development](#development).
 1. Start or choose a Hindsight server:
    - [Hindsight Cloud signup](https://ui.hindsight.vectorize.io/signup)
    - [Self-hosted Hindsight installation](https://hindsight.vectorize.io/developer/installation); use Hindsight's built-in llama.cpp/local-LLM option when you want a no-LLM-API-key private setup
+   - **Embedded (no Docker):** Install [`@vectorize-io/hindsight-all`](https://github.com/vectorize-io/hindsight/tree/main/hindsight-all-npm) and use `HindsightServer` to start a local daemon programmatically. Requires `uv`/`uvx` and Python on the host.
 2. Open Pi in your repo and run `/hindsight`.
 3. Configure the Hindsight API URL. The default self-hosted URL is `http://localhost:8888`.
 4. Choose the narrowest memory profile that fits the repo: **Project + User**, **Project Only**, **User Only**, or **Recall Only**.

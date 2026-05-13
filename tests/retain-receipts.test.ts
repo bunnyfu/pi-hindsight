@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { appendRetainReceipt, listRetainReceipts } from "../extensions/retain-receipts.js";
+import {
+  appendRetainReceipt,
+  listRetainReceipts,
+} from "../extensions/lifecycle/retain-receipts.js";
 
 describe("retain receipts", () => {
   it("redacts and truncates explicit retain receipt context before local persistence", async () => {

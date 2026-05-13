@@ -2,8 +2,8 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { createSeedImportOperations } from "../extensions/seed-import-operations.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import { createSeedImportOperations } from "../extensions/operations/seed-import-operations.js";
 import type { HindsightLikeClient } from "../extensions/types.js";
 
 function client(): HindsightLikeClient {

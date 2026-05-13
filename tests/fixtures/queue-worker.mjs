@@ -1,4 +1,4 @@
-import { enqueueRetainJob, flushRetainQueue } from "../../extensions/queue.ts";
+import { enqueueRetainJob, flushRetainQueue } from "../../extensions/queue/queue.ts";
 
 const [mode, path, id] = process.argv.slice(2);
 const job = {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { buildRetainJob } from "../extensions/retain.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import { buildRetainJob } from "../extensions/lifecycle/retain.js";
 import type { AgentEndEvent } from "@earendil-works/pi-coding-agent";
 
 describe("buildRetainJob", () => {

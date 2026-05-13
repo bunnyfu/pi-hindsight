@@ -2,9 +2,9 @@ import { appendFile, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { createQueueOperations } from "../extensions/queue-operations.js";
-import { enqueueRetainJob, resolveQueuePath } from "../extensions/queue.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import { createQueueOperations } from "../extensions/queue/queue-operations.js";
+import { enqueueRetainJob, resolveQueuePath } from "../extensions/queue/queue.js";
 import type { RetainJob } from "../extensions/types.js";
 
 function job(cwd: string): RetainJob {

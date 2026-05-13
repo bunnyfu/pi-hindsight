@@ -12,7 +12,7 @@ import {
   setSessionMemoryMode,
   setSessionRetainEnabled,
   sessionMetaPath,
-} from "../extensions/session-memory-meta.js";
+} from "../extensions/utils/session-memory-meta.js";
 
 describe("session memory metadata", () => {
   it("defaults to normal recall and retain", async () => {

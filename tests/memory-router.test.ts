@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
 import {
   routeMemoryCandidate,
   type MemoryRoute,
   type MemoryRouteSignal,
   type RoutingStrategy,
-} from "../extensions/memory-router.js";
+} from "../extensions/operations/memory-router.js";
 
 interface RouterEvalFixture {
   name: string;

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   pruneTranscriptRecallBlocks,
   scanTranscriptForRecallBlocks,
-} from "../extensions/recall-cleanup.js";
+} from "../extensions/lifecycle/recall-cleanup.js";
 
 describe("recall cleanup", () => {
   it("scans transcript lines for persisted recall blocks", async () => {

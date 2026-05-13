@@ -12,7 +12,7 @@ import {
   readProjectConfig,
   writeGlobalConfig,
   writeProjectConfig,
-} from "../extensions/config-writer.js";
+} from "../extensions/config/config-writer.js";
 
 describe("config writer", () => {
   it("builds project bank override patch", () => {

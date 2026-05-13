@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { buildConfigEditingTabs } from "../extensions/config-editing-model.js";
-import { buildRetainReceiptStatusFacts, createSetupComponent } from "../extensions/setup-tui.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import { buildConfigEditingTabs } from "../extensions/config/config-editing-model.js";
+import {
+  buildRetainReceiptStatusFacts,
+  createSetupComponent,
+} from "../extensions/tui/setup-tui.js";
 
 const theme = {
   fg: (_name: string, text: string) => text,

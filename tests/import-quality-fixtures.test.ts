@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { importPiSession } from "../extensions/import-sessions.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import { importPiSession } from "../extensions/imports/import-sessions.js";
 import {
   assistantMessage,
   captureRetainClient,

@@ -3,13 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { AgentEndEvent } from "@earendil-works/pi-coding-agent";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { createMemoryOperations } from "../extensions/memory-operation-service.js";
-import { createRetainTurnPolicy } from "../extensions/memory-lifecycle-retain.js";
-import type { RuntimeSnapshot } from "../extensions/memory-lifecycle-runtime.js";
-import { importPiSession } from "../extensions/import-sessions.js";
-import { recallForContext } from "../extensions/recall.js";
-import { liveDocumentId, stableSessionId } from "../extensions/session.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import { createMemoryOperations } from "../extensions/operations/memory-operation-service.js";
+import { createRetainTurnPolicy } from "../extensions/lifecycle/memory-lifecycle-retain.js";
+import type { RuntimeSnapshot } from "../extensions/lifecycle/memory-lifecycle-runtime.js";
+import { importPiSession } from "../extensions/imports/import-sessions.js";
+import { recallForContext } from "../extensions/lifecycle/recall.js";
+import { liveDocumentId, stableSessionId } from "../extensions/utils/session.js";
 import type { HindsightLikeClient, ResolvedConfig, TagsMatch } from "../extensions/types.js";
 import {
   assistantMessage,

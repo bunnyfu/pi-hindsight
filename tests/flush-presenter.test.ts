@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   flushRetainQueueNotifyLevel,
   formatFlushRetainQueueResult,
-} from "../extensions/flush-presenter.js";
-import type { FlushRetainQueueResult } from "../extensions/queue.js";
+} from "../extensions/queue/flush-presenter.js";
+import type { FlushRetainQueueResult } from "../extensions/queue/queue.js";
 
 function result(overrides: Partial<FlushRetainQueueResult> = {}): FlushRetainQueueResult {
   return { sent: 1, remaining: 0, deadLettered: 0, malformed: 0, ...overrides };

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ensureGlobalBank, ensureProjectBank } from "../extensions/bank-operations.js";
+import { ensureGlobalBank, ensureProjectBank } from "../extensions/banks/bank-operations.js";
 import type { HindsightLikeClient } from "../extensions/types.js";
 
 function client(

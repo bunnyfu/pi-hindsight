@@ -5,7 +5,7 @@ import {
   bankSettingsTargetLines,
   bankTemplateSummaryLines,
   exportedBankTemplateSummaryLines,
-} from "../extensions/bank-settings-presenter.js";
+} from "../extensions/banks/bank-settings-presenter.js";
 
 describe("bank settings presenter", () => {
   it("shows concrete location and bank IDs", () => {

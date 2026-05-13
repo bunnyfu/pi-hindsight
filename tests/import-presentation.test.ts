@@ -3,7 +3,7 @@ import {
   importDocumentSummary,
   renderProjectImportMessage,
   renderImportSessionMessage,
-} from "../extensions/import-presentation.js";
+} from "../extensions/imports/import-presentation.js";
 
 describe("import presentation", () => {
   it("renders import quality metrics and forensic warning", () => {

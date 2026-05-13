@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { handleMentalModels } from "../extensions/setup-tui-mental-models.js";
-import { DEFAULT_CONFIG } from "../extensions/config-defaults.js";
+import { handleMentalModels } from "../extensions/tui/setup-tui-mental-models.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config-defaults.js";
 import type { HindsightLikeClient, ResolvedConfig } from "../extensions/types.js";
-import type { MemoryOperationsDeps } from "../extensions/memory-operation-service.js";
+import type { MemoryOperationsDeps } from "../extensions/operations/memory-operation-service.js";
 
 function clientWith(overrides: Partial<HindsightLikeClient>): HindsightLikeClient {
   return {

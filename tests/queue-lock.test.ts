@@ -26,7 +26,7 @@ describe("queue lock acquisition", () => {
       },
     }));
 
-    const { RETAIN_QUEUE_LOCK, withQueueLock } = await import("../extensions/queue-lock.js");
+    const { RETAIN_QUEUE_LOCK, withQueueLock } = await import("../extensions/queue/queue-lock.js");
     const originalRetryMs = RETAIN_QUEUE_LOCK.retryMs;
     const originalTimeoutMs = RETAIN_QUEUE_LOCK.timeoutMs;
     RETAIN_QUEUE_LOCK.retryMs = 1;
@@ -64,7 +64,7 @@ describe("queue lock acquisition", () => {
       },
     }));
 
-    const { RETAIN_QUEUE_LOCK, withQueueLock } = await import("../extensions/queue-lock.js");
+    const { RETAIN_QUEUE_LOCK, withQueueLock } = await import("../extensions/queue/queue-lock.js");
     const originalRetryMs = RETAIN_QUEUE_LOCK.retryMs;
     const originalTimeoutMs = RETAIN_QUEUE_LOCK.timeoutMs;
     RETAIN_QUEUE_LOCK.retryMs = 1;
@@ -101,7 +101,7 @@ describe("queue lock acquisition", () => {
       },
     }));
 
-    const { RETAIN_QUEUE_LOCK, withQueueLock } = await import("../extensions/queue-lock.js");
+    const { RETAIN_QUEUE_LOCK, withQueueLock } = await import("../extensions/queue/queue-lock.js");
     const originalRetryMs = RETAIN_QUEUE_LOCK.retryMs;
     const originalTimeoutMs = RETAIN_QUEUE_LOCK.timeoutMs;
     RETAIN_QUEUE_LOCK.retryMs = 1;
