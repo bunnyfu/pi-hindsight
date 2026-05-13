@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { collectStatusHealthFacts } from "../extensions/status-health.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import { collectStatusHealthFacts } from "../extensions/utils/status-health.js";
 import type { HindsightLikeClient } from "../extensions/types.js";
 
 describe("status health", () => {

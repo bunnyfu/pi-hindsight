@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
 import {
   CONFIG_FIELD_PATHS,
   CONFIG_FIELD_RESET_KEYS,
   CONFIG_RESET_PATHS,
-} from "../extensions/config-field-paths.js";
+} from "../extensions/config/config-field-paths.js";
 import {
   buildConfigEditingFields,
   buildConfigEditingTabs,
@@ -12,8 +12,8 @@ import {
   parseConfigEditingFieldInput,
   patchForConfigEditingField,
   type ConfigLayers,
-} from "../extensions/config-editing-model.js";
-import { buildStatusFacts } from "../extensions/config-editing-registry.js";
+} from "../extensions/config/config-editing-model.js";
+import { buildStatusFacts } from "../extensions/config/config-editing-registry.js";
 
 describe("config editing model", () => {
   function layers(overrides: Partial<ConfigLayers> = {}): ConfigLayers {

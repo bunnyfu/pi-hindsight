@@ -4,10 +4,10 @@ import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { HindsightClient } from "@vectorize-io/hindsight-client";
-import { createHindsightClient } from "../extensions/client.js";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { createMemoryOperations } from "../extensions/memory-operation-service.js";
-import { operationIdsFromResponse } from "../extensions/queue-delivery.js";
+import { createHindsightClient } from "../extensions/client/client.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import { createMemoryOperations } from "../extensions/operations/memory-operation-service.js";
+import { operationIdsFromResponse } from "../extensions/queue/queue-delivery.js";
 import {
   cleanupSmokeBank,
   createSmokeRecorder,

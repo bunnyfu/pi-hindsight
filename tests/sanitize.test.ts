@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { redactError, redactSecrets } from "../extensions/sanitize.js";
+import { redactError, redactSecrets } from "../extensions/utils/sanitize.js";
 
 describe("redactSecrets", () => {
   it("redacts common credentials", () => {

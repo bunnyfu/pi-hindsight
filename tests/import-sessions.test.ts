@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
 import type { RetainJob, UpdateMode } from "../extensions/types.js";
 import {
   discoverProjectSessionFiles,
@@ -11,12 +11,12 @@ import {
   parseImportSessionJsonl,
   parsePiSessionJsonl,
   selectImportBranches,
-} from "../extensions/import-sessions.js";
-import { readImportCheckpoint } from "../extensions/import-checkpoint.js";
-import { hashImportContent, readImportManifest } from "../extensions/import-manifest.js";
-import { enqueueRetainJob, readRetainQueue, resolveQueuePath } from "../extensions/queue.js";
-import { stableSessionId } from "../extensions/session.js";
-import { setNextSessionRetainMode } from "../extensions/session-memory-meta.js";
+} from "../extensions/imports/import-sessions.js";
+import { readImportCheckpoint } from "../extensions/imports/import-checkpoint.js";
+import { hashImportContent, readImportManifest } from "../extensions/imports/import-manifest.js";
+import { enqueueRetainJob, readRetainQueue, resolveQueuePath } from "../extensions/queue/queue.js";
+import { stableSessionId } from "../extensions/utils/session.js";
+import { setNextSessionRetainMode } from "../extensions/utils/session-memory-meta.js";
 
 const equivalentPathVariants = [
   { name: "same path", sessionCwd: (project: string) => project },
@@ -2061,7 +2061,7 @@ describe("Pi session import", () => {
 
       try {
         const { importProjectSessions: importProjectSessionsWithSwappedRead } =
-          await import("../extensions/import-sessions.js");
+          await import("../extensions/imports/import-sessions.js");
 
         await expect(
           importProjectSessionsWithSwappedRead({

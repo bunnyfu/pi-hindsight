@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { getBuiltInBankTemplate } from "../extensions/bank-template-catalog.js";
+import { getBuiltInBankTemplate } from "../extensions/banks/bank-template-catalog.js";
 import {
   buildBankTemplateEditorFields,
   mentalModelTagWarnings,
   updateBankTemplateField,
   validateBankTemplateManifestForEditing,
-} from "../extensions/bank-template-editor.js";
+} from "../extensions/banks/bank-template-editor.js";
 
 describe("bank template editor", () => {
   it("builds reusable editor fields from a template manifest", () => {

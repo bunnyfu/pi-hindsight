@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
-import { composeRecallQuery } from "../extensions/recall.js";
+import { composeRecallQuery } from "../extensions/lifecycle/recall.js";
 
 describe("recall query quality", () => {
   it("uses recent workflow signal, repo hints, and bounded query context", () => {

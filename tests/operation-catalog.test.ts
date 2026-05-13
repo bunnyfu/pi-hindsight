@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { createOperationCatalog } from "../extensions/operation-catalog.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import { createOperationCatalog } from "../extensions/operations/operation-catalog.js";
 import type { HindsightLikeClient, ResolvedConfig } from "../extensions/types.js";
 
 type RetainOptions = Parameters<HindsightLikeClient["retain"]>[2];

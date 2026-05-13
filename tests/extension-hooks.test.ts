@@ -2,15 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { enqueueRetainJob, readRetainQueue, resolveQueuePath } from "../extensions/queue.js";
+import { enqueueRetainJob, readRetainQueue, resolveQueuePath } from "../extensions/queue/queue.js";
 import {
   addSessionMemoryTag,
   readSessionMemoryMeta,
   setNextSessionRetainMode,
   setSessionMemoryMode,
   setSessionRetainEnabled,
-} from "../extensions/session-memory-meta.js";
-import { liveDocumentId, stableSessionId } from "../extensions/session.js";
+} from "../extensions/utils/session-memory-meta.js";
+import { liveDocumentId, stableSessionId } from "../extensions/utils/session.js";
 import type { RetainJob } from "../extensions/types.js";
 
 async function waitForCondition(
@@ -40,12 +40,12 @@ const mocked = vi.hoisted(() => ({
   checkHindsight: vi.fn(async () => ({ ok: true })),
 }));
 
-vi.mock("../extensions/client.js", () => ({
+vi.mock("../extensions/client/client.js", () => ({
   createHindsightClient: () => mocked.client,
   checkHindsight: mocked.checkHindsight,
 }));
 
-vi.mock("../extensions/bank-operations.js", () => ({
+vi.mock("../extensions/banks/bank-operations.js", () => ({
   ensureGlobalBank: mocked.ensureGlobalBank,
   ensureProjectBank: mocked.ensureProjectBank,
 }));
@@ -81,7 +81,7 @@ describe("extension hooks", () => {
       join(cwd, ".pi", "hindsight.json"),
       JSON.stringify({ hindsight: { baseUrl: "http://unused.test" } }),
     );
-    const { createMemoryLifecycle } = await import("../extensions/memory-lifecycle.js");
+    const { createMemoryLifecycle } = await import("../extensions/lifecycle/memory-lifecycle.js");
     const ctx = {
       cwd,
       ui: { setStatus: vi.fn(), notify: vi.fn() },
@@ -104,7 +104,7 @@ describe("extension hooks", () => {
       join(cwd, ".pi", "hindsight.json"),
       JSON.stringify({ banks: { global: { enabled: true, bankId: "global-bank" } } }),
     );
-    const { createMemoryLifecycle } = await import("../extensions/memory-lifecycle.js");
+    const { createMemoryLifecycle } = await import("../extensions/lifecycle/memory-lifecycle.js");
     const ctx = {
       cwd,
       ui: { setStatus: vi.fn(), notify: vi.fn() },
@@ -129,7 +129,7 @@ describe("extension hooks", () => {
       join(cwd, ".pi", "hindsight.json"),
       JSON.stringify({ hindsight: { baseUrl: "http://unused.test" } }),
     );
-    const { createMemoryLifecycle } = await import("../extensions/memory-lifecycle.js");
+    const { createMemoryLifecycle } = await import("../extensions/lifecycle/memory-lifecycle.js");
     const ctx = {
       cwd,
       ui: { setStatus: vi.fn(), notify: vi.fn() },
@@ -471,7 +471,7 @@ describe("extension hooks", () => {
       sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
     };
 
-    const { createMemoryLifecycle } = await import("../extensions/memory-lifecycle.js");
+    const { createMemoryLifecycle } = await import("../extensions/lifecycle/memory-lifecycle.js");
     const lifecycle = createMemoryLifecycle(cwd);
     await lifecycle.initialize(ctx);
     mocked.client.retain.mockClear();
@@ -515,7 +515,7 @@ describe("extension hooks", () => {
       sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
     };
 
-    const { createMemoryLifecycle } = await import("../extensions/memory-lifecycle.js");
+    const { createMemoryLifecycle } = await import("../extensions/lifecycle/memory-lifecycle.js");
     const lifecycle = createMemoryLifecycle(cwd);
     await lifecycle.initialize(ctx);
     mocked.client.retain.mockClear();
@@ -552,7 +552,7 @@ describe("extension hooks", () => {
       sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
     };
 
-    const { createMemoryLifecycle } = await import("../extensions/memory-lifecycle.js");
+    const { createMemoryLifecycle } = await import("../extensions/lifecycle/memory-lifecycle.js");
     const lifecycle = createMemoryLifecycle(cwd);
     await lifecycle.initialize(ctx);
     mocked.client.retain.mockClear();
@@ -1536,7 +1536,7 @@ describe("extension hooks", () => {
     const u2 = { role: "user", content: "u2", timestamp: 3 };
     const a2 = { role: "assistant", content: "a2", timestamp: 4 };
 
-    const { createMemoryLifecycle } = await import("../extensions/memory-lifecycle.js");
+    const { createMemoryLifecycle } = await import("../extensions/lifecycle/memory-lifecycle.js");
     const ctx = {
       cwd,
       ui: { setStatus: vi.fn(), notify: vi.fn() },
@@ -1575,7 +1575,7 @@ describe("extension hooks", () => {
       }),
     );
     const sessionFile = join(cwd, "session-api_key=super-secret-token.jsonl");
-    const { createMemoryLifecycle } = await import("../extensions/memory-lifecycle.js");
+    const { createMemoryLifecycle } = await import("../extensions/lifecycle/memory-lifecycle.js");
     const ctx = {
       cwd,
       ui: { setStatus: vi.fn(), notify: vi.fn() },
@@ -1656,7 +1656,7 @@ describe("extension hooks", () => {
     await enqueueRetainJob(queuePath, { ...baseJob, id: "2" });
     await enqueueRetainJob(queuePath, { ...baseJob, id: "3" });
 
-    const { createMemoryLifecycle } = await import("../extensions/memory-lifecycle.js");
+    const { createMemoryLifecycle } = await import("../extensions/lifecycle/memory-lifecycle.js");
     const ctx = {
       cwd,
       ui: { setStatus: vi.fn(), notify: vi.fn() },

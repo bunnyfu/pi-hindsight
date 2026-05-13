@@ -1,10 +1,10 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { buildConfigEditingFields } from "../extensions/config-editing-model.js";
-import { createOperationCatalog } from "../extensions/operation-catalog.js";
-import type { MemoryOperationsDeps } from "../extensions/memory-operation-service.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import { buildConfigEditingFields } from "../extensions/config/config-editing-model.js";
+import { createOperationCatalog } from "../extensions/operations/operation-catalog.js";
+import type { MemoryOperationsDeps } from "../extensions/operations/memory-operation-service.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const outputPath = join(root, "docs", "surface-reference.md");

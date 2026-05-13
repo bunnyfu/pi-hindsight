@@ -6,7 +6,7 @@ import {
   addRetainFingerprints,
   readRetainFingerprints,
   RETAIN_CURSOR_LIMITS,
-} from "../extensions/retain-cursor.js";
+} from "../extensions/lifecycle/retain-cursor.js";
 
 describe("retain cursor", () => {
   it("prunes old fingerprints per session", async () => {

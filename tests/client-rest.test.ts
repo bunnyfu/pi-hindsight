@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
 import { PI_HINDSIGHT_USER_AGENT } from "../extensions/version.js";
 import {
   assertHealthResponse,
@@ -46,7 +46,7 @@ import {
   updateDirectiveRequestBody,
   updateDocumentRequestBody,
   updateMentalModelRequestBody,
-} from "../extensions/client-rest.js";
+} from "../extensions/client/client-rest.js";
 
 describe("Hindsight REST transport helpers", () => {
   afterEach(() => {

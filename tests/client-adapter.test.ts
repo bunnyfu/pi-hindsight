@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
 import { PI_HINDSIGHT_USER_AGENT } from "../extensions/version.js";
 
 const mocks = vi.hoisted(() => ({
@@ -26,7 +26,7 @@ describe("Hindsight client adapter", () => {
   });
 
   it("uses official retain for single memories when document tags are absent", async () => {
-    const { createHindsightClient } = await import("../extensions/client.js");
+    const { createHindsightClient } = await import("../extensions/client/client.js");
     const client = createHindsightClient(DEFAULT_CONFIG);
 
     expect(mocks.constructor).toHaveBeenCalledWith(
@@ -57,7 +57,7 @@ describe("Hindsight client adapter", () => {
   });
 
   it("keeps retainBatch fallback when document tags are present", async () => {
-    const { createHindsightClient } = await import("../extensions/client.js");
+    const { createHindsightClient } = await import("../extensions/client/client.js");
     const client = createHindsightClient(DEFAULT_CONFIG);
 
     await client.retain("bank", "content", {

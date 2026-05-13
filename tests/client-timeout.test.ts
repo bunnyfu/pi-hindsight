@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createServer } from "node:http";
-import { createHindsightClient } from "../extensions/client.js";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
+import { createHindsightClient } from "../extensions/client/client.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
 
 describe("Hindsight client timeout", () => {
   it("rejects slow calls using configured timeout", async () => {

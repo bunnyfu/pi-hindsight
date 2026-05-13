@@ -5,7 +5,7 @@ import {
   renderMentalModel,
   renderMentalModelHistory,
   renderMentalModelOperationResult,
-} from "../extensions/mental-model-presenter.js";
+} from "../extensions/tui/mental-model-presenter.js";
 
 describe("mental model presenter", () => {
   it("normalizes list responses and renders selectable labels", () => {

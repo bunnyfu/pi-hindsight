@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { ConfigEditingField, ConfigEditingTab } from "../extensions/config-editing-model.js";
+import type {
+  ConfigEditingField,
+  ConfigEditingTab,
+} from "../extensions/config/config-editing-model.js";
 import {
   applySetupIntent,
   selectedSetupField,
   selectedSetupIndex,
   setupIntentFromInput,
-} from "../extensions/setup-tui.js";
-import type { SetupUiState } from "../extensions/setup-tui.js";
+} from "../extensions/tui/setup-tui.js";
+import type { SetupUiState } from "../extensions/tui/setup-tui.js";
 
 function field(id: ConfigEditingField["id"], changed = false): ConfigEditingField {
   return {

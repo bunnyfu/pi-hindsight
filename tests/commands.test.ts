@@ -2,10 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { registerCommands } from "../extensions/commands.js";
-import { maintenanceCommandOperations } from "../extensions/command-maintenance.js";
-import { readSessionMemoryMeta, setSessionMemoryMode } from "../extensions/session-memory-meta.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import { registerCommands } from "../extensions/tui/commands.js";
+import { maintenanceCommandOperations } from "../extensions/tui/command-maintenance.js";
+import {
+  readSessionMemoryMeta,
+  setSessionMemoryMode,
+} from "../extensions/utils/session-memory-meta.js";
 import type { HindsightLikeClient } from "../extensions/types.js";
 
 type RegisteredTestCommand = {

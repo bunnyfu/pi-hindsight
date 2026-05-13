@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
 import {
   detectAppendCapability,
   isAppendUnsupportedError,
   resolveRetainDocumentTarget,
-} from "../extensions/capabilities.js";
+} from "../extensions/client/capabilities.js";
 import type { HindsightLikeClient } from "../extensions/types.js";
 
 function client(retain: HindsightLikeClient["retain"]): HindsightLikeClient {

@@ -2,19 +2,19 @@ import { describe, expect, it } from "vitest";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { createMemoryOperations } from "../extensions/memory-operation-service.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import { createMemoryOperations } from "../extensions/operations/memory-operation-service.js";
 import {
   flushRetainQueue,
   readDeadLetterQueue,
   readRetainQueue,
   resolveQueuePath,
-} from "../extensions/queue.js";
+} from "../extensions/queue/queue.js";
 import type { HindsightLikeClient, ResolvedConfig } from "../extensions/types.js";
 import {
   setSessionMemoryMode,
   setSessionRetainEnabled,
-} from "../extensions/session-memory-meta.js";
+} from "../extensions/utils/session-memory-meta.js";
 
 function testConfig(queuePath = ".pi/hindsight/q.jsonl"): ResolvedConfig {
   return {

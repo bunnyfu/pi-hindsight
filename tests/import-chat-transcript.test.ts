@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { readRetainQueue, resolveQueuePath } from "../extensions/queue.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import { readRetainQueue, resolveQueuePath } from "../extensions/queue/queue.js";
 import {
   importChatTranscript,
   parseChatTranscriptJsonl,
-} from "../extensions/import-chat-transcript.js";
-import { importMemoryChatTranscript } from "../extensions/import-operations.js";
+} from "../extensions/imports/import-chat-transcript.js";
+import { importMemoryChatTranscript } from "../extensions/imports/import-operations.js";
 
 describe("chat transcript import", () => {
   it("parses high-signal chat transcript events and drops stream noise", () => {

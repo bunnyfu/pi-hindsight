@@ -3,10 +3,10 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentEndEvent } from "@earendil-works/pi-coding-agent";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { buildRetainJob } from "../extensions/retain.js";
-import { selectMemoryScopes } from "../extensions/memory-scope.js";
-import { importPiSession } from "../extensions/import-sessions.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import { buildRetainJob } from "../extensions/lifecycle/retain.js";
+import { selectMemoryScopes } from "../extensions/operations/memory-scope.js";
+import { importPiSession } from "../extensions/imports/import-sessions.js";
 import type { HindsightLikeClient, ResolvedConfig } from "../extensions/types.js";
 
 function noopClient(): HindsightLikeClient {

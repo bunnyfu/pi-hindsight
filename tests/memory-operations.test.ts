@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { createMemoryOperations } from "../extensions/memory-operation-service.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import { createMemoryOperations } from "../extensions/operations/memory-operation-service.js";
 import type { HindsightLikeClient } from "../extensions/types.js";
 
 function client(): HindsightLikeClient {

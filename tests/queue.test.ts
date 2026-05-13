@@ -10,7 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
-import { isQueueLockRaceError } from "../extensions/queue-lock.js";
+import { isQueueLockRaceError } from "../extensions/queue/queue-lock.js";
 import {
   enqueueRetainJob,
   flushRetainQueue,
@@ -23,8 +23,11 @@ import {
   resolveQueuePath,
   summarizeRetainQueue,
   writeRetainQueue,
-} from "../extensions/queue.js";
-import { operationIdsFromResponse, retainOptionsForJob } from "../extensions/queue-delivery.js";
+} from "../extensions/queue/queue.js";
+import {
+  operationIdsFromResponse,
+  retainOptionsForJob,
+} from "../extensions/queue/queue-delivery.js";
 import type { RetainJob } from "../extensions/types.js";
 
 const job: RetainJob = {

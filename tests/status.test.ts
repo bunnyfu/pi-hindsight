@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { formatHindsightStatus } from "../extensions/status.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import { formatHindsightStatus } from "../extensions/utils/status.js";
 
 describe("formatHindsightStatus", () => {
   it("separates style from detail and truncates length", () => {

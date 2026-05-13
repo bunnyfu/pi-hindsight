@@ -8,9 +8,9 @@ import {
   parseBankTemplateManifestJson,
   summarizeBankTemplateImportResult,
   summarizeBankTemplateManifestValue,
-} from "../extensions/bank-template-operations.js";
-import { DEFAULT_CONFIG } from "../extensions/config-defaults.js";
-import type { MemoryOperationsDeps } from "../extensions/memory-operation-types.js";
+} from "../extensions/banks/bank-template-operations.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config-defaults.js";
+import type { MemoryOperationsDeps } from "../extensions/operations/memory-operation-types.js";
 
 function deps() {
   const importBankTemplate = vi.fn(async () => ({ dry_run: true, config_applied: true }));

@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { registerTools } from "./tools.js";
-import { registerCommands } from "./commands.js";
-import { createMemoryLifecycle } from "./memory-lifecycle.js";
+import { registerTools } from "./operations/tools.js";
+import { registerCommands } from "./tui/commands.js";
+import { createMemoryLifecycle } from "./lifecycle/memory-lifecycle.js";
 
 export default function hindsightExtension(pi: ExtensionAPI) {
   const lifecycle = createMemoryLifecycle(process.cwd());

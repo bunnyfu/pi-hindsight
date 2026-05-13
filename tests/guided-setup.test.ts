@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config-defaults.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config-defaults.js";
 import {
   buildGuidedSetupGlobalPatch,
   buildGuidedSetupPatch,
@@ -13,7 +13,7 @@ import {
   maybeOfferHistoricalImportForSetup,
   runGuidedSetup,
   setupProfileChoiceToMemoryProfile,
-} from "../extensions/guided-setup.js";
+} from "../extensions/tui/guided-setup.js";
 
 const configuredGlobal = {
   ...DEFAULT_CONFIG,

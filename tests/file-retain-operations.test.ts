@@ -2,8 +2,8 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
-import { createFileRetainOperations } from "../extensions/file-retain-operations.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
+import { createFileRetainOperations } from "../extensions/operations/file-retain-operations.js";
 import type { HindsightLikeClient } from "../extensions/types.js";
 
 describe("file retain operations", () => {

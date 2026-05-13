@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
 import {
   bankSelectionMessage,
   formatDebugReport,
   observationScopeDiagnostics,
   safeConfig,
-} from "../extensions/diagnostics.js";
-import type { ImportManifestEntry } from "../extensions/import-manifest.js";
+} from "../extensions/utils/diagnostics.js";
+import type { ImportManifestEntry } from "../extensions/imports/import-manifest.js";
 import {
   PI_HINDSIGHT_CLIENT_RANGE,
   PI_HINDSIGHT_SUPPORTED_NODE,

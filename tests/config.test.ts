@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { resolveConfig } from "../extensions/config.js";
+import { resolveConfig } from "../extensions/config/config.js";
 
 function tmp() {
   return mkdtempSync(join(tmpdir(), "pi-hindsight-"));

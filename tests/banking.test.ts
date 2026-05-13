@@ -4,14 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import type { ExecFileSyncOptions } from "node:child_process";
-import { DEFAULT_CONFIG } from "../extensions/config.js";
+import { DEFAULT_CONFIG } from "../extensions/config/config.js";
 import {
   baseTags,
   deriveProjectBankId,
   findRepoRoot,
   recallScopeTags,
-} from "../extensions/banking.js";
-import { liveDocumentId, stableSessionId } from "../extensions/session.js";
+} from "../extensions/banks/banking.js";
+import { liveDocumentId, stableSessionId } from "../extensions/utils/session.js";
 
 const LOCAL_GIT_ENV_KEYS = [
   "GIT_ALTERNATE_OBJECT_DIRECTORIES",

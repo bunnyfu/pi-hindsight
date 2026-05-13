@@ -19,7 +19,7 @@ import {
   operationToolResponse,
   updateBankConfigToolResponse,
   updateDirectiveToolResponse,
-} from "../extensions/tool-presenters.js";
+} from "../extensions/tui/tool-presenters.js";
 
 describe("tool presenters", () => {
   it("presents directive tool results", () => {
