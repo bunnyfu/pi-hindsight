@@ -41,7 +41,7 @@ describe("setup flow state", () => {
     expect(setupIntentFromInput("d")).toEqual({ type: "chooseDeployment" });
     expect(setupIntentFromInput("g")).toEqual({ type: "guidedSetup" });
     expect(setupIntentFromInput("f")).toEqual({ type: "flushQueue" });
-    expect(setupIntentFromInput("m")).toEqual({ type: "mentalModels" });
+    expect(setupIntentFromInput("m")).toBeUndefined();
     expect(setupIntentFromInput("h")).toEqual({ type: "moveTab", delta: -1 });
     expect(setupIntentFromInput("l")).toEqual({ type: "moveTab", delta: 1 });
     expect(setupIntentFromInput("j")).toEqual({ type: "moveSelection", delta: 1 });
@@ -83,10 +83,6 @@ describe("setup flow state", () => {
     expect(applySetupIntent(tabs(), state, { type: "flushQueue" })).toMatchObject({
       kind: "action",
       action: "flush-queue",
-    });
-    expect(applySetupIntent(tabs(), state, { type: "mentalModels" })).toMatchObject({
-      kind: "action",
-      action: "mental-models",
     });
     expect(applySetupIntent(tabs(), state, { type: "close" })).toMatchObject({
       kind: "action",

@@ -6,7 +6,6 @@ export type SetupActionId =
   | "choose-deployment"
   | "guided-setup"
   | "flush-queue"
-  | "mental-models"
   | "toggle-advanced"
   | "done";
 

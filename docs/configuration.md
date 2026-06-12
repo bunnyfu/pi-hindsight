@@ -55,7 +55,7 @@ Pi Hindsight distinguishes local Pi behavior from bank-owned Hindsight settings.
 - `Location: Project` or `Location: User` describes the Pi memory route.
 - `Bank: <bank-id>` names the concrete Hindsight bank that owns missions, config overrides, mental models, and directives.
 
-Mission text and mental models remain Hindsight bank settings, not normal Pi JSON config. Use `hindsight_get_bank_config` to inspect resolved bank config and override counts. Use `hindsight_update_bank_config` with `confirm: true` for raw Hindsight per-bank config override fields. Use `hindsight_reset_bank_config` only when you intentionally want to clear bank config overrides and fall back to Hindsight defaults. Bank template import/export is managed in the Hindsight control-plane web UI, not in Pi. Use `hindsight_list_directives`, `hindsight_get_directive`, `hindsight_create_directive`, `hindsight_update_directive`, and `hindsight_delete_directive` to manage bank-owned hard rules.
+Mission text and mental models remain Hindsight bank settings, not normal Pi JSON config. Use `hindsight_get_bank_config` to inspect resolved bank config and override counts. Use `hindsight_update_bank_config` with `confirm: true` for raw Hindsight per-bank config override fields. Use `hindsight_reset_bank_config` only when you intentionally want to clear bank config overrides and fall back to Hindsight defaults. Bank templates, mental models, and directives are managed in the Hindsight control-plane web UI, not in Pi.
 
 ### Bank config surface audit
 

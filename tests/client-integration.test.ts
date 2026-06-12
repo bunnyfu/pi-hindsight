@@ -59,56 +59,6 @@ describe("Hindsight client adapter integration", () => {
         sendJson(res, 200, { text: "reflection" });
         return;
       }
-      if (
-        req.method === "GET" &&
-        req.url ===
-          "/v1/default/banks/test-bank/directives?tags=project&tags_match=all&active_only=false&limit=10&offset=1"
-      ) {
-        sendJson(res, 200, {
-          items: [{ id: "directive-1", bank_id: "test-bank", name: "Rule", content: "Use facts." }],
-        });
-        return;
-      }
-      if (
-        req.method === "GET" &&
-        req.url === "/v1/default/banks/test-bank/directives/directive-1"
-      ) {
-        sendJson(res, 200, {
-          id: "directive-1",
-          bank_id: "test-bank",
-          name: "Rule",
-          content: "Use facts.",
-        });
-        return;
-      }
-      if (req.method === "POST" && req.url === "/v1/default/banks/test-bank/directives") {
-        sendJson(res, 200, {
-          id: "directive-2",
-          bank_id: "test-bank",
-          name: "New",
-          content: "Be exact.",
-        });
-        return;
-      }
-      if (
-        req.method === "PATCH" &&
-        req.url === "/v1/default/banks/test-bank/directives/directive-2"
-      ) {
-        sendJson(res, 200, {
-          id: "directive-2",
-          bank_id: "test-bank",
-          name: "New",
-          content: "Updated.",
-        });
-        return;
-      }
-      if (
-        req.method === "DELETE" &&
-        req.url === "/v1/default/banks/test-bank/directives/directive-2"
-      ) {
-        sendJson(res, 200, { deleted: true });
-        return;
-      }
       if (req.method === "GET" && req.url === "/v1/default/banks/test-bank/config") {
         sendJson(res, 200, { config: { retain_custom_instructions: "Read from db" } });
         return;
@@ -187,53 +137,6 @@ describe("Hindsight client adapter integration", () => {
       }
       if (req.method === "POST" && req.url === "/v1/default/banks/test-bank/background") {
         sendJson(res, 200, { updated: true });
-        return;
-      }
-      if (
-        req.method === "GET" &&
-        req.url ===
-          "/v1/default/banks/test-bank/mental-models?tags=source%3Api&tags_match=all&detail=metadata&limit=10&offset=2"
-      ) {
-        sendJson(res, 200, { items: [{ id: "model-1", name: "Model" }] });
-        return;
-      }
-      if (
-        req.method === "GET" &&
-        req.url === "/v1/default/banks/test-bank/mental-models/model-1?detail=full"
-      ) {
-        sendJson(res, 200, { id: "model-1", name: "Model", content: "full" });
-        return;
-      }
-      if (req.method === "POST" && req.url === "/v1/default/banks/test-bank/mental-models") {
-        sendJson(res, 202, { operation_id: "create-op", status: "queued" });
-        return;
-      }
-      if (
-        req.method === "PATCH" &&
-        req.url === "/v1/default/banks/test-bank/mental-models/model-1"
-      ) {
-        sendJson(res, 200, { id: "model-1", name: "Updated" });
-        return;
-      }
-      if (
-        req.method === "GET" &&
-        req.url === "/v1/default/banks/test-bank/mental-models/model-1/history"
-      ) {
-        sendJson(res, 200, { items: [{ id: "v1" }] });
-        return;
-      }
-      if (
-        req.method === "POST" &&
-        req.url === "/v1/default/banks/test-bank/mental-models/model-1/refresh"
-      ) {
-        sendJson(res, 202, { operation_id: "refresh-op", status: "queued" });
-        return;
-      }
-      if (
-        req.method === "DELETE" &&
-        req.url === "/v1/default/banks/test-bank/mental-models/model-1"
-      ) {
-        sendJson(res, 200, { deleted: true });
         return;
       }
       sendJson(res, 404, { detail: `unexpected ${req.method} ${req.url}` });
@@ -320,26 +223,6 @@ describe("Hindsight client adapter integration", () => {
       includeToolCalls: false,
       tagGroups: [{ tags: ["source:pi"], match: "any_strict" }],
     });
-    const directives = await client.listDirectives?.("test-bank", {
-      tags: ["project"],
-      tagsMatch: "all",
-      activeOnly: false,
-      limit: 10,
-      offset: 1,
-    });
-    const directive = await client.getDirective?.("test-bank", "directive-1");
-    const createdDirective = await client.createDirective?.("test-bank", {
-      name: "New",
-      content: "Be exact.",
-      priority: 3,
-      isActive: true,
-      tags: ["project"],
-    });
-    const updatedDirective = await client.updateDirective?.("test-bank", "directive-2", {
-      content: "Updated.",
-      tags: null,
-    });
-    const deletedDirective = await client.deleteDirective?.("test-bank", "directive-2");
     const bankConfig = await client.getBankConfig?.("test-bank");
     const bankConfigUpdate = await client.updateBankConfig?.("test-bank", {
       retain_custom_instructions: "Write to db",
@@ -388,52 +271,9 @@ describe("Hindsight client adapter integration", () => {
       content: "Background",
       updateDisposition: true,
     });
-    const models = await client.listMentalModels?.("test-bank", {
-      tags: ["source:pi"],
-      tagsMatch: "all",
-      detail: "metadata",
-      limit: 10,
-      offset: 2,
-    });
-    const model = await client.getMentalModel?.("test-bank", "model-1", { detail: "full" });
-    const createdModel = await client.createMentalModel?.("test-bank", {
-      name: "Model",
-      sourceQuery: "What should recur?",
-      tags: ["source:pi"],
-      maxTokens: 256,
-    });
-    const updatedModel = await client.updateMentalModel?.("test-bank", "model-1", {
-      sourceQuery: "Updated query",
-      tags: null,
-    });
-    const history = await client.getMentalModelHistory?.("test-bank", "model-1");
-    const refreshed = await client.refreshMentalModel?.("test-bank", "model-1");
-    const deleted = await client.deleteMentalModel?.("test-bank", "model-1");
 
     expect(recall).toEqual({ results: [{ text: "remembered fact" }] });
     expect(reflection).toEqual({ text: "reflection" });
-    expect(directives).toEqual({
-      items: [{ id: "directive-1", bank_id: "test-bank", name: "Rule", content: "Use facts." }],
-    });
-    expect(directive).toEqual({
-      id: "directive-1",
-      bank_id: "test-bank",
-      name: "Rule",
-      content: "Use facts.",
-    });
-    expect(createdDirective).toEqual({
-      id: "directive-2",
-      bank_id: "test-bank",
-      name: "New",
-      content: "Be exact.",
-    });
-    expect(updatedDirective).toEqual({
-      id: "directive-2",
-      bank_id: "test-bank",
-      name: "New",
-      content: "Updated.",
-    });
-    expect(deletedDirective).toEqual({ deleted: true });
     expect(bankConfig).toEqual({ config: { retain_custom_instructions: "Read from db" } });
     expect(bankConfigUpdate).toEqual({ updated: true });
     expect(bankConfigReset).toEqual({ reset: true });
@@ -451,13 +291,6 @@ describe("Hindsight client adapter integration", () => {
       disposition: { skepticism: 1, literalism: 2, empathy: 3 },
     });
     expect(backgroundUpdate).toEqual({ updated: true });
-    expect(models).toEqual({ items: [{ id: "model-1", name: "Model" }] });
-    expect(model).toEqual({ id: "model-1", name: "Model", content: "full" });
-    expect(createdModel).toEqual({ operation_id: "create-op", status: "queued" });
-    expect(updatedModel).toEqual({ id: "model-1", name: "Updated" });
-    expect(history).toEqual({ items: [{ id: "v1" }] });
-    expect(refreshed).toEqual({ operation_id: "refresh-op", status: "queued" });
-    expect(deleted).toEqual({ deleted: true });
 
     expect(requests.map((request) => `${request.method} ${request.url}`)).toEqual([
       "GET /v1/default/banks/test-bank/profile",
@@ -466,11 +299,6 @@ describe("Hindsight client adapter integration", () => {
       "POST /v1/default/banks/test-bank/memories",
       "POST /v1/default/banks/test-bank/memories/recall",
       "POST /v1/default/banks/test-bank/reflect",
-      "GET /v1/default/banks/test-bank/directives?tags=project&tags_match=all&active_only=false&limit=10&offset=1",
-      "GET /v1/default/banks/test-bank/directives/directive-1",
-      "POST /v1/default/banks/test-bank/directives",
-      "PATCH /v1/default/banks/test-bank/directives/directive-2",
-      "DELETE /v1/default/banks/test-bank/directives/directive-2",
       "GET /v1/default/banks/test-bank/config",
       "PATCH /v1/default/banks/test-bank/config",
       "DELETE /v1/default/banks/test-bank/config",
@@ -486,13 +314,6 @@ describe("Hindsight client adapter integration", () => {
       "PATCH /v1/default/banks/test-bank",
       "PUT /v1/default/banks/test-bank/profile",
       "POST /v1/default/banks/test-bank/background",
-      "GET /v1/default/banks/test-bank/mental-models?tags=source%3Api&tags_match=all&detail=metadata&limit=10&offset=2",
-      "GET /v1/default/banks/test-bank/mental-models/model-1?detail=full",
-      "POST /v1/default/banks/test-bank/mental-models",
-      "PATCH /v1/default/banks/test-bank/mental-models/model-1",
-      "GET /v1/default/banks/test-bank/mental-models/model-1/history",
-      "POST /v1/default/banks/test-bank/mental-models/model-1/refresh",
-      "DELETE /v1/default/banks/test-bank/mental-models/model-1",
     ]);
 
     expect(requests[2]?.body).toMatchObject({
@@ -541,32 +362,17 @@ describe("Hindsight client adapter integration", () => {
       include: { facts: {}, tool_calls: null },
       tag_groups: [{ tags: ["source:pi"], match: "any_strict" }],
     });
-    expect(requests[8]?.body).toEqual({
-      name: "New",
-      content: "Be exact.",
-      priority: 3,
-      is_active: true,
-      tags: ["project"],
-    });
-    expect(requests[9]?.body).toEqual({ content: "Updated.", tags: null });
-    expect(requests[12]?.body).toEqual({
+    expect(requests[7]?.body).toEqual({
       updates: { retain_custom_instructions: "Write to db" },
     });
-    expect(requests[16]?.body).toEqual({ tags: ["updated"] });
-    expect(requests[23]?.body).toEqual({
+    expect(requests[11]?.body).toEqual({ tags: ["updated"] });
+    expect(requests[18]?.body).toEqual({
       name: "Updated",
       reflect_mission: "Reflect precisely",
     });
-    expect(requests[24]?.body).toEqual({
+    expect(requests[19]?.body).toEqual({
       disposition: { skepticism: 1, literalism: 2, empathy: 3 },
     });
-    expect(requests[25]?.body).toEqual({ content: "Background", update_disposition: true });
-    expect(requests[28]?.body).toEqual({
-      name: "Model",
-      source_query: "What should recur?",
-      tags: ["source:pi"],
-      max_tokens: 256,
-    });
-    expect(requests[29]?.body).toEqual({ source_query: "Updated query", tags: null });
+    expect(requests[20]?.body).toEqual({ content: "Background", update_disposition: true });
   });
 });

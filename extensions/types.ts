@@ -203,72 +203,6 @@ export interface HindsightCapabilities {
   probeDocumentId?: string;
 }
 
-export interface MentalModelTrigger {
-  mode?: "full" | "delta";
-  refresh_after_consolidation?: boolean;
-  fact_types?: Array<"world" | "experience" | "observation"> | null;
-  exclude_mental_models?: boolean;
-  exclude_mental_model_ids?: string[] | null;
-  tags_match?: TagsMatch | null;
-  tag_groups?: unknown[] | null;
-  include_chunks?: boolean | null;
-  recall_max_tokens?: number | null;
-  recall_chunks_max_tokens?: number | null;
-}
-
-export interface ListDirectivesOptions {
-  tags?: string[];
-  tagsMatch?: "any" | "all" | "exact";
-  activeOnly?: boolean;
-  limit?: number;
-  offset?: number;
-}
-
-export interface CreateDirectiveRequest {
-  name: string;
-  content: string;
-  priority?: number;
-  isActive?: boolean;
-  tags?: string[];
-}
-
-export interface UpdateDirectiveRequest {
-  name?: string | null;
-  content?: string | null;
-  priority?: number | null;
-  isActive?: boolean | null;
-  tags?: string[] | null;
-}
-
-export interface CreateMentalModelRequest {
-  id?: string | null;
-  name: string;
-  sourceQuery: string;
-  tags?: string[];
-  maxTokens?: number;
-  trigger?: MentalModelTrigger;
-}
-
-export interface UpdateMentalModelRequest {
-  name?: string | null;
-  sourceQuery?: string | null;
-  tags?: string[] | null;
-  maxTokens?: number | null;
-  trigger?: MentalModelTrigger | null;
-}
-
-export interface ListMentalModelsOptions {
-  tags?: string[];
-  tagsMatch?: MentalModelTagsMatch;
-  detail?: MentalModelDetail;
-  limit?: number;
-  offset?: number;
-}
-
-export interface GetMentalModelOptions {
-  detail?: MentalModelDetail;
-}
-
 export interface ListOperationsOptions {
   status?: OperationStatus;
   taskType?: string;
@@ -470,30 +404,6 @@ export interface HindsightLikeClient {
   updateBankProfile?(bankId: string, request: UpdateBankProfileRequest): Promise<unknown>;
   updateBankDisposition?(bankId: string, disposition: DispositionTraits): Promise<unknown>;
   addBankBackground?(bankId: string, request: AddBankBackgroundRequest): Promise<unknown>;
-  listDirectives?(bankId: string, options?: ListDirectivesOptions): Promise<unknown>;
-  getDirective?(bankId: string, directiveId: string): Promise<unknown>;
-  createDirective?(bankId: string, request: CreateDirectiveRequest): Promise<unknown>;
-  updateDirective?(
-    bankId: string,
-    directiveId: string,
-    request: UpdateDirectiveRequest,
-  ): Promise<unknown>;
-  deleteDirective?(bankId: string, directiveId: string): Promise<unknown>;
-  listMentalModels?(bankId: string, options?: ListMentalModelsOptions): Promise<unknown>;
-  getMentalModel?(
-    bankId: string,
-    mentalModelId: string,
-    options?: GetMentalModelOptions,
-  ): Promise<unknown>;
-  createMentalModel?(bankId: string, request: CreateMentalModelRequest): Promise<unknown>;
-  updateMentalModel?(
-    bankId: string,
-    mentalModelId: string,
-    request: UpdateMentalModelRequest,
-  ): Promise<unknown>;
-  deleteMentalModel?(bankId: string, mentalModelId: string): Promise<unknown>;
-  getMentalModelHistory?(bankId: string, mentalModelId: string): Promise<unknown>;
-  refreshMentalModel?(bankId: string, mentalModelId: string): Promise<unknown>;
   triggerConsolidation?(bankId: string): Promise<unknown>;
   recoverConsolidation?(bankId: string): Promise<unknown>;
   clearObservations?(bankId: string): Promise<unknown>;

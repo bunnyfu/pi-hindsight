@@ -10,61 +10,48 @@ This reference is generated from the operation catalog and config editing regist
 
 Pi Hindsight 1.0 supports a stable Pi-first Hindsight integration. Core and Pi workflow tools are part of the stable 1.0 contract. Capability-gated tools are supported when the connected Hindsight server exposes the required upstream endpoint or field; unsupported servers should return a clear capability error.
 
-| Tool                                              | Scope                |
-| ------------------------------------------------- | -------------------- |
-| `hindsight_recall`                                | core 1.0             |
-| `hindsight_retain`                                | core 1.0             |
-| `hindsight_retain_global`                         | core 1.0             |
-| `hindsight_retain_files`                          | capability-gated 1.0 |
-| `hindsight_retain_receipts`                       | Pi workflow 1.0      |
-| `hindsight_route_memory`                          | Pi workflow 1.0      |
-| `hindsight_delete_document`                       | capability-gated 1.0 |
-| `hindsight_list_documents`                        | capability-gated 1.0 |
-| `hindsight_get_document`                          | capability-gated 1.0 |
-| `hindsight_update_document_tags`                  | capability-gated 1.0 |
-| `hindsight_list_entities`                         | capability-gated 1.0 |
-| `hindsight_get_entity`                            | capability-gated 1.0 |
-| `hindsight_regenerate_entity`                     | capability-gated 1.0 |
-| `hindsight_get_graph`                             | capability-gated 1.0 |
-| `hindsight_get_entity_graph`                      | capability-gated 1.0 |
-| `hindsight_list_tags`                             | capability-gated 1.0 |
-| `hindsight_list_mental_models`                    | capability-gated 1.0 |
-| `hindsight_get_mental_model`                      | capability-gated 1.0 |
-| `hindsight_create_mental_model`                   | capability-gated 1.0 |
-| `hindsight_promote_reflect_query_to_mental_model` | capability-gated 1.0 |
-| `hindsight_update_mental_model`                   | capability-gated 1.0 |
-| `hindsight_delete_mental_model`                   | capability-gated 1.0 |
-| `hindsight_get_mental_model_history`              | capability-gated 1.0 |
-| `hindsight_refresh_mental_model`                  | capability-gated 1.0 |
-| `hindsight_trigger_consolidation`                 | capability-gated 1.0 |
-| `hindsight_recover_consolidation`                 | capability-gated 1.0 |
-| `hindsight_clear_observations`                    | capability-gated 1.0 |
-| `hindsight_inspect_retain_queue`                  | Pi workflow 1.0      |
-| `hindsight_list_operations`                       | capability-gated 1.0 |
-| `hindsight_cancel_operation`                      | capability-gated 1.0 |
-| `hindsight_retry_operation`                       | capability-gated 1.0 |
-| `hindsight_list_memories`                         | capability-gated 1.0 |
-| `hindsight_get_memory`                            | capability-gated 1.0 |
-| `hindsight_get_chunk`                             | capability-gated 1.0 |
-| `hindsight_get_memory_history`                    | capability-gated 1.0 |
-| `hindsight_delete_memory_observations`            | capability-gated 1.0 |
-| `hindsight_configure`                             | Pi workflow 1.0      |
-| `hindsight_get_bank_config`                       | capability-gated 1.0 |
-| `hindsight_update_bank_config`                    | capability-gated 1.0 |
-| `hindsight_get_bank_profile`                      | Pi workflow 1.0      |
-| `hindsight_update_bank_profile`                   | Pi workflow 1.0      |
-| `hindsight_update_bank_disposition`               | Pi workflow 1.0      |
-| `hindsight_add_bank_background`                   | Pi workflow 1.0      |
-| `hindsight_reset_bank_config`                     | capability-gated 1.0 |
-| `hindsight_list_directives`                       | capability-gated 1.0 |
-| `hindsight_get_directive`                         | capability-gated 1.0 |
-| `hindsight_create_directive`                      | capability-gated 1.0 |
-| `hindsight_update_directive`                      | capability-gated 1.0 |
-| `hindsight_delete_directive`                      | capability-gated 1.0 |
-| `hindsight_import`                                | Pi workflow 1.0      |
-| `hindsight_import_seed_content`                   | Pi workflow 1.0      |
-| `hindsight_import_chat_transcript`                | Pi workflow 1.0      |
-| `hindsight_reflect`                               | core 1.0             |
+| Tool                                   | Scope                |
+| -------------------------------------- | -------------------- |
+| `hindsight_recall`                     | core 1.0             |
+| `hindsight_retain`                     | core 1.0             |
+| `hindsight_retain_global`              | core 1.0             |
+| `hindsight_retain_files`               | capability-gated 1.0 |
+| `hindsight_retain_receipts`            | Pi workflow 1.0      |
+| `hindsight_route_memory`               | Pi workflow 1.0      |
+| `hindsight_delete_document`            | capability-gated 1.0 |
+| `hindsight_list_documents`             | capability-gated 1.0 |
+| `hindsight_get_document`               | capability-gated 1.0 |
+| `hindsight_update_document_tags`       | capability-gated 1.0 |
+| `hindsight_list_entities`              | capability-gated 1.0 |
+| `hindsight_get_entity`                 | capability-gated 1.0 |
+| `hindsight_regenerate_entity`          | capability-gated 1.0 |
+| `hindsight_get_graph`                  | capability-gated 1.0 |
+| `hindsight_get_entity_graph`           | capability-gated 1.0 |
+| `hindsight_list_tags`                  | capability-gated 1.0 |
+| `hindsight_trigger_consolidation`      | capability-gated 1.0 |
+| `hindsight_recover_consolidation`      | capability-gated 1.0 |
+| `hindsight_clear_observations`         | capability-gated 1.0 |
+| `hindsight_inspect_retain_queue`       | Pi workflow 1.0      |
+| `hindsight_list_operations`            | capability-gated 1.0 |
+| `hindsight_cancel_operation`           | capability-gated 1.0 |
+| `hindsight_retry_operation`            | capability-gated 1.0 |
+| `hindsight_list_memories`              | capability-gated 1.0 |
+| `hindsight_get_memory`                 | capability-gated 1.0 |
+| `hindsight_get_chunk`                  | capability-gated 1.0 |
+| `hindsight_get_memory_history`         | capability-gated 1.0 |
+| `hindsight_delete_memory_observations` | capability-gated 1.0 |
+| `hindsight_configure`                  | Pi workflow 1.0      |
+| `hindsight_get_bank_config`            | capability-gated 1.0 |
+| `hindsight_update_bank_config`         | capability-gated 1.0 |
+| `hindsight_get_bank_profile`           | Pi workflow 1.0      |
+| `hindsight_update_bank_profile`        | Pi workflow 1.0      |
+| `hindsight_update_bank_disposition`    | Pi workflow 1.0      |
+| `hindsight_add_bank_background`        | Pi workflow 1.0      |
+| `hindsight_reset_bank_config`          | capability-gated 1.0 |
+| `hindsight_import`                     | Pi workflow 1.0      |
+| `hindsight_import_seed_content`        | Pi workflow 1.0      |
+| `hindsight_import_chat_transcript`     | Pi workflow 1.0      |
+| `hindsight_reflect`                    | core 1.0             |
 
 ## Deferred or non-goal upstream surfaces
 
@@ -274,96 +261,6 @@ List Hindsight tags for compact inspection.
 | `limit`   | number                    | no       | Maximum tags to return.                     |
 | `offset`  | number                    | no       | Pagination offset.                          |
 
-### `hindsight_list_mental_models`
-
-List Hindsight mental models for a bank.
-
-| Parameter   | Type                        | Required | Description                                 |
-| ----------- | --------------------------- | -------- | ------------------------------------------- |
-| `bank`      | string                      | no       | Optional bank id. Defaults to project bank. |
-| `tags`      | array<string>               | no       |                                             |
-| `tagsMatch` | any \| all \| exact         | no       |                                             |
-| `detail`    | metadata \| content \| full | no       |                                             |
-| `limit`     | number                      | no       | Maximum mental models to return.            |
-| `offset`    | number                      | no       | Pagination offset.                          |
-
-### `hindsight_get_mental_model`
-
-Fetch one Hindsight mental model by ID.
-
-| Parameter       | Type                        | Required | Description                                 |
-| --------------- | --------------------------- | -------- | ------------------------------------------- |
-| `mentalModelId` | string                      | yes      | Mental model ID.                            |
-| `bank`          | string                      | no       | Optional bank id. Defaults to project bank. |
-| `detail`        | metadata \| content \| full | no       |                                             |
-
-### `hindsight_create_mental_model`
-
-Create a Hindsight mental model from a source query.
-
-| Parameter     | Type          | Required | Description                                 |
-| ------------- | ------------- | -------- | ------------------------------------------- |
-| `name`        | string        | yes      | Mental model name.                          |
-| `sourceQuery` | string        | yes      | Source query used to build the model.       |
-| `bank`        | string        | no       | Optional bank id. Defaults to project bank. |
-| `id`          | string        | no       | Optional mental model ID.                   |
-| `tags`        | array<string> | no       |                                             |
-| `maxTokens`   | number        | no       | Optional max token budget.                  |
-
-### `hindsight_promote_reflect_query_to_mental_model`
-
-Create a mental model from a useful project or User Bank reflect query.
-
-| Parameter     | Type              | Required | Description                |
-| ------------- | ----------------- | -------- | -------------------------- |
-| `bank`        | project \| global | yes      |                            |
-| `name`        | string            | yes      | Mental model name.         |
-| `sourceQuery` | string            | yes      | Reflect query to promote.  |
-| `id`          | string            | no       | Optional mental model ID.  |
-| `tags`        | array<string>     | no       |                            |
-| `maxTokens`   | number            | no       | Optional max token budget. |
-
-### `hindsight_update_mental_model`
-
-Update a Hindsight mental model.
-
-| Parameter       | Type                  | Required | Description                                 |
-| --------------- | --------------------- | -------- | ------------------------------------------- |
-| `mentalModelId` | string                | yes      | Mental model ID.                            |
-| `bank`          | string                | no       | Optional bank id. Defaults to project bank. |
-| `name`          | string \| null        | no       |                                             |
-| `sourceQuery`   | string \| null        | no       |                                             |
-| `tags`          | array<string> \| null | no       |                                             |
-| `maxTokens`     | number \| null        | no       |                                             |
-
-### `hindsight_delete_mental_model`
-
-Delete one Hindsight mental model. Destructive and irreversible; requires confirm=true.
-
-| Parameter       | Type   | Required | Description                                 |
-| --------------- | ------ | -------- | ------------------------------------------- |
-| `mentalModelId` | string | yes      | Mental model ID.                            |
-| `bank`          | string | no       | Optional bank id. Defaults to project bank. |
-| `confirm`       | true   | yes      | Required destructive-action confirmation.   |
-
-### `hindsight_get_mental_model_history`
-
-Fetch Hindsight mental model history.
-
-| Parameter       | Type   | Required | Description                                 |
-| --------------- | ------ | -------- | ------------------------------------------- |
-| `mentalModelId` | string | yes      | Mental model ID.                            |
-| `bank`          | string | no       | Optional bank id. Defaults to project bank. |
-
-### `hindsight_refresh_mental_model`
-
-Refresh a Hindsight mental model and surface operation IDs when returned.
-
-| Parameter       | Type   | Required | Description                                 |
-| --------------- | ------ | -------- | ------------------------------------------- |
-| `mentalModelId` | string | yes      | Mental model ID.                            |
-| `bank`          | string | no       | Optional bank id. Defaults to project bank. |
-
 ### `hindsight_trigger_consolidation`
 
 Trigger Hindsight consolidation for a bank.
@@ -561,65 +458,6 @@ Reset Hindsight bank config overrides for a selected bank.
 | --------- | ------ | -------- | ------------------------------------------------------- |
 | `bank`    | string | no       | Optional bank id. Defaults to project bank.             |
 | `confirm` | true   | yes      | Required destructive-action confirmation. Must be true. |
-
-### `hindsight_list_directives`
-
-List bank-owned Hindsight directives (hard reflect rules).
-
-| Parameter    | Type                | Required | Description                                 |
-| ------------ | ------------------- | -------- | ------------------------------------------- |
-| `bank`       | string              | no       | Optional bank id. Defaults to project bank. |
-| `tags`       | array<string>       | no       | Optional tag filter.                        |
-| `tagsMatch`  | any \| all \| exact | no       |                                             |
-| `activeOnly` | boolean             | no       | Only return active directives.              |
-| `limit`      | number              | no       | Maximum directives to return.               |
-| `offset`     | number              | no       | Pagination offset.                          |
-
-### `hindsight_get_directive`
-
-Get a bank-owned Hindsight directive by ID.
-
-| Parameter     | Type   | Required | Description                                 |
-| ------------- | ------ | -------- | ------------------------------------------- |
-| `directiveId` | string | yes      | Directive ID.                               |
-| `bank`        | string | no       | Optional bank id. Defaults to project bank. |
-
-### `hindsight_create_directive`
-
-Create a bank-owned Hindsight directive (hard reflect rule).
-
-| Parameter  | Type          | Required | Description                                    |
-| ---------- | ------------- | -------- | ---------------------------------------------- |
-| `name`     | string        | yes      | Human-readable directive name.                 |
-| `content`  | string        | yes      | Directive text to inject into prompts.         |
-| `bank`     | string        | no       | Optional bank id. Defaults to project bank.    |
-| `priority` | number        | no       | Higher priority directives are injected first. |
-| `isActive` | boolean       | no       | Whether this directive is active.              |
-| `tags`     | array<string> | no       | Directive tags.                                |
-
-### `hindsight_update_directive`
-
-Update a bank-owned Hindsight directive.
-
-| Parameter     | Type                  | Required | Description                                 |
-| ------------- | --------------------- | -------- | ------------------------------------------- |
-| `directiveId` | string                | yes      | Directive ID.                               |
-| `bank`        | string                | no       | Optional bank id. Defaults to project bank. |
-| `name`        | string \| null        | no       | New directive name.                         |
-| `content`     | string \| null        | no       | New directive text.                         |
-| `priority`    | number \| null        | no       | New priority.                               |
-| `isActive`    | boolean \| null       | no       | New active status.                          |
-| `tags`        | array<string> \| null | no       | New tags.                                   |
-
-### `hindsight_delete_directive`
-
-Delete a bank-owned Hindsight directive. Destructive and irreversible; requires confirm=true.
-
-| Parameter     | Type   | Required | Description                                             |
-| ------------- | ------ | -------- | ------------------------------------------------------- |
-| `directiveId` | string | yes      | Directive ID.                                           |
-| `bank`        | string | no       | Optional bank id. Defaults to project bank.             |
-| `confirm`     | true   | yes      | Required destructive-action confirmation. Must be true. |
 
 ### `hindsight_import`
 

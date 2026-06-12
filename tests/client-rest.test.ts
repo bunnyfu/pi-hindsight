@@ -10,23 +10,15 @@ import {
   chunkItemPath,
   consolidationPath,
   consolidationRecoverPath,
-  createDirectiveRequestBody,
   createHindsightRestTransport,
-  createMentalModelRequestBody,
   documentItemPath,
   documentsCollectionPath,
-  directiveItemPath,
-  directivesCollectionPath,
   encodeBankPath,
   entitiesCollectionPath,
   entityGraphPath,
   entityItemPath,
   entityRegeneratePath,
   graphPath,
-  mentalModelCollectionPath,
-  mentalModelHistoryPath,
-  mentalModelItemPath,
-  mentalModelRefreshPath,
   memoriesCollectionPath,
   memoryHistoryPath,
   memoryItemPath,
@@ -40,9 +32,7 @@ import {
   tagsCollectionPath,
   updateBankConfigRequestBody,
   updateBankProfileRequestBody,
-  updateDirectiveRequestBody,
   updateDocumentRequestBody,
-  updateMentalModelRequestBody,
 } from "../extensions/client/client-rest.js";
 
 describe("Hindsight REST transport helpers", () => {
@@ -94,42 +84,9 @@ describe("Hindsight REST transport helpers", () => {
     );
     expect(observationsPath("bank/id")).toBe("/v1/default/banks/bank%2Fid/observations");
     expect(
-      directivesCollectionPath("bank/id", {
-        tags: ["source:pi", "profile:coding"],
-        tagsMatch: "all",
-        activeOnly: false,
-        limit: 10,
-        offset: 5,
-      }),
-    ).toBe(
-      "/v1/default/banks/bank%2Fid/directives?tags=source%3Api&tags=profile%3Acoding&tags_match=all&active_only=false&limit=10&offset=5",
-    );
-    expect(directiveItemPath("bank/id", "directive/id")).toBe(
-      "/v1/default/banks/bank%2Fid/directives/directive%2Fid",
-    );
-    expect(
       updateBankConfigRequestBody({ retain_custom_instructions: "Extract carefully" }),
     ).toEqual({
       updates: { retain_custom_instructions: "Extract carefully" },
-    });
-    expect(
-      createDirectiveRequestBody({
-        name: "Rule",
-        content: "Use source facts.",
-        priority: 2,
-        isActive: false,
-        tags: ["project"],
-      }),
-    ).toEqual({
-      name: "Rule",
-      content: "Use source facts.",
-      priority: 2,
-      is_active: false,
-      tags: ["project"],
-    });
-    expect(updateDirectiveRequestBody({ content: null, isActive: true })).toEqual({
-      content: null,
-      is_active: true,
     });
   });
 
@@ -217,75 +174,6 @@ describe("Hindsight REST transport helpers", () => {
     ).toEqual({
       reflect_mission: "Reflect",
       retain_mission: null,
-    });
-  });
-
-  it("maps mental model paths and query options to Hindsight REST shape", () => {
-    expect(
-      mentalModelCollectionPath("bank/id", {
-        tags: ["project", "stable"],
-        tagsMatch: "all",
-        detail: "metadata",
-        limit: 10,
-        offset: 5,
-      }),
-    ).toBe(
-      "/v1/default/banks/bank%2Fid/mental-models?tags=project&tags=stable&tags_match=all&detail=metadata&limit=10&offset=5",
-    );
-    expect(mentalModelItemPath("bank/id", "model/id", { detail: "full" })).toBe(
-      "/v1/default/banks/bank%2Fid/mental-models/model%2Fid?detail=full",
-    );
-    expect(mentalModelHistoryPath("bank/id", "model/id")).toBe(
-      "/v1/default/banks/bank%2Fid/mental-models/model%2Fid/history",
-    );
-    expect(mentalModelRefreshPath("bank/id", "model/id")).toBe(
-      "/v1/default/banks/bank%2Fid/mental-models/model%2Fid/refresh",
-    );
-  });
-
-  it("maps mental model request bodies to OpenAPI field names", () => {
-    expect(
-      createMentalModelRequestBody({
-        id: "team-style",
-        name: "Team Style",
-        sourceQuery: "How does the team prefer to work?",
-        tags: ["team"],
-        maxTokens: 2048,
-        trigger: {
-          mode: "delta",
-          refresh_after_consolidation: false,
-          fact_types: ["world", "observation"],
-          exclude_mental_models: true,
-          exclude_mental_model_ids: ["old-model"],
-          tags_match: "all_strict",
-          tag_groups: [{ and: ["project", "stable"] }],
-          include_chunks: false,
-          recall_max_tokens: 1024,
-          recall_chunks_max_tokens: 256,
-        },
-      }),
-    ).toEqual({
-      id: "team-style",
-      name: "Team Style",
-      source_query: "How does the team prefer to work?",
-      tags: ["team"],
-      max_tokens: 2048,
-      trigger: {
-        mode: "delta",
-        refresh_after_consolidation: false,
-        fact_types: ["world", "observation"],
-        exclude_mental_models: true,
-        exclude_mental_model_ids: ["old-model"],
-        tags_match: "all_strict",
-        tag_groups: [{ and: ["project", "stable"] }],
-        include_chunks: false,
-        recall_max_tokens: 1024,
-        recall_chunks_max_tokens: 256,
-      },
-    });
-    expect(updateMentalModelRequestBody({ sourceQuery: "New query", tags: null })).toEqual({
-      source_query: "New query",
-      tags: null,
     });
   });
 

@@ -217,7 +217,7 @@ describe("memory operations", () => {
     ]);
   });
 
-  it("reports unavailable bank config and directive APIs", async () => {
+  it("reports unavailable bank config APIs", async () => {
     const operations = createMemoryOperations({
       getClient: () => ({
         retain: async () => undefined,
@@ -241,31 +241,9 @@ describe("memory operations", () => {
     await expect(operations.resetBankConfig({ bank: "project", confirm: true })).rejects.toThrow(
       "Hindsight client does not support bank config reset.",
     );
-    await expect(operations.listDirectives({ bank: "project" })).rejects.toThrow(
-      "Hindsight client does not support directive list.",
-    );
-    await expect(operations.getDirective({ bank: "project", directiveId: "d" })).rejects.toThrow(
-      "Hindsight client does not support directive get.",
-    );
-    await expect(
-      operations.createDirective({
-        bank: "project",
-        request: { name: "Rule", content: "Use facts." },
-      }),
-    ).rejects.toThrow("Hindsight client does not support directive create.");
-    await expect(
-      operations.updateDirective({
-        bank: "project",
-        directiveId: "d",
-        request: { content: "Updated" },
-      }),
-    ).rejects.toThrow("Hindsight client does not support directive update.");
-    await expect(
-      operations.deleteDirective({ bank: "project", directiveId: "d", confirm: true }),
-    ).rejects.toThrow("Hindsight client does not support directive delete.");
   });
 
-  it("requires explicit confirmation for destructive config and directive operations", async () => {
+  it("requires explicit confirmation for destructive config operations", async () => {
     const operations = createMemoryOperations({
       getClient: () => ({
         retain: async () => undefined,
@@ -273,7 +251,6 @@ describe("memory operations", () => {
         reflect: async () => ({}),
         updateBankConfig: async () => ({}),
         resetBankConfig: async () => ({}),
-        deleteDirective: async () => ({}),
       }),
       getConfig: () => DEFAULT_CONFIG,
       getProjectBankId: () => "project-bank",
@@ -287,9 +264,6 @@ describe("memory operations", () => {
     ).rejects.toThrow("confirm:true is required to update bank config");
     await expect(operations.resetBankConfig({ bank: "project" })).rejects.toThrow(
       "confirm:true is required to reset bank config",
-    );
-    await expect(operations.deleteDirective({ bank: "project", directiveId: "d" })).rejects.toThrow(
-      "confirm:true is required to delete directive",
     );
   });
 
@@ -329,38 +303,6 @@ describe("memory operations", () => {
           calls.push({ method: "resetBankConfig", bank });
           return { ok: true };
         },
-        listDirectives: async (bank) => {
-          calls.push({ method: "listDirectives", bank });
-          return { items: [] };
-        },
-        getDirective: async (bank) => {
-          calls.push({ method: "getDirective", bank });
-          return { id: "directive" };
-        },
-        createDirective: async (bank, request) => {
-          calls.push({ method: "createDirective", bank, request });
-          return { id: "directive" };
-        },
-        updateDirective: async (bank, _directiveId, request) => {
-          calls.push({ method: "updateDirective", bank, request });
-          return { id: "directive" };
-        },
-        deleteDirective: async (bank) => {
-          calls.push({ method: "deleteDirective", bank });
-          return { deleted: true };
-        },
-        listMentalModels: async (bank) => {
-          calls.push({ method: "listMentalModels", bank });
-          return { items: [] };
-        },
-        createMentalModel: async (bank, request) => {
-          calls.push({ method: "createMentalModel", bank, request });
-          return { operation_id: "op" };
-        },
-        refreshMentalModel: async (bank) => {
-          calls.push({ method: "refreshMentalModel", bank });
-          return { operation_id: "op", status: "queued" };
-        },
       }),
       getConfig: () => config,
       getProjectBankId: () => "project-bank",
@@ -383,45 +325,6 @@ describe("memory operations", () => {
       confirm: true,
     });
     await operations.resetBankConfig({ bank: "global", confirm: true });
-    await operations.listDirectives({ bank: "global" });
-    await operations.getDirective({ bank: "global", directiveId: "directive" });
-    await operations.createDirective({
-      bank: "project",
-      request: { name: "Rule", content: "Use source facts." },
-    });
-    await operations.updateDirective({
-      bank: "global",
-      directiveId: "directive",
-      request: { content: "Updated" },
-    });
-    await operations.deleteDirective({ bank: "global", directiveId: "directive", confirm: true });
-    await operations.listMentalModels({ bank: "global" });
-    await operations.createMentalModel({
-      bank: "project",
-      request: { name: "Project model", sourceQuery: "What matters?" },
-    });
-    await operations.refreshMentalModel({ bank: "global", mentalModelId: "model" });
-    await operations.promoteReflectQueryToMentalModel({
-      bank: "global",
-      name: "Project patterns",
-      sourceQuery: "What patterns recur?",
-      tags: ["project", "patterns"],
-    });
-
-    await expect(
-      operations.promoteReflectQueryToMentalModel({
-        bank: "project",
-        name: "   ",
-        sourceQuery: "What patterns recur?",
-      }),
-    ).rejects.toThrow("Mental model name is required");
-    await expect(
-      operations.promoteReflectQueryToMentalModel({
-        bank: "project",
-        name: "Project patterns",
-        sourceQuery: "   ",
-      }),
-    ).rejects.toThrow("Mental model source query is required");
 
     expect(calls).toEqual(
       expect.arrayContaining([
@@ -437,31 +340,6 @@ describe("memory operations", () => {
         },
         { method: "resetBankConfig", bank: "global-luxus" },
         { method: "getBankConfig", bank: "global-luxus" },
-        { method: "listDirectives", bank: "global-luxus" },
-        { method: "getDirective", bank: "global-luxus" },
-        {
-          method: "createDirective",
-          bank: "project-bank",
-          request: { name: "Rule", content: "Use source facts." },
-        },
-        { method: "updateDirective", bank: "global-luxus", request: { content: "Updated" } },
-        { method: "deleteDirective", bank: "global-luxus" },
-        { method: "listMentalModels", bank: "global-luxus" },
-        {
-          method: "createMentalModel",
-          bank: "project-bank",
-          request: { name: "Project model", sourceQuery: "What matters?" },
-        },
-        { method: "refreshMentalModel", bank: "global-luxus" },
-        {
-          method: "createMentalModel",
-          bank: "global-luxus",
-          request: {
-            name: "Project patterns",
-            sourceQuery: "What patterns recur?",
-            tags: ["project", "patterns"],
-          },
-        },
       ]),
     );
   });

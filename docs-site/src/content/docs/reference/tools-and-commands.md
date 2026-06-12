@@ -12,7 +12,7 @@ For a generated reference of registered tools, commands, and editable config fie
 /hindsight
 ```
 
-Shows memory status, selected banks, config facts, retain queue status, import status, and recent retain receipts. Status activity can distinguish recall, retain, and import work, including `importing`, `imported`, `import-queued`, and `import-failed`. It also exposes setup/config editing actions. Press `f` to flush queued retain jobs from the TUI. Press `m` to open the read-only mental model list/detail view; use the Hindsight web interface for create, edit, refresh, or delete.
+Shows memory status, selected banks, config facts, retain queue status, import status, and recent retain receipts. Status activity can distinguish recall, retain, and import work, including `importing`, `imported`, `import-queued`, and `import-failed`. It also exposes setup/config editing actions. Press `f` to flush queued retain jobs from the TUI. Mental models and directives are managed in the Hindsight control-plane web UI.
 
 ## Setup and config
 
@@ -88,14 +88,6 @@ Additional tools:
 - `hindsight_update_bank_disposition`
 - `hindsight_add_bank_background`
 - `hindsight_reset_bank_config`
-- `hindsight_list_directives`
-- `hindsight_get_directive`
-- `hindsight_create_directive`
-- `hindsight_update_directive`
-- `hindsight_delete_directive`
-- `hindsight_get_bank_template_schema`
-- `hindsight_export_bank_template`
-- `hindsight_import_bank_template`
 - `hindsight_import`
 - `hindsight_import_seed_content`
 - `hindsight_import_chat_transcript`
@@ -113,14 +105,6 @@ Additional tools:
 - `hindsight_get_graph`
 - `hindsight_get_entity_graph`
 - `hindsight_list_tags`
-- `hindsight_list_mental_models`
-- `hindsight_get_mental_model`
-- `hindsight_create_mental_model`
-- `hindsight_promote_reflect_query_to_mental_model`
-- `hindsight_update_mental_model`
-- `hindsight_delete_mental_model`
-- `hindsight_get_mental_model_history`
-- `hindsight_refresh_mental_model`
 - `hindsight_trigger_consolidation`
 - `hindsight_recover_consolidation`
 - `hindsight_clear_observations`

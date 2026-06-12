@@ -54,7 +54,6 @@ For details, see [Memory profiles](/pi-hindsight/start/memory-profiles/).
 - `Enter`: edit selected setting
 - `r`: remove selected setting's active override
 - `f`: flush queued Retain Jobs
-- `m`: open read-only mental model list/detail view
 - `a`: toggle advanced fields
 - `d`: deployment setup
 - `g`: rerun guided setup

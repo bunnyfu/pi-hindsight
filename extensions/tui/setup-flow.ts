@@ -12,7 +12,6 @@ export type SetupIntent =
   | { type: "chooseDeployment" }
   | { type: "guidedSetup" }
   | { type: "flushQueue" }
-  | { type: "mentalModels" }
   | { type: "toggleAdvanced" }
   | { type: "moveTab"; delta: number }
   | { type: "moveSelection"; delta: number }
@@ -101,7 +100,6 @@ export function setupIntentFromInput(data: string): SetupIntent | undefined {
   if (data === "d") return { type: "chooseDeployment" };
   if (data === "g") return { type: "guidedSetup" };
   if (data === "f") return { type: "flushQueue" };
-  if (data === "m") return { type: "mentalModels" };
   if (matchesKey(data, Key.left) || data === "h" || data === "<") {
     return { type: "moveTab", delta: -1 };
   }
@@ -126,7 +124,6 @@ export function applySetupIntent(
   if (intent.type === "chooseDeployment") return withAction("choose-deployment", normalized);
   if (intent.type === "guidedSetup") return withAction("guided-setup", normalized);
   if (intent.type === "flushQueue") return withAction("flush-queue", normalized);
-  if (intent.type === "mentalModels") return withAction("mental-models", normalized);
   if (intent.type === "toggleAdvanced") return withAction("toggle-advanced", normalized);
   if (intent.type === "finish") return withAction("done", { ...normalized, step: "done" });
   if (intent.type === "startGuidedSetup") return withState({ ...normalized, step: "profile" });

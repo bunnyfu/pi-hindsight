@@ -11,14 +11,10 @@ import {
   chunkItemPath,
   consolidationPath,
   consolidationRecoverPath,
-  createDirectiveRequestBody,
   createHindsightRestTransport,
   withRetry,
-  createMentalModelRequestBody,
   documentItemPath,
   documentsCollectionPath,
-  directiveItemPath,
-  directivesCollectionPath,
   encodeBankPath,
   entitiesCollectionPath,
   entityGraphPath,
@@ -29,10 +25,6 @@ import {
   memoryHistoryPath,
   memoryItemPath,
   memoryObservationsPath,
-  mentalModelCollectionPath,
-  mentalModelHistoryPath,
-  mentalModelItemPath,
-  mentalModelRefreshPath,
   operationCancelPath,
   operationRetryPath,
   operationsCollectionPath,
@@ -41,9 +33,7 @@ import {
   tagsCollectionPath,
   updateBankConfigRequestBody,
   updateBankProfileRequestBody,
-  updateDirectiveRequestBody,
   updateDocumentRequestBody,
-  updateMentalModelRequestBody,
 } from "./client-rest.js";
 import { installFetchRequestCompat } from "./fetch-compat.js";
 import { withTimeout } from "./timeout.js";
@@ -282,72 +272,6 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
     listTags: (bankId, options) =>
       withTimeout("hindsight listTags", timeoutMs, (signal) =>
         rest.request(tagsCollectionPath(bankId, options), { signal }),
-      ),
-    // Use direct OpenAPI REST paths for directives so list filters (tags_match, active_only,
-    // limit, offset) and nullable update fields stay aligned with server behavior.
-    listDirectives: (bankId, options) =>
-      withTimeout("hindsight listDirectives", timeoutMs, (signal) =>
-        rest.request(directivesCollectionPath(bankId, options), { signal }),
-      ),
-    getDirective: (bankId, directiveId) =>
-      withTimeout("hindsight getDirective", timeoutMs, (signal) =>
-        rest.request(directiveItemPath(bankId, directiveId), { signal }),
-      ),
-    createDirective: (bankId, request) =>
-      withTimeout("hindsight createDirective", timeoutMs, (signal) =>
-        rest.request(directivesCollectionPath(bankId), {
-          method: "POST",
-          signal,
-          body: JSON.stringify(createDirectiveRequestBody(request)),
-        }),
-      ),
-    updateDirective: (bankId, directiveId, request) =>
-      withTimeout("hindsight updateDirective", timeoutMs, (signal) =>
-        rest.request(directiveItemPath(bankId, directiveId), {
-          method: "PATCH",
-          signal,
-          body: JSON.stringify(updateDirectiveRequestBody(request)),
-        }),
-      ),
-    deleteDirective: (bankId, directiveId) =>
-      withTimeout("hindsight deleteDirective", timeoutMs, (signal) =>
-        rest.request(directiveItemPath(bankId, directiveId), { method: "DELETE", signal }),
-      ),
-    listMentalModels: (bankId, options) =>
-      withTimeout("hindsight listMentalModels", timeoutMs, (signal) =>
-        rest.request(mentalModelCollectionPath(bankId, options), { signal }),
-      ),
-    getMentalModel: (bankId, mentalModelId, options) =>
-      withTimeout("hindsight getMentalModel", timeoutMs, (signal) =>
-        rest.request(mentalModelItemPath(bankId, mentalModelId, options), { signal }),
-      ),
-    createMentalModel: (bankId, request) =>
-      withTimeout("hindsight createMentalModel", timeoutMs, (signal) =>
-        rest.request(mentalModelCollectionPath(bankId), {
-          method: "POST",
-          signal,
-          body: JSON.stringify(createMentalModelRequestBody(request)),
-        }),
-      ),
-    updateMentalModel: (bankId, mentalModelId, request) =>
-      withTimeout("hindsight updateMentalModel", timeoutMs, (signal) =>
-        rest.request(mentalModelItemPath(bankId, mentalModelId), {
-          method: "PATCH",
-          signal,
-          body: JSON.stringify(updateMentalModelRequestBody(request)),
-        }),
-      ),
-    deleteMentalModel: (bankId, mentalModelId) =>
-      withTimeout("hindsight deleteMentalModel", timeoutMs, (signal) =>
-        rest.request(mentalModelItemPath(bankId, mentalModelId), { method: "DELETE", signal }),
-      ),
-    getMentalModelHistory: (bankId, mentalModelId) =>
-      withTimeout("hindsight getMentalModelHistory", timeoutMs, (signal) =>
-        rest.request(mentalModelHistoryPath(bankId, mentalModelId), { signal }),
-      ),
-    refreshMentalModel: (bankId, mentalModelId) =>
-      withTimeout("hindsight refreshMentalModel", timeoutMs, (signal) =>
-        rest.request(mentalModelRefreshPath(bankId, mentalModelId), { method: "POST", signal }),
       ),
     triggerConsolidation: (bankId) =>
       withTimeout("hindsight triggerConsolidation", timeoutMs, (signal) =>

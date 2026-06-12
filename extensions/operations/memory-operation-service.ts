@@ -8,11 +8,9 @@ import { createBankConfigOperations } from "../banks/bank-config-operations.js";
 import { createBankProfileOperations } from "./memory-bank-profile-operations.js";
 import { createAdminOperations } from "./memory-admin-operations.js";
 import { createConfigOperations } from "./memory-config-operations.js";
-import { createDirectiveOperations } from "./memory-directive-operations.js";
 import { createDocumentOperations } from "./memory-document-operations.js";
 import { createExplorationOperations } from "./memory-exploration-operations.js";
 import { createFileRetainOperations } from "./file-retain-operations.js";
-import { createMentalModelOperations } from "./memory-mental-model-operations.js";
 import { createQueueOperations } from "../queue/queue-operations.js";
 import { createRecallOperations } from "./memory-recall-operations.js";
 import { createRetainOperations } from "./memory-retain-operations.js";
@@ -72,8 +70,6 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
     ...createConfigOperations(deps),
     ...createBankConfigOperations(deps),
     ...createBankProfileOperations(deps),
-    ...createDirectiveOperations(deps),
-    ...createMentalModelOperations(deps),
     ...createAdminOperations(deps),
     ...createImportOperations(deps),
     ...createSeedImportOperations(deps),

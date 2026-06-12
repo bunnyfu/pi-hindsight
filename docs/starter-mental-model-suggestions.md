@@ -4,13 +4,7 @@ Mental models should start as explicit, inspectable user choices. Pi Hindsight m
 
 ## Placement decision
 
-Starter suggestions should live in three places:
-
-1. **Docs** describe the recommended model set and safety policy.
-2. **Setup/TUI** may show the same suggestions as opt-in shortcuts after mental model operations exist.
-3. **Bank templates** may reference the same suggestions later, but templates should not silently create models unless the user explicitly imports and confirms that template behavior.
-
-The default setup path should remain lightweight. Suggestions are an advanced affordance, not a first-run requirement.
+Starter suggestions live in docs only. Mental models are created and managed in the Hindsight control-plane web UI; Pi does not expose mental model creation. Use the suggestions below as copy-paste material when creating models in the web UI.
 
 ## Product rules
 
@@ -57,21 +51,6 @@ Avoid starter mental models for:
 - project facts in the global bank
 - global preferences inferred from one isolated project incident
 
-## Future TUI behavior
+## Web UI handoff
 
-A future TUI slice should not try to recreate Hindsight's full mental model editor. If starter suggestions become interactive in Pi, prefer one of these lighter options:
-
-1. Show suggestions as read-only copy with a Hindsight web interface handoff.
-2. Offer a preview-only dry run of name, source query, tags, and target bank.
-3. Defer actual create/edit/refresh/delete to the Hindsight web interface unless a later issue explicitly reopens Pi-side editing.
-
-Pi should not hide source queries behind friendly labels.
-
-## Bank template guidance
-
-Bank template work may reuse these suggestions in one of two safe ways:
-
-- include them as documentation or setup prompts, leaving creation to the user; or
-- include model definitions only when the template import preview clearly states which mental models will be created.
-
-Templates must not create global mental models by default. Global template suggestions should require an explicit global-bank import or equivalent confirmation.
+Pi intentionally does not recreate Hindsight's mental model editor. All create/edit/refresh/delete happens in the Hindsight control-plane web UI. If Pi ever surfaces these suggestions interactively, it must stay read-only with a web interface handoff, and it should not hide source queries behind friendly labels.

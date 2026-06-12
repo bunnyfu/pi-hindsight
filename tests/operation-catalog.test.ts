@@ -28,11 +28,6 @@ function client(): HindsightLikeClient {
     getBankConfig: async () => ({ config: {}, overrides: {} }),
     updateBankConfig: async () => ({ config: {}, overrides: { recall_budget_function: "fixed" } }),
     resetBankConfig: async () => ({ ok: true }),
-    listDirectives: async () => ({ items: [] }),
-    getDirective: async () => ({ id: "directive", name: "Rule", content: "Use facts." }),
-    createDirective: async () => ({ id: "directive", name: "Rule", content: "Use facts." }),
-    updateDirective: async () => ({ id: "directive", name: "Rule", content: "Updated." }),
-    deleteDirective: async () => ({ deleted: true }),
     listOperations: async () => ({ items: [] }),
     cancelOperation: async () => ({ status: "cancelled" }),
     retryOperation: async () => ({ status: "pending" }),
@@ -42,13 +37,6 @@ function client(): HindsightLikeClient {
     getMemoryHistory: async () => ({ items: [] }),
     deleteMemoryObservations: async () => ({ deleted: true }),
     retainFiles: async () => ({ operation_ids: ["op-file"] }),
-    listMentalModels: async () => ({ items: [] }),
-    getMentalModel: async () => ({ id: "mm-1", name: "Model", tags: [] }),
-    createMentalModel: async () => ({ id: "mm-1" }),
-    updateMentalModel: async () => ({ id: "mm-1" }),
-    deleteMentalModel: async () => ({ deleted: true }),
-    getMentalModelHistory: async () => ({ items: [] }),
-    refreshMentalModel: async () => ({ operation_id: "op-mm" }),
     triggerConsolidation: async () => ({ operation_id: "op-c" }),
     recoverConsolidation: async () => ({ operation_id: "op-r" }),
     clearObservations: async () => ({ cleared: true }),
@@ -410,10 +398,6 @@ describe("operation catalog", () => {
         ?.confirm?.const,
     ).toBe(true);
     expect(
-      (requireTool(catalog, "hindsight_delete_directive").parameters as JsonSchema).properties
-        ?.confirm?.const,
-    ).toBe(true);
-    expect(
       (requireTool(catalog, "hindsight_cancel_operation").parameters as JsonSchema).properties
         ?.confirm?.const,
     ).toBe(true);
@@ -733,29 +717,6 @@ describe("operation catalog", () => {
     ]);
   });
 
-  it("passes nullable directive updates through the public tool surface", async () => {
-    const updateDirective = vi.fn(async () => ({ id: "directive", content: "Updated" }));
-    const catalog = createOperationCatalog({
-      getClient: () => ({ ...client(), updateDirective }),
-      getConfig: () => DEFAULT_CONFIG,
-      getProjectBankId: () => "project-bank",
-    });
-    const tool = catalog.tools.find((candidate) => candidate.name === "hindsight_update_directive");
-
-    await tool?.execute(
-      "call",
-      { directiveId: "directive", bank: "target-bank", content: null, tags: null },
-      new AbortController().signal,
-      () => undefined,
-      { cwd: "/repo", sessionManager: {} } as never,
-    );
-
-    expect(updateDirective).toHaveBeenCalledWith("target-bank", "directive", {
-      content: null,
-      tags: null,
-    });
-  });
-
   it("declares the public tool and command surface in one catalog", () => {
     const catalog = createOperationCatalog({
       getClient: () => client(),
@@ -780,14 +741,6 @@ describe("operation catalog", () => {
       "hindsight_get_graph",
       "hindsight_get_entity_graph",
       "hindsight_list_tags",
-      "hindsight_list_mental_models",
-      "hindsight_get_mental_model",
-      "hindsight_create_mental_model",
-      "hindsight_promote_reflect_query_to_mental_model",
-      "hindsight_update_mental_model",
-      "hindsight_delete_mental_model",
-      "hindsight_get_mental_model_history",
-      "hindsight_refresh_mental_model",
       "hindsight_trigger_consolidation",
       "hindsight_recover_consolidation",
       "hindsight_clear_observations",
@@ -808,11 +761,6 @@ describe("operation catalog", () => {
       "hindsight_update_bank_disposition",
       "hindsight_add_bank_background",
       "hindsight_reset_bank_config",
-      "hindsight_list_directives",
-      "hindsight_get_directive",
-      "hindsight_create_directive",
-      "hindsight_update_directive",
-      "hindsight_delete_directive",
       "hindsight_import",
       "hindsight_import_seed_content",
       "hindsight_import_chat_transcript",

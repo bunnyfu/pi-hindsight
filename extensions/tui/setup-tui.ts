@@ -11,7 +11,6 @@ import {
 } from "../queue/flush-presenter.js";
 import { hasProjectHindsightConfig, runGuidedSetup } from "./guided-setup.js";
 import { buildSetupTabs } from "./setup-tui-facts.js";
-import { handleMentalModels } from "./setup-tui-mental-models.js";
 import { createSetupComponent } from "./setup-tui-render.js";
 import { handleDeployment, handleFieldEdit, handleResetFieldAction } from "./setup-tui-actions.js";
 import type { SetupActionId, SetupUiState, ThemeLike } from "./setup-tui-types.js";
@@ -80,8 +79,7 @@ export async function runHindsightSetupTui(
       else if (action === "flush-queue") {
         const result = await createMemoryOperations(deps).flush(ctx.cwd);
         ctx.ui.notify(formatFlushRetainQueueResult(result), flushRetainQueueNotifyLevel(result));
-      } else if (action === "mental-models") await handleMentalModels(ctx, deps);
-      else if (action === "toggle-advanced") {
+      } else if (action === "toggle-advanced") {
         state.showAdvanced = !state.showAdvanced;
         state.selectedByTab = {};
       } else if (action.startsWith("reset:")) {

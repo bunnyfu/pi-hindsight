@@ -1,22 +1,15 @@
 import { PI_HINDSIGHT_USER_AGENT } from "../version.js";
 import type {
-  CreateDirectiveRequest,
-  CreateMentalModelRequest,
   GetEntityGraphOptions,
   GetGraphOptions,
-  GetMentalModelOptions,
   ListDocumentsOptions,
   ListEntitiesOptions,
   ListMemoriesOptions,
-  ListDirectivesOptions,
-  ListMentalModelsOptions,
   ListOperationsOptions,
   ListTagsOptions,
   ResolvedConfig,
   UpdateBankProfileRequest,
-  UpdateDirectiveRequest,
   UpdateDocumentRequest,
-  UpdateMentalModelRequest,
 } from "../types.js";
 import { redactError } from "../utils/sanitize.js";
 
@@ -326,61 +319,10 @@ export function updateBankProfileRequestBody(
   };
 }
 
-export function directivesCollectionPath(
-  bankId: string,
-  options: ListDirectivesOptions = {},
-): string {
-  const params = new URLSearchParams();
-  for (const tag of options.tags ?? []) params.append("tags", tag);
-  if (options.tagsMatch) params.set("tags_match", options.tagsMatch);
-  if (options.activeOnly !== undefined) params.set("active_only", String(options.activeOnly));
-  if (options.limit !== undefined) params.set("limit", String(options.limit));
-  if (options.offset !== undefined) params.set("offset", String(options.offset));
-  return appendQuery(encodeBankPath(bankId, "/directives"), params);
-}
-
-export function directiveItemPath(bankId: string, directiveId: string): string {
-  return `${encodeBankPath(bankId, "/directives")}/${encodeURIComponent(directiveId)}`;
-}
-
 export function updateBankConfigRequestBody(
   updates: Record<string, unknown>,
 ): Record<string, unknown> {
   return { updates };
-}
-
-export function mentalModelCollectionPath(
-  bankId: string,
-  options: ListMentalModelsOptions = {},
-): string {
-  const params = new URLSearchParams();
-  for (const tag of options.tags ?? []) params.append("tags", tag);
-  if (options.tagsMatch) params.set("tags_match", options.tagsMatch);
-  if (options.detail) params.set("detail", options.detail);
-  if (options.limit !== undefined) params.set("limit", String(options.limit));
-  if (options.offset !== undefined) params.set("offset", String(options.offset));
-  return appendQuery(encodeBankPath(bankId, "/mental-models"), params);
-}
-
-export function mentalModelItemPath(
-  bankId: string,
-  mentalModelId: string,
-  options: GetMentalModelOptions = {},
-): string {
-  const params = new URLSearchParams();
-  if (options.detail) params.set("detail", options.detail);
-  return appendQuery(
-    `${encodeBankPath(bankId, "/mental-models")}/${encodeURIComponent(mentalModelId)}`,
-    params,
-  );
-}
-
-export function mentalModelHistoryPath(bankId: string, mentalModelId: string): string {
-  return `${mentalModelItemPath(bankId, mentalModelId)}/history`;
-}
-
-export function mentalModelRefreshPath(bankId: string, mentalModelId: string): string {
-  return `${mentalModelItemPath(bankId, mentalModelId)}/refresh`;
 }
 
 export function consolidationPath(bankId: string): string {
@@ -393,53 +335,4 @@ export function consolidationRecoverPath(bankId: string): string {
 
 export function observationsPath(bankId: string): string {
   return encodeBankPath(bankId, "/observations");
-}
-
-export function createDirectiveRequestBody(
-  request: CreateDirectiveRequest,
-): Record<string, unknown> {
-  return {
-    name: request.name,
-    content: request.content,
-    ...(request.priority !== undefined ? { priority: request.priority } : {}),
-    ...(request.isActive !== undefined ? { is_active: request.isActive } : {}),
-    ...(request.tags !== undefined ? { tags: request.tags } : {}),
-  };
-}
-
-export function updateDirectiveRequestBody(
-  request: UpdateDirectiveRequest,
-): Record<string, unknown> {
-  return {
-    ...(request.name !== undefined ? { name: request.name } : {}),
-    ...(request.content !== undefined ? { content: request.content } : {}),
-    ...(request.priority !== undefined ? { priority: request.priority } : {}),
-    ...(request.isActive !== undefined ? { is_active: request.isActive } : {}),
-    ...(request.tags !== undefined ? { tags: request.tags } : {}),
-  };
-}
-
-export function createMentalModelRequestBody(
-  request: CreateMentalModelRequest,
-): Record<string, unknown> {
-  return {
-    ...(request.id !== undefined ? { id: request.id } : {}),
-    name: request.name,
-    source_query: request.sourceQuery,
-    ...(request.tags ? { tags: request.tags } : {}),
-    ...(request.maxTokens !== undefined ? { max_tokens: request.maxTokens } : {}),
-    ...(request.trigger ? { trigger: request.trigger } : {}),
-  };
-}
-
-export function updateMentalModelRequestBody(
-  request: UpdateMentalModelRequest,
-): Record<string, unknown> {
-  return {
-    ...(request.name !== undefined ? { name: request.name } : {}),
-    ...(request.sourceQuery !== undefined ? { source_query: request.sourceQuery } : {}),
-    ...(request.tags !== undefined ? { tags: request.tags } : {}),
-    ...(request.maxTokens !== undefined ? { max_tokens: request.maxTokens } : {}),
-    ...(request.trigger !== undefined ? { trigger: request.trigger } : {}),
-  };
 }
