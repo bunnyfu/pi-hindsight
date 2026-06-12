@@ -4,9 +4,10 @@ import { projectMessages } from "../utils/messages.js";
 import { routeMemoryCandidate, type MemoryRouteDecision } from "../operations/memory-router.js";
 import { enqueueRetainFromAgentEnd } from "./retain.js";
 import {
-  addRetainFingerprints,
-  messageFingerprint,
-  readRetainFingerprints,
+  advanceRetainCursor,
+  filterNewRetainMessages,
+  readSessionRetainState,
+  retainedThroughIndex,
 } from "./retain-cursor.js";
 import { stableSessionId } from "../utils/session.js";
 import {
@@ -48,31 +49,37 @@ export interface RetainTurnPolicyDeps {
 }
 
 export function createRetainTurnPolicy(deps: RetainTurnPolicyDeps): RetainTurnPolicy {
-  const retainedBySession = new Map<string, Set<string>>();
+  const retainedBySession = new Map<string, Awaited<ReturnType<typeof readSessionRetainState>>>();
+
+  const sessionRetainState = async (runtime: RuntimeSnapshot) => {
+    const sessionId = stableSessionId(runtime.sessionFile, runtime.cwd);
+    const state =
+      retainedBySession.get(sessionId) ?? (await readSessionRetainState(runtime.cwd, sessionId));
+    retainedBySession.set(sessionId, state);
+    return { sessionId, state };
+  };
 
   const newRetainMessages = async (
     runtime: RuntimeSnapshot,
     messages: AgentEndEvent["messages"],
   ): Promise<AgentEndEvent["messages"]> => {
-    const sessionId = stableSessionId(runtime.sessionFile, runtime.cwd);
-    const seen =
-      retainedBySession.get(sessionId) ?? (await readRetainFingerprints(runtime.cwd, sessionId));
-    retainedBySession.set(sessionId, seen);
-    return messages.filter(
-      (message) => !seen.has(messageFingerprint(message as AgentMessage)),
-    ) as AgentEndEvent["messages"];
+    const { state } = await sessionRetainState(runtime);
+    return filterNewRetainMessages(messages as AgentMessage[], state) as AgentEndEvent["messages"];
   };
 
   const markRetainedMessages = async (
     runtime: RuntimeSnapshot,
-    messages: AgentEndEvent["messages"],
+    allMessages: AgentEndEvent["messages"],
+    retainedMessages?: AgentEndEvent["messages"],
   ): Promise<void> => {
-    const sessionId = stableSessionId(runtime.sessionFile, runtime.cwd);
-    const seen = retainedBySession.get(sessionId) ?? new Set<string>();
-    const fingerprints = messages.map((message) => messageFingerprint(message as AgentMessage));
-    for (const fingerprint of fingerprints) seen.add(fingerprint);
-    retainedBySession.set(sessionId, seen);
-    await addRetainFingerprints(runtime.cwd, sessionId, fingerprints);
+    const { sessionId } = await sessionRetainState(runtime);
+    const batch = retainedMessages ?? allMessages;
+    const throughIndex = retainedThroughIndex(
+      allMessages as AgentMessage[],
+      batch as AgentMessage[],
+    );
+    await advanceRetainCursor(runtime.cwd, sessionId, allMessages as AgentMessage[], throughIndex);
+    retainedBySession.set(sessionId, await readSessionRetainState(runtime.cwd, sessionId));
   };
 
   const retainableMessages = (messages: AgentEndEvent["messages"]): Record<string, unknown>[] =>
@@ -147,7 +154,7 @@ export function createRetainTurnPolicy(deps: RetainTurnPolicyDeps): RetainTurnPo
         const capabilities = deps.getCapabilities();
         const { targets, decision } = retainTargets(runtime, messages);
         if (targets.length === 0) {
-          await markRetainedMessages(runtime, messages);
+          await markRetainedMessages(runtime, event.messages, messages);
           deps.setMemoryStatus(runtime, "retained", 0);
           if (config.notifications.retain) {
             deps.notify(
@@ -176,7 +183,7 @@ export function createRetainTurnPolicy(deps: RetainTurnPolicyDeps): RetainTurnPo
           sent += result.sent;
           remaining = result.remaining;
         }
-        if (queued) await markRetainedMessages(runtime, messages);
+        if (queued) await markRetainedMessages(runtime, event.messages, messages);
         deps.setMemoryStatus(runtime, remaining > 0 ? "retain-queued" : "retained", remaining);
         if (config.notifications.retain) {
           deps.notify(
