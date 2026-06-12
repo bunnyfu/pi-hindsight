@@ -88,12 +88,51 @@ describe("extension hooks", () => {
       sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
     };
 
-    await createMemoryLifecycle(cwd).initialize(ctx);
+    const lifecycle = createMemoryLifecycle(cwd);
+    await lifecycle.initialize(ctx);
 
     expect(ctx.ui.setStatus).toHaveBeenLastCalledWith(
       "hindsight",
       expect.stringContaining("connected"),
     );
+    expect(lifecycle.deps.getInitHealth()).toMatchObject({ failures: [] });
+  });
+
+  it("records inspectable init failures when bank ensure fails", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
+    mkdirSync(join(cwd, ".git"));
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ hindsight: { baseUrl: "http://unused.test" } }),
+    );
+    mocked.ensureProjectBank.mockRejectedValueOnce(new Error("bank ensure exploded"));
+    const { createMemoryLifecycle } = await import("../extensions/lifecycle/memory-lifecycle.js");
+    const ctx = {
+      cwd,
+      ui: { setStatus: vi.fn(), notify: vi.fn() },
+      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
+    };
+
+    const lifecycle = createMemoryLifecycle(cwd);
+    await lifecycle.initialize(ctx);
+
+    expect(lifecycle.deps.getInitHealth()).toMatchObject({
+      failures: [
+        expect.objectContaining({
+          subsystem: "project-bank",
+          error: expect.stringContaining("bank ensure exploded"),
+        }),
+      ],
+    });
+    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith(
+      "hindsight",
+      expect.stringContaining("offline"),
+    );
+    const warningCalls = (ctx.ui.notify.mock.calls as Array<[string, string]>).filter(([message]) =>
+      message.includes("project bank ensure failed"),
+    );
+    expect(warningCalls).toHaveLength(1);
   });
 
   it("notifies when startup migrates legacy global memory config", async () => {

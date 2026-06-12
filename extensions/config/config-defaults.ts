@@ -30,6 +30,7 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
     lastRecallPath: ".pi/hindsight/last-recall.json",
     topK: 8,
     timeoutMs: 40_000,
+    cacheTtlMs: 60_000,
     injectionMode: "context",
     injectionPosition: "append",
     includeFactsInDebug: false,

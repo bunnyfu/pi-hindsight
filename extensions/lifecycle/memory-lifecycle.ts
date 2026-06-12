@@ -22,11 +22,22 @@ import {
 import { createRetainTurnPolicy } from "./memory-lifecycle-retain.js";
 import { createRecallTurnPolicy } from "./memory-lifecycle-recall.js";
 
+export interface InitHealthFailure {
+  subsystem: "project-bank" | "user-bank" | "capability-probe";
+  error: string;
+}
+
+export interface InitHealth {
+  checkedAt: string;
+  failures: InitHealthFailure[];
+}
+
 export interface MemoryLifecycleDeps {
   getClient(): HindsightLikeClient;
   getConfig(): ResolvedConfig;
   getProjectBankId(): string;
   getCapabilities(): HindsightCapabilities | undefined;
+  getInitHealth(): InitHealth | undefined;
   reloadConfig(cwd: string): void;
 }
 
@@ -46,6 +57,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
   let client: HindsightLikeClient = createHindsightClient(config);
   let projectBankId = deriveProjectBankId(initialCwd, config);
   let capabilities: HindsightCapabilities | undefined;
+  let initHealth: InitHealth | undefined;
   let periodicFlush: NodeJS.Timeout | undefined;
   let periodicFlushActive = false;
   const stopPeriodicFlush = () => {
@@ -109,6 +121,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
     getConfig: () => config,
     getProjectBankId: () => projectBankId,
     getCapabilities: () => capabilities,
+    getInitHealth: () => initHealth,
     reloadConfig,
   };
 
@@ -148,7 +161,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
         );
       }
       if (!config.enabled) return;
-      let ensureFailed = false;
+      const failures: InitHealthFailure[] = [];
       let ensureSucceeded = false;
       if (config.banks.project.enabled) {
         try {
@@ -158,7 +171,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
           });
           ensureSucceeded = true;
         } catch (error) {
-          ensureFailed = true;
+          failures.push({ subsystem: "project-bank", error: redactError(error) });
           setMemoryStatus(runtime, "offline");
           notify(runtime, `Hindsight project bank ensure failed: ${redactError(error)}`, "warning");
         }
@@ -171,7 +184,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
           });
           ensureSucceeded = true;
         } catch (error) {
-          ensureFailed = true;
+          failures.push({ subsystem: "user-bank", error: redactError(error) });
           setMemoryStatus(runtime, "offline");
           notify(runtime, `Hindsight global bank ensure failed: ${redactError(error)}`, "warning");
         }
@@ -185,13 +198,17 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
         try {
           capabilities = await detectAppendCapability(client, capabilityProbeBankId);
         } catch (error) {
-          ensureFailed = true;
+          failures.push({ subsystem: "capability-probe", error: redactError(error) });
           setMemoryStatus(runtime, "offline");
           notify(runtime, `Hindsight capability check failed: ${redactError(error)}`, "warning");
         }
       }
+      initHealth = { checkedAt: new Date().toISOString(), failures };
       startPeriodicFlush(runtime);
-      setMemoryStatus(runtime, ensureFailed ? "offline" : ensureSucceeded ? "connected" : "idle");
+      setMemoryStatus(
+        runtime,
+        failures.length ? "offline" : ensureSucceeded ? "connected" : "idle",
+      );
       if (config.notifications.startup)
         notify(runtime, bankSelectionMessage(projectBankId, config), "info");
     },

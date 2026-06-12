@@ -277,6 +277,7 @@ export function normalizeConfig(
           : DEFAULT_CONFIG.recall.lastRecallPath,
       topK: positiveInt(config.recall?.topK, DEFAULT_CONFIG.recall.topK),
       timeoutMs: positiveInt(config.recall?.timeoutMs, DEFAULT_CONFIG.recall.timeoutMs),
+      cacheTtlMs: positiveInt(config.recall?.cacheTtlMs, DEFAULT_CONFIG.recall.cacheTtlMs),
       injectionMode: "context",
       injectionPosition: enumValue(
         config.recall?.injectionPosition,

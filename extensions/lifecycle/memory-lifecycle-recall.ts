@@ -38,13 +38,14 @@ interface RecallCacheEntry {
   failures: RecallFailure[];
 }
 
-export function createRecallCache(ttlMs: number = 60000) {
+export function createRecallCache(ttlMs: number | (() => number) = 60000) {
   const cache = new Map<string, { entry: RecallCacheEntry; timestamp: number }>();
+  const ttl = () => (typeof ttlMs === "function" ? ttlMs() : ttlMs);
   return {
     get(key: string): RecallCacheEntry | undefined {
       const cached = cache.get(key);
       if (!cached) return undefined;
-      if (Date.now() - cached.timestamp > ttlMs) {
+      if (Date.now() - cached.timestamp > ttl()) {
         cache.delete(key);
         return undefined;
       }
@@ -83,7 +84,7 @@ function patchWithRecallMessage(
 }
 
 export function createRecallTurnPolicy(deps: RecallTurnPolicyDeps): RecallTurnPolicy {
-  const cache = createRecallCache(60000);
+  const cache = createRecallCache(() => deps.getConfig().recall.cacheTtlMs);
   return {
     async recall(event: ContextEvent, runtime: RuntimeSnapshot): Promise<ContextPatch | undefined> {
       const config = deps.getConfig();

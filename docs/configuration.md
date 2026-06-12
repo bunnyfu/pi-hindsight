@@ -102,6 +102,7 @@ Bank missions are intentionally absent from this JSON example. Hindsight bank co
     "lastRecallPath": ".pi/hindsight/last-recall.json",
     "topK": 8,
     "timeoutMs": 40000,
+    "cacheTtlMs": 60000,
     "injectionPosition": "append"
   },
   "observations": {

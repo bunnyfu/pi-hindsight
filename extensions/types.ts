@@ -73,6 +73,7 @@ export interface ResolvedConfig {
     lastRecallPath: string;
     topK: number;
     timeoutMs: number;
+    cacheTtlMs: number;
     injectionMode: "context";
     injectionPosition: RecallInjectionPosition;
     includeFactsInDebug: boolean;
