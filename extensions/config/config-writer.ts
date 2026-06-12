@@ -6,7 +6,7 @@ import { applyEdits, modify } from "jsonc-parser";
 
 import { validEnvVarName } from "./config.js";
 import { resetPathsForConfigKeys, type ConfigResetKey } from "./config-field-paths.js";
-import { parseJsonWithComments } from "./config-json.js";
+import { parseJsonWithComments } from "./config.js";
 
 export type MemoryProfile = "project-only" | "project+global" | "global-only" | "recall-only";
 
@@ -394,4 +394,42 @@ export async function writeGlobalConfig(
 ): Promise<{ path: string; config: Record<string, unknown> }> {
   const path = activeConfigPath(globalConfigPath(home), globalJsoncConfigPath(home));
   return writeConfig(path, readGlobalConfig(home), patch, deletePaths);
+}
+
+export type ConfigOperationDeps = {
+  getProjectBankId(): string;
+  reloadConfig?(cwd: string): void;
+};
+
+export async function configureMemory(
+  cwd: string,
+  args: ProjectConfigPatchInput,
+  deps: ConfigOperationDeps,
+): Promise<{ path: string; config: Record<string, unknown>; projectBankId: string }> {
+  const projectBankId = args.projectBankId || deps.getProjectBankId();
+  const patch = buildProjectConfigPatch(args);
+  const deletes = buildProjectConfigDeletes(args);
+  const result =
+    args.scope === "global"
+      ? await writeGlobalConfig(patch, deletes)
+      : await writeProjectConfig(cwd, patch, deletes);
+  deps.reloadConfig?.(cwd);
+  return { projectBankId, ...result };
+}
+
+export async function initMemoryConfig(
+  cwd: string,
+  deps: Pick<ConfigOperationDeps, "getProjectBankId"> & {
+    getConfig(): { hindsight: { baseUrl: string } };
+  },
+): Promise<{ path: string; config: Record<string, unknown>; projectBankId: string }> {
+  const projectBankId = deps.getProjectBankId();
+  const result = await writeProjectConfig(
+    cwd,
+    buildProjectConfigPatch({
+      projectBankId,
+      baseUrl: deps.getConfig().hindsight.baseUrl,
+    }),
+  );
+  return { projectBankId, ...result };
 }

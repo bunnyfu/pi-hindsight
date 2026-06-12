@@ -1,6 +1,6 @@
 import type { AgentEndEvent } from "@earendil-works/pi-coding-agent";
 import { resolveConfig } from "../config/config.js";
-import { consumeLastConfigMigrationResults } from "../config/config-migration.js";
+import { consumeLastConfigMigrationResults } from "../config/config.js";
 import { deriveProjectBankId } from "../banks/banking.js";
 import { createHindsightClient } from "../client/client.js";
 import { ensureGlobalBank, ensureProjectBank } from "../banks/bank-operations.js";
