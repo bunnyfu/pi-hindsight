@@ -1,13 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type {
-  HindsightCapabilities,
   HindsightObservationScopes,
   ResolvedConfig,
   RetainJob,
   UpdateMode,
 } from "../types.js";
 import { redactSecrets } from "../utils/sanitize.js";
-import { resolveRetainDocumentTarget } from "../client/capabilities.js";
 
 export interface RetainJobBuildArgs {
   config: ResolvedConfig;
@@ -22,7 +20,6 @@ export interface RetainJobBuildArgs {
   observationScopes?: HindsightObservationScopes;
   documentTags?: string[];
   entities?: RetainJob["item"]["entities"];
-  capabilities?: HindsightCapabilities;
   async?: boolean;
 }
 
@@ -42,18 +39,12 @@ export function buildRetainJob(args: RetainJobBuildArgs): RetainJob {
   const content = redact ? redactSecrets(args.content) : args.content;
   const context = redact ? redactSecrets(args.context) : args.context;
   const metadata = sanitizedMetadata(args.metadata, redact);
-  const target = resolveRetainDocumentTarget({
-    config: args.config,
-    ...(args.capabilities ? { capabilities: args.capabilities } : {}),
-    documentId: args.documentId,
-    updateMode: args.updateMode,
-  });
   return {
     id: randomUUID(),
     bankId: args.bankId,
     createdAt: new Date().toISOString(),
-    documentId: target.documentId,
-    updateMode: target.updateMode,
+    documentId: args.documentId,
+    updateMode: args.updateMode,
     item: {
       content,
       context,

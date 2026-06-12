@@ -1,6 +1,5 @@
 import type { AgentEndEvent } from "@earendil-works/pi-coding-agent";
 import type {
-  HindsightCapabilities,
   HindsightLikeClient,
   HindsightObservationScopes,
   ResolvedConfig,
@@ -21,7 +20,6 @@ export function buildRetainJob(args: {
   sessionFile?: string;
   bankId: string;
   messages: AgentEndEvent["messages"];
-  capabilities?: HindsightCapabilities;
   extraTags?: string[];
 }): RetainJob | undefined {
   const projected = projectMessages(args.messages, args.config);
@@ -49,7 +47,6 @@ export function buildRetainJob(args: {
       ...(args.sessionFile ? { pi_session_file: args.sessionFile } : {}),
     },
     ...(observationScopes.length ? { observationScopes } : {}),
-    ...(args.capabilities ? { capabilities: args.capabilities } : {}),
   });
 }
 
@@ -60,7 +57,6 @@ export async function enqueueRetainFromAgentEnd(args: {
   config: ResolvedConfig;
   client: HindsightLikeClient;
   bankId: string;
-  capabilities?: HindsightCapabilities;
   extraTags?: string[];
 }): Promise<{ queued: boolean; sent: number; remaining: number }> {
   if (!args.config.enabled || !args.config.retain.enabled)
@@ -71,7 +67,6 @@ export async function enqueueRetainFromAgentEnd(args: {
     ...(args.sessionFile ? { sessionFile: args.sessionFile } : {}),
     bankId: args.bankId,
     messages: args.event.messages,
-    ...(args.capabilities ? { capabilities: args.capabilities } : {}),
     ...(args.extraTags ? { extraTags: args.extraTags } : {}),
   });
   if (!job) return { queued: false, sent: 0, remaining: 0 };
@@ -110,7 +105,6 @@ export interface RetainDurablyArgs {
   documentTags?: string[];
   entities?: RetainJob["item"]["entities"];
   async?: boolean;
-  capabilities?: HindsightCapabilities;
 }
 
 export interface RetainDurablyResult {

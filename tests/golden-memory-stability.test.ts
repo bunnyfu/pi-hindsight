@@ -169,7 +169,7 @@ describe("golden memory stability", () => {
         getConfig: () => DEFAULT_CONFIG,
         getClient: () => store.client,
         getProjectBankId: () => "project-bank",
-        getCapabilities: () => undefined,
+
         setMemoryStatus: (_runtime, activity) => statuses.push(activity),
         notify: () => undefined,
       });

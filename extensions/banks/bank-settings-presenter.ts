@@ -1,4 +1,4 @@
-import { isRecord } from "../client/client-rest.js";
+import { isRecord } from "../config/config-normalize.js";
 
 export type BankSettingsLocation = "Project" | "User";
 

@@ -995,7 +995,7 @@ describe("extension hooks", () => {
     );
   });
 
-  it("records append capability without a live probe when global bank ensure fails", async () => {
+  it("does not run append capability probes when global bank ensure fails", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
     mkdirSync(join(cwd, ".git"));
     mkdirSync(join(cwd, ".pi"));

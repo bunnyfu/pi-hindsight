@@ -1,4 +1,4 @@
-import type { HindsightCapabilities, ResolvedConfig } from "../types.js";
+import type { ResolvedConfig } from "../types.js";
 import {
   PI_HINDSIGHT_CLIENT_PACKAGE,
   PI_HINDSIGHT_CLIENT_RANGE,
@@ -38,7 +38,6 @@ export interface DebugReportArgs {
   importCount?: number;
   latestImport?: ImportManifestEntry;
   health?: { ok: boolean; error?: string };
-  capabilities?: HindsightCapabilities;
   activity?: HindsightActivity;
   memoryCount?: number;
   queueRemaining?: number;
@@ -128,7 +127,7 @@ export function formatDebugReport(args: DebugReportArgs): string {
           npm: PI_HINDSIGHT_SUPPORTED_NPM,
           typebox: PI_HINDSIGHT_SUPPORTED_TYPEBOX,
           hindsightServer:
-            "Official-client-compatible Hindsight server; advanced tools are capability-gated.",
+            "Hindsight 0.8+ with append update_mode support; advanced tools are capability-gated.",
           policy: "Pi-first 1.0 integration; global platform admin parity is out of scope.",
         },
       },
@@ -186,17 +185,12 @@ export function formatDebugReport(args: DebugReportArgs): string {
             ? "Inspect queue files, fix malformed JSONL offline if needed, then run /hindsight:flush after Hindsight is reachable."
             : null,
       },
-      capabilities: args.capabilities
-        ? {
-            appendUpdateMode: args.capabilities.appendUpdateMode ? "supported" : "unsupported",
-            checkedAt: args.capabilities.checkedAt,
-            error: args.capabilities.error ?? null,
-            probeDocumentId: args.capabilities.probeDocumentId ?? null,
-            action: args.capabilities.appendUpdateMode
-              ? null
-              : "Upgrade Hindsight; append update mode is required for live retain.",
-          }
-        : { appendUpdateMode: "not checked" },
+      serverRequirements: {
+        appendUpdateMode: "required (Hindsight 0.8+)",
+        clientPackage: PI_HINDSIGHT_CLIENT_PACKAGE,
+        clientRange: PI_HINDSIGHT_CLIENT_RANGE,
+        action: "Upgrade to Hindsight 0.8+ if live append retain fails.",
+      },
       imports: {
         manifestPath: args.importManifestPath ?? args.config.import.manifestPath,
         error: args.importManifestError ?? null,

@@ -4,11 +4,10 @@ import { consumeLastConfigMigrationResults } from "../config/config.js";
 import { deriveProjectBankId } from "../banks/banking.js";
 import { createHindsightClient } from "../client/client.js";
 import { ensureGlobalBank, ensureProjectBank } from "../banks/bank-operations.js";
-import { detectAppendCapability } from "../client/capabilities.js";
 import { flushRetainQueue, retainQueuePath } from "../queue/queue.js";
 import { formatFlushRetainQueueResult } from "../queue/flush-presenter.js";
 import { bankSelectionMessage } from "../utils/diagnostics.js";
-import type { HindsightCapabilities, HindsightLikeClient, ResolvedConfig } from "../types.js";
+import type { HindsightLikeClient, ResolvedConfig } from "../types.js";
 import { redactError } from "../utils/sanitize.js";
 import {
   notify,
@@ -23,7 +22,7 @@ import { createRetainTurnPolicy } from "./memory-lifecycle-retain.js";
 import { createRecallTurnPolicy } from "./memory-lifecycle-recall.js";
 
 export interface InitHealthFailure {
-  subsystem: "project-bank" | "user-bank" | "capability-probe";
+  subsystem: "project-bank" | "user-bank";
   error: string;
 }
 
@@ -36,7 +35,6 @@ export interface MemoryLifecycleDeps {
   getClient(): HindsightLikeClient;
   getConfig(): ResolvedConfig;
   getProjectBankId(): string;
-  getCapabilities(): HindsightCapabilities | undefined;
   getInitHealth(): InitHealth | undefined;
   reloadConfig(cwd: string): void;
 }
@@ -56,7 +54,6 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
   let config: ResolvedConfig = resolveConfig(initialCwd);
   let client: HindsightLikeClient = createHindsightClient(config);
   let projectBankId = deriveProjectBankId(initialCwd, config);
-  let capabilities: HindsightCapabilities | undefined;
   let initHealth: InitHealth | undefined;
   let periodicFlush: NodeJS.Timeout | undefined;
   let periodicFlushActive = false;
@@ -71,7 +68,6 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
     config = resolveConfig(cwd);
     client = createHindsightClient(config);
     projectBankId = deriveProjectBankId(cwd, config);
-    capabilities = undefined;
   };
 
   const startPeriodicFlush = (runtime: RuntimeSnapshot) => {
@@ -120,7 +116,6 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
     getClient: () => client,
     getConfig: () => config,
     getProjectBankId: () => projectBankId,
-    getCapabilities: () => capabilities,
     getInitHealth: () => initHealth,
     reloadConfig,
   };
@@ -129,7 +124,6 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
     getConfig: () => config,
     getClient: () => client,
     getProjectBankId: () => projectBankId,
-    getCapabilities: () => capabilities,
     setMemoryStatus: (runtime, activity, queueRemaining) =>
       setMemoryStatus(runtime, activity, undefined, queueRemaining),
     notify,
@@ -187,20 +181,6 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
           failures.push({ subsystem: "user-bank", error: redactError(error) });
           setMemoryStatus(runtime, "offline");
           notify(runtime, `Hindsight global bank ensure failed: ${redactError(error)}`, "warning");
-        }
-      }
-      const capabilityProbeBankId = config.banks.project.enabled
-        ? projectBankId
-        : config.banks.user.enabled
-          ? config.banks.user.bankId
-          : undefined;
-      if (config.retain.enabled && capabilityProbeBankId) {
-        try {
-          capabilities = await detectAppendCapability(client, capabilityProbeBankId);
-        } catch (error) {
-          failures.push({ subsystem: "capability-probe", error: redactError(error) });
-          setMemoryStatus(runtime, "offline");
-          notify(runtime, `Hindsight capability check failed: ${redactError(error)}`, "warning");
         }
       }
       initHealth = { checkedAt: new Date().toISOString(), failures };

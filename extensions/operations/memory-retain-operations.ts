@@ -60,7 +60,6 @@ export function createRetainOperations(deps: MemoryOperationsDeps) {
         ...(args.tags ?? []),
         ...meta.tags,
       ]);
-      const capabilities = deps.getCapabilities?.();
       const identity = createMemoryIdentity(args.cwd, config, args.sessionFile);
       const defaultObservationScopes = config.observations.enabled
         ? expandObservationScopes(config.observations.scopes, {
@@ -98,7 +97,6 @@ export function createRetainOperations(deps: MemoryOperationsDeps) {
         ...(args.documentTags?.length ? { documentTags: args.documentTags } : {}),
         ...(args.entities?.length ? { entities: args.entities } : {}),
         ...(args.async !== undefined ? { async: args.async } : {}),
-        ...(capabilities ? { capabilities } : {}),
       });
       const response = { ...result, tags, queued: result.enqueued };
       await appendRetainReceipt(

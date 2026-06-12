@@ -196,14 +196,6 @@ export interface RetainJob {
   deadLetteredAt?: string;
 }
 
-export interface HindsightCapabilities {
-  version?: string;
-  appendUpdateMode: boolean;
-  checkedAt: string;
-  error?: string;
-  probeDocumentId?: string;
-}
-
 export interface HindsightLikeClient {
   retain(
     bankId: string,

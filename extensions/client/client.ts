@@ -10,7 +10,7 @@ import type { Client, ReflectRequest } from "@vectorize-io/hindsight-client";
 import { redactError } from "../utils/sanitize.js";
 import type { HindsightLikeClient, ResolvedConfig } from "../types.js";
 import { PI_HINDSIGHT_USER_AGENT } from "../version.js";
-import { isRetryableError } from "./client-rest.js";
+import { withRetry } from "./client-retry.js";
 import { installFetchRequestCompat } from "./fetch-compat.js";
 import { withTimeout } from "./timeout.js";
 
@@ -43,29 +43,6 @@ function unwrapSdkResponse<T>(
   const statusCode = response.response?.status;
   const details = error?.detail ?? error?.message ?? error;
   throw new HindsightError(`${operation} failed: ${JSON.stringify(details)}`, statusCode, details);
-}
-
-async function withSdkRetry<T>(
-  operation: string,
-  fn: () => Promise<T>,
-  maxRetries = 3,
-  baseDelayMs = 1000,
-): Promise<T> {
-  let lastError: Error | undefined;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    if (attempt > 0) {
-      const jitter = Math.random() * baseDelayMs * 0.5;
-      const delay = baseDelayMs * 2 ** (attempt - 1) + jitter;
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-    try {
-      return await fn();
-    } catch (error) {
-      if (!isRetryableError(error)) throw error;
-      lastError = error as Error;
-    }
-  }
-  throw lastError ?? new Error(`${operation} failed after retries`);
 }
 
 function reflectInclude(options: ReflectOptions): ReflectRequest["include"] | undefined {
@@ -215,11 +192,11 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
       }),
     getBankProfile: (...args) =>
       withTimeout("hindsight getBankProfile", timeoutMs, (signal) =>
-        withSdkRetry("getBankProfile", () => raw.getBankProfile(args[0], { signal })),
+        withRetry("getBankProfile", () => raw.getBankProfile(args[0], { signal })),
       ),
     getBankStats: (bankId) =>
       withTimeout("hindsight getBankStats", timeoutMs, (signal) =>
-        withSdkRetry("getBankStats", async () => {
+        withRetry("getBankStats", async () => {
           const response = await sdk.getAgentStats({
             client: lowLevel,
             path: { bank_id: bankId },
@@ -230,11 +207,11 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
       ),
     getBankConfig: (bankId) =>
       withTimeout("hindsight getBankConfig", timeoutMs, (signal) =>
-        withSdkRetry("getBankConfig", () => raw.getBankConfig(bankId, { signal })),
+        withRetry("getBankConfig", () => raw.getBankConfig(bankId, { signal })),
       ),
     health: () =>
       withTimeout("hindsight health", timeoutMs, (signal) =>
-        withSdkRetry("health", async () => {
+        withRetry("health", async () => {
           const response = await sdk.healthEndpointHealthGet({ client: lowLevel, signal });
           return unwrapSdkResponse(response, "health");
         }),

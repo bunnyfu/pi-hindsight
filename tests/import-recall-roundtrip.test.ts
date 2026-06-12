@@ -265,7 +265,7 @@ describe("retain/import to recall roundtrip quality", () => {
       getConfig: () => DEFAULT_CONFIG,
       getClient: () => store.client,
       getProjectBankId: () => "project-bank",
-      getCapabilities: () => undefined,
+
       setMemoryStatus: () => undefined,
       notify: () => undefined,
     });

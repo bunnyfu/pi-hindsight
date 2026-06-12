@@ -16,7 +16,7 @@ import {
   readSessionMemoryMeta,
 } from "../utils/session-memory-meta.js";
 import { redactError } from "../utils/sanitize.js";
-import type { HindsightCapabilities, HindsightLikeClient, ResolvedConfig } from "../types.js";
+import type { HindsightLikeClient, ResolvedConfig } from "../types.js";
 import type { RuntimeSnapshot } from "./memory-lifecycle-runtime.js";
 import type { HindsightActivity } from "../utils/status.js";
 
@@ -39,7 +39,6 @@ export interface RetainTurnPolicyDeps {
   getConfig(): ResolvedConfig;
   getClient(): HindsightLikeClient;
   getProjectBankId(): string;
-  getCapabilities(): HindsightCapabilities | undefined;
   setMemoryStatus(
     runtime: RuntimeSnapshot,
     activity: RetainStatusActivity,
@@ -151,7 +150,6 @@ export function createRetainTurnPolicy(deps: RetainTurnPolicyDeps): RetainTurnPo
 
       try {
         deps.setMemoryStatus(runtime, "retaining");
-        const capabilities = deps.getCapabilities();
         const { targets, decision } = retainTargets(runtime, messages);
         if (targets.length === 0) {
           await markRetainedMessages(runtime, event.messages, messages);
@@ -176,7 +174,6 @@ export function createRetainTurnPolicy(deps: RetainTurnPolicyDeps): RetainTurnPo
             config,
             client: deps.getClient(),
             bankId,
-            ...(capabilities ? { capabilities } : {}),
             extraTags: sessionMemory.tags,
           });
           queued ||= result.queued;
