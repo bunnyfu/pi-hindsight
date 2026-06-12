@@ -5,7 +5,7 @@ import { deriveProjectBankId } from "../banks/banking.js";
 import { createHindsightClient } from "../client/client.js";
 import { ensureGlobalBank, ensureProjectBank } from "../banks/bank-operations.js";
 import { detectAppendCapability } from "../client/capabilities.js";
-import { flushRetainQueue, resolveQueuePath } from "../queue/queue.js";
+import { flushRetainQueue, retainQueuePath } from "../queue/queue.js";
 import { formatFlushRetainQueueResult } from "../queue/flush-presenter.js";
 import { bankSelectionMessage } from "../utils/diagnostics.js";
 import type { HindsightCapabilities, HindsightLikeClient, ResolvedConfig } from "../types.js";
@@ -65,7 +65,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
   const startPeriodicFlush = (runtime: RuntimeSnapshot) => {
     stopPeriodicFlush();
     if (!config.enabled || !config.retain.enabled || config.retain.flushIntervalMs <= 0) return;
-    const queuePath = resolveQueuePath(runtime.cwd, config.retain.queuePath);
+    const queuePath = retainQueuePath(runtime.cwd, config);
     periodicFlush = setInterval(() => {
       if (periodicFlushActive) return;
       periodicFlushActive = true;
@@ -222,15 +222,11 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       const runtime = snapshotRuntime(ctx);
       if (!runtime) return;
       try {
-        const result = await flushRetainQueue(
-          resolveQueuePath(runtime.cwd, config.retain.queuePath),
-          client,
-          {
-            maxJobs: config.retain.shutdownFlushMaxJobs,
-            maxElapsedMs: config.retain.shutdownFlushTimeoutMs,
-            stopOnFirstFailure: true,
-          },
-        );
+        const result = await flushRetainQueue(retainQueuePath(runtime.cwd, config), client, {
+          maxJobs: config.retain.shutdownFlushMaxJobs,
+          maxElapsedMs: config.retain.shutdownFlushTimeoutMs,
+          stopOnFirstFailure: true,
+        });
         if (result.deadLettered || result.remaining) {
           notify(runtime, formatFlushRetainQueueResult(result), "warning");
         }

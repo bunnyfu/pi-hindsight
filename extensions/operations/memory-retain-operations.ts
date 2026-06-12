@@ -1,10 +1,10 @@
 import type { MemoryOperationsDeps } from "./memory-operation-types.js";
-import { flushRetain } from "../lifecycle/retain-queue.js";
+import { flushRetain } from "../queue/queue.js";
 import { resolveOperationBank } from "../banks/bank-selection.js";
 import { explicitMemoryDocumentId } from "../utils/session.js";
 import { createMemoryIdentity, explicitRetainTags } from "./memory-identity.js";
 import { expandObservationScopes } from "../lifecycle/observation-scopes.js";
-import { retainDurably } from "../lifecycle/retain-durable.js";
+import { retainDurably } from "../lifecycle/retain.js";
 import { appendRetainReceipt, listRetainReceipts } from "../lifecycle/retain-receipts.js";
 import {
   getEffectiveSessionMemoryMode,

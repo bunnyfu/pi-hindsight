@@ -1,11 +1,11 @@
 import type { HindsightLikeClient, ResolvedConfig, RetainJob, UpdateMode } from "../types.js";
-import { buildDurableRetainJob } from "../lifecycle/retain-durable.js";
+import { buildDurableRetainJob } from "../lifecycle/retain.js";
 import {
-  enqueueRetainWithStats,
+  enqueueRetain,
   flushRetain,
   readQueuedRetains,
   removeQueuedRetains,
-} from "../lifecycle/retain-queue.js";
+} from "../queue/queue.js";
 import {
   importRetainJobMatchesReference,
   staleImportRetainJobForReference,
@@ -59,7 +59,7 @@ export async function deliverImportRetain(
   );
   const existing = await readQueuedRetains(args.cwd, args.config);
   const existingJob = existing.find((queued) => importRetainJobMatchesReference(queued, job));
-  if (!existingJob) await enqueueRetainWithStats(args.cwd, args.config, job);
+  if (!existingJob) await enqueueRetain(args.cwd, args.config, job);
   const result = await flushRetain(args.cwd, args.config, args.client, {
     stopOnFirstFailure: true,
   });

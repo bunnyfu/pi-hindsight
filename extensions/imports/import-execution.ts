@@ -18,7 +18,7 @@ import {
 } from "./import-retain.js";
 import { redactError } from "../utils/sanitize.js";
 import type { ImportPlan } from "./import-plan.js";
-import { removeQueuedRetains } from "../lifecycle/retain-queue.js";
+import { removeQueuedRetains } from "../queue/queue.js";
 import { importRetainJobMatchesIdentity } from "./import-queue-identity.js";
 import type { ImportProgressReporter } from "./import-sessions.js";
 

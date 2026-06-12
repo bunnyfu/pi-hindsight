@@ -1,19 +1,18 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
-import type { HindsightLikeClient, RetainJob } from "../types.js";
+import type { HindsightLikeClient, ResolvedConfig, RetainJob } from "../types.js";
 import { deliverRetainJob, operationIdsFromResponse, redactQueueError } from "./queue-delivery.js";
 import { JsonlQueueStore, type JsonlQueueFileSummary } from "./jsonl-queue-store.js";
-import {
-  RETAIN_QUEUE_LOCK,
-  isQueueLockOwnerStale,
-  type QueueLockOwner,
-  withQueueLock,
-} from "./queue-lock.js";
+import { withQueueLock } from "./queue-lock.js";
 
 export { RETAIN_QUEUE_LOCK, isQueueLockOwnerStale, type QueueLockOwner } from "./queue-lock.js";
 
 export function resolveQueuePath(cwd: string, queuePath: string): string {
   return isAbsolute(queuePath) ? queuePath : join(cwd, queuePath);
+}
+
+export function retainQueuePath(cwd: string, config: ResolvedConfig): string {
+  return resolveQueuePath(cwd, config.retain.queuePath);
 }
 
 export function resolveDeadLetterQueuePath(path: string): string {
@@ -228,4 +227,40 @@ export async function flushRetainQueue(
       ...(operationIds.length ? { operationIds: [...new Set(operationIds)] } : {}),
     };
   });
+}
+
+export async function enqueueRetain(
+  cwd: string,
+  config: ResolvedConfig,
+  job: RetainJob,
+): Promise<EnqueueRetainJobResult> {
+  return enqueueRetainJobWithStats(retainQueuePath(cwd, config), job);
+}
+
+export async function flushRetain(
+  cwd: string,
+  config: ResolvedConfig,
+  client: HindsightLikeClient,
+  options?: FlushRetainQueueOptions,
+): Promise<FlushRetainQueueResult> {
+  return flushRetainQueue(retainQueuePath(cwd, config), client, options);
+}
+
+export async function readQueuedRetains(cwd: string, config: ResolvedConfig): Promise<RetainJob[]> {
+  return readRetainQueue(retainQueuePath(cwd, config));
+}
+
+export async function removeQueuedRetains(
+  cwd: string,
+  config: ResolvedConfig,
+  predicate: (job: RetainJob) => boolean,
+): Promise<number> {
+  return removeRetainQueueJobs(retainQueuePath(cwd, config), predicate);
+}
+
+export async function summarizeRetain(
+  cwd: string,
+  config: ResolvedConfig,
+): Promise<RetainQueueSummary> {
+  return summarizeRetainQueue(retainQueuePath(cwd, config));
 }
