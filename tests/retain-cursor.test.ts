@@ -8,7 +8,9 @@ import {
   filterNewRetainMessages,
   messageFingerprint,
   readSessionRetainState,
+  retainedThroughIndex,
   retainCursorPath,
+  RETAIN_CURSOR_TAIL_WINDOW,
   RETAIN_CURSOR_VERSION,
 } from "../extensions/lifecycle/retain-cursor.js";
 
@@ -40,6 +42,8 @@ describe("retain cursor", () => {
 
     const state = await readSessionRetainState(cwd, sessionId);
     expect(state?.cursor?.index).toBe(2_499);
+    expect(state?.cursor?.fingerprints.length).toBeLessThanOrEqual(RETAIN_CURSOR_TAIL_WINDOW);
+    expect(state?.cursor?.messageIds.length).toBeLessThanOrEqual(RETAIN_CURSOR_TAIL_WINDOW);
     expect(filterNewRetainMessages(messages, state)).toEqual([]);
   });
 
@@ -82,6 +86,23 @@ describe("retain cursor", () => {
     expect(stored.sessions[sessionId]).not.toHaveProperty("legacyFingerprints");
   });
 
+  it("migrates over-cap legacy stores from the end without a full-transcript burst", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-cursor-"));
+    const sessionId = "legacy-over-cap";
+    const messages = transcript(8);
+    const legacyFingerprints = messages.slice(6).map(messageFingerprint);
+
+    mkdirSync(join(cwd, ".pi", "hindsight"), { recursive: true });
+    writeFileSync(
+      retainCursorPath(cwd),
+      `${JSON.stringify({ sessions: { [sessionId]: legacyFingerprints } }, null, 2)}\n`,
+      "utf8",
+    );
+
+    const migrated = await readSessionRetainState(cwd, sessionId);
+    expect(filterNewRetainMessages(messages, migrated)).toEqual(messages.slice(8));
+  });
+
   it("retains edited messages while keeping earlier dedupe", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-cursor-"));
     const sessionId = "edit-session";
@@ -98,6 +119,29 @@ describe("retain cursor", () => {
     expect(filterNewRetainMessages(edited, state)).toEqual([edited[2]]);
   });
 
+  it("does not re-retain unchanged suffix after edit mark cycle", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-cursor-"));
+    const sessionId = "edit-mark-cycle";
+    const original = transcript(4);
+    const edited = [
+      ...original.slice(0, 2),
+      msg("m2", "assistant", "message-2-edited", 3),
+      ...original.slice(3),
+    ];
+
+    await advanceRetainCursor(cwd, sessionId, original, original.length - 1);
+    const afterFullRetain = await readSessionRetainState(cwd, sessionId);
+    expect(filterNewRetainMessages(edited, afterFullRetain)).toEqual([edited[2]]);
+
+    const editedBatch = [edited[2]!];
+    const throughIndex = retainedThroughIndex(edited, editedBatch);
+    await advanceRetainCursor(cwd, sessionId, edited, throughIndex);
+
+    const afterEditMark = await readSessionRetainState(cwd, sessionId);
+    expect(afterEditMark?.cursor?.index).toBe(3);
+    expect(filterNewRetainMessages(edited, afterEditMark)).toEqual([]);
+  });
+
   it("retains branched suffixes without replaying the shared prefix", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-cursor-"));
     const sessionId = "branch-session";
@@ -112,5 +156,22 @@ describe("retain cursor", () => {
     const state = await readSessionRetainState(cwd, sessionId);
 
     expect(filterNewRetainMessages(branched, state)).toEqual(branched.slice(3));
+  });
+
+  it("returns -1 from retainedThroughIndex when the batch is not found", () => {
+    const messages = transcript(4);
+    const missing = [msg("missing", "assistant", "not-in-transcript", 99)];
+    expect(retainedThroughIndex(messages, missing)).toBe(-1);
+  });
+
+  it("uses forward id+fingerprint match instead of a later duplicate", () => {
+    const duplicateContent = msg("dup", "assistant", "same-content", 2);
+    const messages = [
+      msg("m0", "user", "message-0", 1),
+      duplicateContent,
+      msg("m2", "user", "message-2", 3),
+      msg("dup-later", "assistant", "same-content", 4),
+    ];
+    expect(retainedThroughIndex(messages, [duplicateContent])).toBe(1);
   });
 });

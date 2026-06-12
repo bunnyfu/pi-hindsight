@@ -3,12 +3,14 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 
-export const RETAIN_CURSOR_VERSION = 2 as const;
+export const RETAIN_CURSOR_VERSION = 3 as const;
+export const RETAIN_CURSOR_TAIL_WINDOW = 200;
 
 export interface SessionRetainCursor {
   index: number;
   chainHash: string;
   idChainHash: string;
+  tailStart: number;
   messageIds: string[];
   fingerprints: string[];
 }
@@ -18,7 +20,7 @@ export interface SessionRetainState {
   legacyFingerprints?: Set<string>;
 }
 
-interface RetainCursorStoreV2 {
+interface RetainCursorStoreV3 {
   version: typeof RETAIN_CURSOR_VERSION;
   sessions: Record<string, SessionRetainCursor | LegacySessionEntry>;
 }
@@ -30,6 +32,14 @@ interface LegacySessionEntry {
 type RetainCursorStoreV1 = {
   sessions: Record<string, string[]>;
 };
+
+interface SessionRetainCursorV2 {
+  index: number;
+  chainHash: string;
+  idChainHash: string;
+  messageIds: string[];
+  fingerprints: string[];
+}
 
 export function retainCursorPath(cwd: string): string {
   return join(cwd, ".pi", "hindsight", "retain-cursors.json");
@@ -82,13 +92,28 @@ export function idChainHash(messages: readonly AgentMessage[], throughIndex: num
 }
 
 function buildCursor(messages: readonly AgentMessage[], throughIndex: number): SessionRetainCursor {
-  const fingerprints = messages.slice(0, throughIndex + 1).map(messageFingerprint);
+  const tailStart = Math.max(0, throughIndex - RETAIN_CURSOR_TAIL_WINDOW + 1);
+  const tailMessages = messages.slice(tailStart, throughIndex + 1);
+  const prefixFingerprints = messages.slice(0, throughIndex + 1).map(messageFingerprint);
   return {
     index: throughIndex,
-    chainHash: chainHash(fingerprints, throughIndex),
+    chainHash: chainHash(prefixFingerprints, throughIndex),
     idChainHash: idChainHash(messages, throughIndex),
-    messageIds: messages.slice(0, throughIndex + 1).map(messageId),
-    fingerprints,
+    tailStart,
+    messageIds: tailMessages.map(messageId),
+    fingerprints: tailMessages.map(messageFingerprint),
+  };
+}
+
+function migrateCursorToV3(cursor: SessionRetainCursorV2): SessionRetainCursor {
+  const tailStart = Math.max(0, cursor.index - RETAIN_CURSOR_TAIL_WINDOW + 1);
+  return {
+    index: cursor.index,
+    chainHash: cursor.chainHash,
+    idChainHash: cursor.idChainHash,
+    tailStart,
+    messageIds: cursor.messageIds.slice(tailStart),
+    fingerprints: cursor.fingerprints.slice(tailStart),
   };
 }
 
@@ -101,6 +126,19 @@ function isLegacySessionEntry(value: unknown): value is LegacySessionEntry {
   );
 }
 
+function isSessionRetainCursorV2(value: unknown): value is SessionRetainCursorV2 {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const cursor = value as SessionRetainCursorV2;
+  return (
+    typeof cursor.index === "number" &&
+    typeof cursor.chainHash === "string" &&
+    typeof cursor.idChainHash === "string" &&
+    Array.isArray(cursor.messageIds) &&
+    Array.isArray(cursor.fingerprints) &&
+    !("tailStart" in cursor)
+  );
+}
+
 function isSessionRetainCursor(value: unknown): value is SessionRetainCursor {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const cursor = value as SessionRetainCursor;
@@ -108,6 +146,7 @@ function isSessionRetainCursor(value: unknown): value is SessionRetainCursor {
     typeof cursor.index === "number" &&
     typeof cursor.chainHash === "string" &&
     typeof cursor.idChainHash === "string" &&
+    typeof cursor.tailStart === "number" &&
     Array.isArray(cursor.messageIds) &&
     Array.isArray(cursor.fingerprints)
   );
@@ -127,7 +166,7 @@ function readLegacyStore(parsed: RetainCursorStoreV1): Record<string, LegacySess
   return sessions;
 }
 
-async function readRetainCursorStore(path: string): Promise<RetainCursorStoreV2> {
+async function readRetainCursorStore(path: string): Promise<RetainCursorStoreV3> {
   try {
     const parsed = JSON.parse(await readFile(path, "utf8")) as unknown;
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -141,9 +180,18 @@ async function readRetainCursorStore(path: string): Promise<RetainCursorStoreV2>
     }
 
     if (version === RETAIN_CURSOR_VERSION) {
-      const normalized: RetainCursorStoreV2["sessions"] = {};
+      const normalized: RetainCursorStoreV3["sessions"] = {};
       for (const [key, value] of Object.entries(sessions)) {
         if (isSessionRetainCursor(value)) normalized[key] = value;
+        else if (isLegacySessionEntry(value)) normalized[key] = value;
+      }
+      return { version: RETAIN_CURSOR_VERSION, sessions: normalized };
+    }
+
+    if (version === 2) {
+      const normalized: RetainCursorStoreV3["sessions"] = {};
+      for (const [key, value] of Object.entries(sessions)) {
+        if (isSessionRetainCursorV2(value)) normalized[key] = migrateCursorToV3(value);
         else if (isLegacySessionEntry(value)) normalized[key] = value;
       }
       return { version: RETAIN_CURSOR_VERSION, sessions: normalized };
@@ -161,7 +209,7 @@ async function readRetainCursorStore(path: string): Promise<RetainCursorStoreV2>
   }
 }
 
-async function writeRetainCursorStore(path: string, store: RetainCursorStoreV2): Promise<void> {
+async function writeRetainCursorStore(path: string, store: RetainCursorStoreV3): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const tmp = `${path}.tmp`;
   await writeFile(tmp, `${JSON.stringify(store, null, 2)}\n`, "utf8");
@@ -182,24 +230,34 @@ export async function readSessionRetainState(
 }
 
 function legacyRetainStart(messages: readonly AgentMessage[], legacy: ReadonlySet<string>): number {
-  for (let i = 0; i < messages.length; i++) {
+  for (let i = messages.length - 1; i >= 0; i--) {
     const message = messages[i];
-    if (!message || !legacy.has(messageFingerprint(message))) return i;
+    if (!message) continue;
+    if (legacy.has(messageFingerprint(message))) return i + 1;
   }
-  return messages.length;
+  return 0;
+}
+
+function prefixChainMatches(
+  messages: readonly AgentMessage[],
+  cursor: SessionRetainCursor,
+): boolean {
+  const fingerprints: string[] = [];
+  for (let i = 0; i <= cursor.index; i++) {
+    const message = messages[i];
+    if (!message) return false;
+    fingerprints.push(messageFingerprint(message));
+  }
+  return chainHash(fingerprints, cursor.index) === cursor.chainHash;
 }
 
 function filterWithCursor(
   messages: readonly AgentMessage[],
   cursor: SessionRetainCursor,
 ): AgentMessage[] {
-  const fingerprints = messages.map(messageFingerprint);
   if (messages.length === 0) return [];
 
-  if (
-    cursor.index < fingerprints.length &&
-    chainHash(fingerprints, cursor.index) === cursor.chainHash
-  ) {
+  if (cursor.index < messages.length && prefixChainMatches(messages, cursor)) {
     return messages.slice(cursor.index + 1);
   }
 
@@ -215,8 +273,14 @@ function filterWithCursor(
       continue;
     }
 
-    const idMatches = messageId(message) === cursor.messageIds[i];
-    const fingerprintMatches = fingerprints[i] === cursor.fingerprints[i];
+    if (i < cursor.tailStart) {
+      if (branched) retained.push(message);
+      continue;
+    }
+
+    const offset = i - cursor.tailStart;
+    const idMatches = messageId(message) === cursor.messageIds[offset];
+    const fingerprintMatches = messageFingerprint(message) === cursor.fingerprints[offset];
 
     if (!idMatches) {
       branched = true;
@@ -259,7 +323,12 @@ export async function advanceRetainCursor(
 
   const path = retainCursorPath(cwd);
   const store = await readRetainCursorStore(path);
-  store.sessions[sessionId] = buildCursor(allMessages, retainedThroughIndex);
+  const existing = store.sessions[sessionId];
+  let effectiveIndex = retainedThroughIndex;
+  if (isSessionRetainCursor(existing)) {
+    effectiveIndex = Math.max(existing.index, retainedThroughIndex);
+  }
+  store.sessions[sessionId] = buildCursor(allMessages, effectiveIndex);
   await writeRetainCursorStore(path, store);
 }
 
@@ -270,10 +339,14 @@ export function retainedThroughIndex(
   if (retainedMessages.length === 0) return -1;
   const lastRetained = retainedMessages[retainedMessages.length - 1];
   if (!lastRetained) return -1;
+  const lastId = messageId(lastRetained);
   const lastFingerprint = messageFingerprint(lastRetained);
-  for (let i = allMessages.length - 1; i >= 0; i--) {
+  for (let i = 0; i < allMessages.length; i++) {
     const message = allMessages[i];
-    if (message && messageFingerprint(message) === lastFingerprint) return i;
+    if (!message) continue;
+    if (messageId(message) === lastId && messageFingerprint(message) === lastFingerprint) {
+      return i;
+    }
   }
-  return allMessages.length - 1;
+  return -1;
 }

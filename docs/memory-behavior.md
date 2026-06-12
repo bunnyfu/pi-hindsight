@@ -45,7 +45,7 @@ A unique backup is written next to the session file before pruning.
 
 Automatic retain runs in Pi's `agent_end` hook. It stores a structured JSON projection of new messages, not a summary.
 
-Live sessions use stable `documentId` values and `updateMode: "append"`. A versioned retain cursor under `.pi/hindsight/retain-cursors.json` tracks the last retained transcript index plus hash chains so overlapping `agent_end` transcripts dedupe in O(1) for append-only sessions, including after extension restart. Legacy fingerprint-only cursor files migrate on read without a duplicate-retain burst.
+Live sessions use stable `documentId` values and `updateMode: "append"`. A versioned retain cursor under `.pi/hindsight/retain-cursors.json` tracks the last retained transcript index plus hash chains and a bounded tail window (200 messages) so overlapping `agent_end` transcripts dedupe for append-only sessions, including after extension restart. Legacy fingerprint-only cursor files migrate on read without a duplicate-retain burst.
 
 The retain projection is controlled by:
 
