@@ -5,7 +5,11 @@ import { join } from "node:path";
 import type { AgentEndEvent } from "@earendil-works/pi-coding-agent";
 import { DEFAULT_CONFIG } from "../extensions/config/config.js";
 import { buildRetainJob } from "../extensions/lifecycle/retain.js";
-import { selectMemoryScopes } from "../extensions/operations/memory-scope.js";
+import {
+  composeScopedTagFilter,
+  scopeTagsForBank,
+  selectMemoryScopes,
+} from "../extensions/operations/memory-scope.js";
 import { importPiSession } from "../extensions/imports/import-sessions.js";
 import type { HindsightLikeClient, ResolvedConfig } from "../extensions/types.js";
 
@@ -119,6 +123,34 @@ describe("Hindsight best-practice invariants", () => {
     };
 
     const scopes = selectMemoryScopes(cwd, config);
+
+    expect(scopeTagsForBank(cwd, config, "pi-global")).toEqual(["source:pi"]);
+    expect(scopeTagsForBank(cwd, config, scopes[0]!.bankId)).toEqual([
+      expect.stringMatching(/^repo:/),
+    ]);
+
+    expect(composeScopedTagFilter(["repo:abc"])).toEqual({
+      tags: ["repo:abc"],
+      tagsMatch: "any_strict",
+    });
+    expect(
+      composeScopedTagFilter(["repo:abc"], { tags: ["topic:auth"], tagsMatch: "all" }),
+    ).toEqual({
+      tagGroups: [
+        { tags: ["repo:abc"], match: "any_strict" },
+        { tags: ["topic:auth"], match: "all" },
+      ],
+    });
+    expect(
+      composeScopedTagFilter(["repo:abc"], {
+        tagGroups: [{ tags: ["kind:decision"], match: "any_strict" }],
+      }),
+    ).toEqual({
+      tagGroups: [
+        { tags: ["repo:abc"], match: "any_strict" },
+        { tags: ["kind:decision"], match: "any_strict" },
+      ],
+    });
 
     expect(scopes).toEqual([
       expect.objectContaining({
