@@ -241,9 +241,6 @@ describe("memory operations", () => {
     await expect(operations.resetBankConfig({ bank: "project", confirm: true })).rejects.toThrow(
       "Hindsight client does not support bank config reset.",
     );
-    await expect(operations.getBankTemplateSchema()).rejects.toThrow(
-      "Hindsight client does not support bank template schema fetch.",
-    );
     await expect(operations.listDirectives({ bank: "project" })).rejects.toThrow(
       "Hindsight client does not support directive list.",
     );
@@ -332,10 +329,6 @@ describe("memory operations", () => {
           calls.push({ method: "resetBankConfig", bank });
           return { ok: true };
         },
-        getBankTemplateSchema: async () => {
-          calls.push({ method: "getBankTemplateSchema", bank: "none" });
-          return { title: "BankTemplateManifest" };
-        },
         listDirectives: async (bank) => {
           calls.push({ method: "listDirectives", bank });
           return { items: [] };
@@ -390,7 +383,6 @@ describe("memory operations", () => {
       confirm: true,
     });
     await operations.resetBankConfig({ bank: "global", confirm: true });
-    await operations.getBankTemplateSchema();
     await operations.listDirectives({ bank: "global" });
     await operations.getDirective({ bank: "global", directiveId: "directive" });
     await operations.createDirective({
@@ -445,7 +437,6 @@ describe("memory operations", () => {
         },
         { method: "resetBankConfig", bank: "global-luxus" },
         { method: "getBankConfig", bank: "global-luxus" },
-        { method: "getBankTemplateSchema", bank: "none" },
         { method: "listDirectives", bank: "global-luxus" },
         { method: "getDirective", bank: "global-luxus" },
         {

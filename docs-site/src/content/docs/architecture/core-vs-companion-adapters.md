@@ -24,8 +24,6 @@ Keep these in `pi-hindsight`:
 - `/hindsight` TUI operations for common Pi memory workflows
 - historical Pi session import
 - generic seed/content import for simple formats when it stays Hindsight- and Pi-agnostic
-- Hindsight bank templates when they configure memory behavior independent of any one framework
-- Hindsight mental-model operations when they expose Hindsight's reusable synthesis model directly
 - release, verification, and troubleshooting docs for Pi users
 
 Core code may contain a Hindsight client adapter for Pi's runtime needs. It should not become a generic integration framework for all Hindsight consumers.
@@ -70,8 +68,7 @@ If most answers are yes, it can be core. If any answer depends on a non-Pi frame
 
 | Request                                                                   | Location        | Reason                                                              |
 | ------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------- |
-| Add `/hindsight` read-only mental model list/detail view                  | Core            | Pi can inspect Hindsight mental models without cloning web UI.      |
-| Add operation-service seam for creating Hindsight bank templates          | Core            | Bank templates are Hindsight-native and framework-neutral.          |
+| Add bank template or mental-model admin CRUD inside Pi                    | Web UI          | Hindsight's control plane already owns admin/browsing workflows.    |
 | Import Markdown, text, or JSON seed files into a selected bank            | Core if generic | Simple content import helps Pi projects without framework coupling. |
 | Add LiteLLM middleware that injects recalled memory into chat completions | Companion       | Middleware shape belongs to LiteLLM, not Pi.                        |
 | Add Vercel AI SDK route handler example                                   | Example         | Useful pattern, but framework-specific runtime and deployment.      |

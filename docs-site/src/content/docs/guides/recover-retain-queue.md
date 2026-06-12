@@ -46,7 +46,6 @@ Inspect status first, then check whether the failure is caused by:
 - wrong server URL
 - missing API key
 - missing or deleted bank
-- invalid bank template setup
 - malformed queue line quarantined by the queue reader
 
 Create a bug report with redacted status output if the queue cannot recover after the server and bank config are valid.

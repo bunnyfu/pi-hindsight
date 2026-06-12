@@ -57,9 +57,6 @@ Pi Hindsight 1.0 supports a stable Pi-first Hindsight integration. Core and Pi w
 | `hindsight_create_directive`                      | capability-gated 1.0 |
 | `hindsight_update_directive`                      | capability-gated 1.0 |
 | `hindsight_delete_directive`                      | capability-gated 1.0 |
-| `hindsight_get_bank_template_schema`              | capability-gated 1.0 |
-| `hindsight_export_bank_template`                  | capability-gated 1.0 |
-| `hindsight_import_bank_template`                  | capability-gated 1.0 |
 | `hindsight_import`                                | Pi workflow 1.0      |
 | `hindsight_import_seed_content`                   | Pi workflow 1.0      |
 | `hindsight_import_chat_transcript`                | Pi workflow 1.0      |
@@ -337,7 +334,7 @@ Update a Hindsight mental model.
 
 ### `hindsight_delete_mental_model`
 
-Delete one Hindsight mental model. Destructive and irreversible; requires confirm=true. Export a bank template first if the model may be needed later.
+Delete one Hindsight mental model. Destructive and irreversible; requires confirm=true.
 
 | Parameter       | Type   | Required | Description                                 |
 | --------------- | ------ | -------- | ------------------------------------------- |
@@ -612,41 +609,13 @@ Update a bank-owned Hindsight directive.
 
 ### `hindsight_delete_directive`
 
-Delete a bank-owned Hindsight directive. Destructive and irreversible; requires confirm=true. Export a bank template first if the directive may be needed later.
+Delete a bank-owned Hindsight directive. Destructive and irreversible; requires confirm=true.
 
 | Parameter     | Type   | Required | Description                                             |
 | ------------- | ------ | -------- | ------------------------------------------------------- |
 | `directiveId` | string | yes      | Directive ID.                                           |
 | `bank`        | string | no       | Optional bank id. Defaults to project bank.             |
 | `confirm`     | true   | yes      | Required destructive-action confirmation. Must be true. |
-
-### `hindsight_get_bank_template_schema`
-
-Fetch the Hindsight bank-template JSON Schema used to validate portable manifests.
-
-| Parameter | Type | Required | Description |
-| --------- | ---- | -------- | ----------- |
-
-### `hindsight_export_bank_template`
-
-Export a portable Hindsight bank template manifest for reuse in another project or bank.
-
-| Parameter    | Type   | Required | Description                                                                           |
-| ------------ | ------ | -------- | ------------------------------------------------------------------------------------- |
-| `bank`       | string | no       | Optional bank id. Defaults to project bank.                                           |
-| `outputFile` | string | no       | Optional path to save the exported manifest JSON. Relative paths resolve against cwd. |
-
-### `hindsight_import_bank_template`
-
-Dry-run or apply a portable Hindsight bank template manifest from a local JSON file or inline JSON.
-
-| Parameter      | Type    | Required | Description                                                                 |
-| -------------- | ------- | -------- | --------------------------------------------------------------------------- |
-| `bank`         | string  | no       | Optional bank id. Defaults to project bank.                                 |
-| `sourceFile`   | string  | no       | Local bank template manifest JSON path. Relative paths resolve against cwd. |
-| `manifestJson` | string  | no       | Inline bank template manifest JSON.                                         |
-| `dryRun`       | boolean | no       | Preview without writing. Defaults to true.                                  |
-| `confirmApply` | true    | no       | Required when dryRun is false. Must be true to apply changes.               |
 
 ### `hindsight_import`
 

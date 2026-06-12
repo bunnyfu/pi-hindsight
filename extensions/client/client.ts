@@ -8,9 +8,6 @@ import {
   bankConfigPath,
   bankBackgroundPath,
   bankProfilePath,
-  bankTemplateExportPath,
-  bankTemplateImportPath,
-  bankTemplateSchemaPath,
   chunkItemPath,
   consolidationPath,
   consolidationRecoverPath,
@@ -285,30 +282,6 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
     listTags: (bankId, options) =>
       withTimeout("hindsight listTags", timeoutMs, (signal) =>
         rest.request(tagsCollectionPath(bankId, options), { signal }),
-      ),
-    // The installed high-level SDK does not export bank-template helpers. Its generated
-    // import helper also exposes no typed body because the server endpoint accepts raw JSON.
-    // Keep a narrow REST shim for template import/export/schema until the public SDK wraps them.
-    importBankTemplate: (bankId, manifest, options) =>
-      withTimeout("hindsight importBankTemplate", timeoutMs, (signal) =>
-        rest.request(bankTemplateImportPath(bankId, options), {
-          method: "POST",
-          signal,
-          body: JSON.stringify(manifest),
-        }),
-      ),
-    exportBankTemplate: (bankId) =>
-      withTimeout(
-        "hindsight exportBankTemplate",
-        timeoutMs,
-        async (signal) =>
-          (await rest.request(bankTemplateExportPath(bankId), {
-            signal,
-          })) as import("../banks/bank-template-catalog.js").BankTemplateManifest,
-      ),
-    getBankTemplateSchema: () =>
-      withTimeout("hindsight getBankTemplateSchema", timeoutMs, (signal) =>
-        rest.request(bankTemplateSchemaPath(), { signal }),
       ),
     // Use direct OpenAPI REST paths for directives so list filters (tags_match, active_only,
     // limit, offset) and nullable update fields stay aligned with server behavior.

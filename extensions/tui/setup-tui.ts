@@ -30,7 +30,6 @@ export type {
   SetupActionId,
   SetupProfileChoice,
   SetupStep,
-  SetupTemplateChoice,
   SetupUiState,
   ThemeLike,
 } from "./setup-tui-types.js";

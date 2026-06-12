@@ -4,7 +4,6 @@ import type {
   SetupActionId,
   SetupProfileChoice,
   SetupStep,
-  SetupTemplateChoice,
   SetupUiState,
 } from "./setup-tui-types.js";
 
@@ -21,7 +20,6 @@ export type SetupIntent =
   | { type: "editSelectedField" }
   | { type: "startGuidedSetup" }
   | { type: "chooseProfile"; profile: SetupProfileChoice }
-  | { type: "chooseTemplate"; template: SetupTemplateChoice }
   | { type: "back" }
   | { type: "finish" };
 
@@ -53,8 +51,7 @@ function withAction(action: SetupActionId | null, state: SetupUiState): SetupRes
 
 function nextStep(step: SetupStep): SetupStep {
   if (step === "profile") return "banks";
-  if (step === "banks") return "template";
-  if (step === "template") return "review";
+  if (step === "banks") return "review";
   if (step === "review") return "done";
   return step;
 }
@@ -62,8 +59,7 @@ function nextStep(step: SetupStep): SetupStep {
 function previousStep(step: SetupStep): SetupStep {
   if (step === "profile") return "config";
   if (step === "banks") return "profile";
-  if (step === "template") return "banks";
-  if (step === "review") return "template";
+  if (step === "review") return "banks";
   if (step === "done") return "review";
   return step;
 }
@@ -139,13 +135,6 @@ export function applySetupIntent(
       ...normalized,
       profileChoice: intent.profile,
       step: nextStep("profile"),
-    });
-  }
-  if (intent.type === "chooseTemplate") {
-    return withState({
-      ...normalized,
-      templateChoice: intent.template,
-      step: nextStep("template"),
     });
   }
   if (intent.type === "back") {

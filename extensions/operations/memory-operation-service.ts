@@ -6,7 +6,6 @@ import {
 } from "../imports/import-operations.js";
 import { createBankConfigOperations } from "../banks/bank-config-operations.js";
 import { createBankProfileOperations } from "./memory-bank-profile-operations.js";
-import { createBankTemplateOperations } from "../banks/bank-template-operations.js";
 import { createAdminOperations } from "./memory-admin-operations.js";
 import { createConfigOperations } from "./memory-config-operations.js";
 import { createDirectiveOperations } from "./memory-directive-operations.js";
@@ -73,7 +72,6 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
     ...createConfigOperations(deps),
     ...createBankConfigOperations(deps),
     ...createBankProfileOperations(deps),
-    ...createBankTemplateOperations(deps),
     ...createDirectiveOperations(deps),
     ...createMentalModelOperations(deps),
     ...createAdminOperations(deps),

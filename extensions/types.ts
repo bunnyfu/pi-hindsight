@@ -4,7 +4,6 @@ import type {
   TagGroupNotInput,
   TagGroupOrInput,
 } from "@vectorize-io/hindsight-client";
-import type { BankTemplateManifest } from "./banks/bank-template-catalog.js";
 
 export type Budget = "low" | "mid" | "high";
 export type UpdateMode = "append" | "replace";
@@ -471,13 +470,6 @@ export interface HindsightLikeClient {
   updateBankProfile?(bankId: string, request: UpdateBankProfileRequest): Promise<unknown>;
   updateBankDisposition?(bankId: string, disposition: DispositionTraits): Promise<unknown>;
   addBankBackground?(bankId: string, request: AddBankBackgroundRequest): Promise<unknown>;
-  importBankTemplate?(
-    bankId: string,
-    manifest: BankTemplateManifest,
-    options?: { dryRun?: boolean },
-  ): Promise<unknown>;
-  exportBankTemplate?(bankId: string): Promise<BankTemplateManifest>;
-  getBankTemplateSchema?(): Promise<unknown>;
   listDirectives?(bankId: string, options?: ListDirectivesOptions): Promise<unknown>;
   getDirective?(bankId: string, directiveId: string): Promise<unknown>;
   createDirective?(bankId: string, request: CreateDirectiveRequest): Promise<unknown>;

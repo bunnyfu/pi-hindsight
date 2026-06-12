@@ -6,8 +6,6 @@ import { DEFAULT_CONFIG } from "../extensions/config/config-defaults.js";
 import {
   buildGuidedSetupGlobalPatch,
   buildGuidedSetupPatch,
-  editTemplateManifestForSetup,
-  enabledTemplateTargets,
   hasProjectHindsightConfig,
   importChoicesForSetup,
   maybeOfferHistoricalImportForSetup,
@@ -115,180 +113,21 @@ describe("guided setup", () => {
     ).toBeUndefined();
   });
 
-  it("builds template targets with concrete project and user bank locations", () => {
-    expect(
-      enabledTemplateTargets({
-        setupProfile: "project-user",
-        projectBankId: "project-bank",
-        globalBankId: "global-luxus",
-      }),
-    ).toEqual([
-      {
-        label: "Project bank (project-bank)",
-        location: "Project",
-        bank: "project-bank",
-        defaultTemplateTarget: "project",
-      },
-      {
-        label: "User bank (global-luxus)",
-        location: "User",
-        bank: "global-luxus",
-        defaultTemplateTarget: "user",
-      },
-    ]);
-  });
-
-  it("edits a selected template before setup apply", async () => {
-    const select = vi
-      .fn()
-      .mockResolvedValueOnce("Edit bank field")
-      .mockResolvedValueOnce("Retain extraction mode: concise")
-      .mockResolvedValueOnce("verbose")
-      .mockResolvedValueOnce("Use template");
-    const ctx = {
-      ui: {
-        select,
-        input: vi.fn(),
-      },
-    } as never;
-
-    const result = await editTemplateManifestForSetup({
-      ctx,
-      label: "Coding Project",
-      manifest: {
-        version: "1",
-        bank: { retain_extraction_mode: "concise" },
-      },
-    });
-
-    expect(result?.bank?.retain_extraction_mode).toBe("verbose");
-    expect(select).toHaveBeenCalledWith(
-      expect.stringContaining("Review or edit bank template\nTemplate: Coding Project"),
-      ["Use template", "Edit bank field", "Cancel"],
-    );
-  });
-
-  it("edits mental model fields before setup apply", async () => {
-    const select = vi
-      .fn()
-      .mockResolvedValueOnce("Edit bank field")
-      .mockResolvedValueOnce("Mental model Project Context max tokens: 1024")
-      .mockResolvedValueOnce("Use template");
-    const input = vi.fn().mockResolvedValueOnce("2048");
-    const ctx = {
-      ui: {
-        select,
-        input,
-        notify: vi.fn(),
-      },
-    } as never;
-
-    const result = await editTemplateManifestForSetup({
-      ctx,
-      label: "Coding Project",
-      manifest: {
-        version: "1",
-        mental_models: [
-          {
-            id: "project-context",
-            name: "Project Context",
-            source_query: "What matters?",
-            max_tokens: 1024,
-          },
-        ],
-      },
-    });
-
-    expect(result?.mental_models?.[0]?.max_tokens).toBe(2048);
-  });
-
-  it("recovers from invalid setup editor field values", async () => {
-    const select = vi
-      .fn()
-      .mockResolvedValueOnce("Edit bank field")
-      .mockResolvedValueOnce("Disposition empathy (advanced)")
-      .mockResolvedValueOnce("Use template");
+  it("writes project config without a template step", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-guided-run-"));
     const notify = vi.fn();
-    const ctx = {
-      ui: {
-        select,
-        input: vi.fn().mockResolvedValueOnce("9"),
-        notify,
-      },
-    } as never;
-
-    const result = await editTemplateManifestForSetup({
-      ctx,
-      label: "Coding Project",
-      manifest: { version: "1", bank: {} },
-    });
-
-    expect(result?.bank).toEqual({});
-    expect(notify).toHaveBeenCalledWith(
-      "Disposition empathy must be an integer from 1 to 5.",
-      "warning",
-    );
-  });
-
-  it("requires template validation errors to be fixed before use", async () => {
-    const select = vi
-      .fn()
-      .mockResolvedValueOnce("Edit bank field")
-      .mockResolvedValueOnce("Retain mission")
-      .mockResolvedValueOnce("Cancel");
-    const input = vi.fn().mockResolvedValueOnce("Remember useful facts.");
-    const ctx = {
-      ui: {
-        select,
-        input,
-      },
-    } as never;
-
-    const result = await editTemplateManifestForSetup({
-      ctx,
-      label: "Bad Template",
-      manifest: {
-        version: "1",
-        mental_models: [{ id: "Bad ID", name: "", source_query: "" }],
-      },
-    });
-
-    expect(result).toBeUndefined();
-    expect(select).toHaveBeenNthCalledWith(1, expect.stringContaining("Validation errors:"), [
-      "Edit bank field",
-      "Cancel",
-    ]);
-  });
-
-  it("passes apply confirmation to guided setup bank template import", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-guided-template-"));
-    const importBankTemplate = vi
-      .fn()
-      .mockResolvedValueOnce({ bankId: "project-bank", result: { dry_run: true } })
-      .mockResolvedValueOnce({ bankId: "project-bank", result: { config_applied: true } });
     const ctx = {
       cwd,
       sessionManager: { getSessionFile: () => undefined },
       ui: {
-        notify: vi.fn(),
+        notify,
         input: vi.fn().mockResolvedValueOnce("project-bank"),
-        select: vi
-          .fn()
-          .mockResolvedValueOnce("Project Only")
-          .mockResolvedValueOnce("Coding / Project")
-          .mockResolvedValueOnce("Use template")
-          .mockResolvedValueOnce("Skip import"),
-        confirm: vi
-          .fn()
-          .mockResolvedValueOnce(true)
-          .mockResolvedValueOnce(true)
-          .mockResolvedValueOnce(true)
-          .mockResolvedValueOnce(true)
-          .mockResolvedValueOnce(false),
+        select: vi.fn().mockResolvedValueOnce("Project Only"),
+        confirm: vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false),
       },
     } as never;
 
-    await runGuidedSetup({
+    const completed = await runGuidedSetup({
       ctx,
       cwd,
       deps: {
@@ -296,18 +135,17 @@ describe("guided setup", () => {
           retain: vi.fn(),
           recall: vi.fn(),
           reflect: vi.fn(),
-          importBankTemplate,
         }),
         getConfig: () => DEFAULT_CONFIG,
         getProjectBankId: () => "project-bank",
-      },
+      } as never,
     });
 
-    expect(importBankTemplate).toHaveBeenNthCalledWith(
-      2,
-      "project-bank",
-      expect.objectContaining({ version: "1" }),
-      { dryRun: false },
+    expect(completed).toBe(true);
+    expect(hasProjectHindsightConfig(cwd)).toBe(true);
+    expect(notify).toHaveBeenCalledWith(
+      expect.stringContaining(`Wrote ${join(cwd, ".pi", "hindsight.json")}`),
+      "info",
     );
   });
 
@@ -315,25 +153,22 @@ describe("guided setup", () => {
     expect(
       importChoicesForSetup({
         setupProfile: "user-only",
-        appliedProfiles: new Set(["coding-project"]),
         globalBankId: "user-bank",
       }),
     ).toEqual(["Skip import", "Preview chat transcript"]);
     expect(
       importChoicesForSetup({
         setupProfile: "project-only",
-        appliedProfiles: new Set(["assistant-personal"]),
         projectBankId: "project-bank",
       }),
     ).toEqual(["Skip import", "Preview repo Pi sessions"]);
     expect(
       importChoicesForSetup({
         setupProfile: "project-user",
-        appliedProfiles: new Set(["assistant-personal"]),
         projectBankId: "project-bank",
         globalBankId: "user-bank",
       }),
-    ).toEqual(["Skip import", "Preview chat transcript", "Preview repo Pi sessions"]);
+    ).toEqual(["Skip import", "Preview repo Pi sessions", "Preview chat transcript"]);
   });
 
   it("previews repo session import after project setup before writing", async () => {
@@ -404,15 +239,6 @@ describe("guided setup", () => {
       ctx,
       operations,
       setupProfile: "user-only",
-      appliedTemplates: [
-        {
-          bank: "user-bank",
-          location: "User",
-          label: "Assistant / Personal",
-          profileId: "assistant-personal",
-          mentalModels: [],
-        },
-      ],
       cwd: "/repo",
       globalBankId: "user-bank",
     });
@@ -425,276 +251,6 @@ describe("guided setup", () => {
       onProgress: expect.any(Function),
     });
     expect(importChatTranscript).toHaveBeenCalledTimes(1);
-  });
-
-  it("offers mental model refresh after successful setup import", async () => {
-    const confirm = vi
-      .fn()
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(true);
-    const notify = vi.fn();
-    const ctx = {
-      ui: {
-        confirm,
-        select: vi.fn().mockResolvedValueOnce("Preview chat transcript"),
-        input: vi.fn().mockResolvedValueOnce("/tmp/chat.jsonl"),
-        notify,
-      },
-    } as never;
-    const importChatTranscript = vi
-      .fn()
-      .mockResolvedValueOnce({
-        bankId: "user-bank",
-        keptEventCount: 3,
-        retainedTurnCount: 1,
-        droppedEventCount: 2,
-        malformedLineCount: 0,
-        documentId: "doc",
-      })
-      .mockResolvedValueOnce({
-        bankId: "user-bank",
-        skipped: false,
-        documentId: "doc",
-      });
-    const refreshMentalModel = vi.fn().mockResolvedValueOnce({
-      bankId: "user-bank",
-      mentalModelId: "user-profile",
-      result: { operation_id: "op-123", status: "queued" },
-    });
-    const operations = {
-      importProjectSessions: vi.fn(),
-      importChatTranscript,
-      refreshMentalModel,
-    } as never;
-
-    await maybeOfferHistoricalImportForSetup({
-      ctx,
-      operations,
-      setupProfile: "user-only",
-      appliedTemplates: [
-        {
-          bank: "user-bank",
-          location: "User",
-          label: "Assistant / Personal",
-          profileId: "assistant-personal",
-          mentalModels: [
-            {
-              id: "user-profile",
-              name: "User Profile",
-              source_query: "What do we know?",
-              tags: ["profile"],
-            },
-          ],
-        },
-      ],
-      cwd: "/repo",
-      globalBankId: "user-bank",
-    });
-
-    expect(refreshMentalModel).toHaveBeenCalledWith({
-      bank: "user-bank",
-      mentalModelId: "user-profile",
-    });
-    expect(confirm).toHaveBeenNthCalledWith(
-      3,
-      "Refresh 1 mental model for User bank user-bank?",
-      expect.stringContaining(
-        "User Profile uses tags [profile]; refresh only sees matching memories.",
-      ),
-    );
-    expect(notify).toHaveBeenCalledWith(
-      "Queued mental model refresh:\nUser Profile: op-123 / queued",
-      "info",
-    );
-  });
-
-  it("skips mental model refresh when user declines", async () => {
-    const confirm = vi
-      .fn()
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false);
-    const ctx = {
-      ui: {
-        confirm,
-        select: vi.fn().mockResolvedValueOnce("Preview chat transcript"),
-        input: vi.fn().mockResolvedValueOnce("/tmp/chat.jsonl"),
-        notify: vi.fn(),
-      },
-    } as never;
-    const importChatTranscript = vi
-      .fn()
-      .mockResolvedValueOnce({
-        bankId: "user-bank",
-        keptEventCount: 1,
-        retainedTurnCount: 1,
-        droppedEventCount: 0,
-        malformedLineCount: 0,
-        documentId: "doc",
-      })
-      .mockResolvedValueOnce({ bankId: "user-bank", skipped: false, documentId: "doc" });
-    const refreshMentalModel = vi.fn();
-
-    await maybeOfferHistoricalImportForSetup({
-      ctx,
-      operations: {
-        importProjectSessions: vi.fn(),
-        importChatTranscript,
-        refreshMentalModel,
-      } as never,
-      setupProfile: "user-only",
-      appliedTemplates: [
-        {
-          bank: "user-bank",
-          location: "User",
-          label: "Assistant / Personal",
-          profileId: "assistant-personal",
-          mentalModels: [{ id: "user-profile", name: "User Profile", source_query: "q" }],
-        },
-      ],
-      cwd: "/repo",
-      globalBankId: "user-bank",
-    });
-
-    expect(refreshMentalModel).not.toHaveBeenCalled();
-  });
-
-  it("continues mental model refresh when one model fails", async () => {
-    const notify = vi.fn();
-    const ctx = {
-      ui: {
-        confirm: vi
-          .fn()
-          .mockResolvedValueOnce(true)
-          .mockResolvedValueOnce(true)
-          .mockResolvedValueOnce(true),
-        select: vi.fn().mockResolvedValueOnce("Preview chat transcript"),
-        input: vi.fn().mockResolvedValueOnce("/tmp/chat.jsonl"),
-        notify,
-      },
-    } as never;
-    const refreshMentalModel = vi
-      .fn()
-      .mockRejectedValueOnce(new Error("refresh failed"))
-      .mockResolvedValueOnce({ result: { operation_id: "op-2", status: "queued" } });
-
-    await maybeOfferHistoricalImportForSetup({
-      ctx,
-      operations: {
-        importProjectSessions: vi.fn(),
-        importChatTranscript: vi
-          .fn()
-          .mockResolvedValueOnce({
-            bankId: "user-bank",
-            keptEventCount: 2,
-            retainedTurnCount: 1,
-            droppedEventCount: 0,
-            malformedLineCount: 0,
-            documentId: "doc",
-          })
-          .mockResolvedValueOnce({ bankId: "user-bank", skipped: false, documentId: "doc" }),
-        refreshMentalModel,
-      } as never,
-      setupProfile: "user-only",
-      appliedTemplates: [
-        {
-          bank: "user-bank",
-          location: "User",
-          label: "Assistant / Personal",
-          profileId: "assistant-personal",
-          mentalModels: [
-            { id: "first", name: "First", source_query: "q" },
-            { id: "second", name: "Second", source_query: "q" },
-          ],
-        },
-      ],
-      cwd: "/repo",
-      globalBankId: "user-bank",
-    });
-
-    expect(refreshMentalModel).toHaveBeenCalledTimes(2);
-    expect(notify).toHaveBeenCalledWith(
-      "Queued mental model refresh:\nSecond: op-2 / queued",
-      "info",
-    );
-    expect(notify).toHaveBeenCalledWith(
-      "Mental model refresh failed:\nFirst: refresh failed",
-      "warning",
-    );
-  });
-
-  it("refreshes only mental models for the imported setup location", async () => {
-    const confirm = vi
-      .fn()
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(true);
-    const ctx = {
-      sessionManager: { getSessionFile: () => "/sessions/current.jsonl" },
-      ui: {
-        confirm,
-        select: vi.fn().mockResolvedValueOnce("Preview repo Pi sessions"),
-        input: vi.fn(),
-        notify: vi.fn(),
-      },
-    } as never;
-    const importProjectSessions = vi
-      .fn()
-      .mockResolvedValueOnce({
-        bankId: "shared-bank",
-        sessionFiles: ["/sessions/current.jsonl"],
-        imported: [{ documents: [] }],
-        malformedLineCount: 0,
-        documentCount: 1,
-        messageCount: 2,
-      })
-      .mockResolvedValueOnce({
-        bankId: "shared-bank",
-        sessionFiles: ["/sessions/current.jsonl"],
-        documentCount: 1,
-        messageCount: 2,
-      });
-    const refreshMentalModel = vi.fn().mockResolvedValue({
-      bankId: "shared-bank",
-      result: { operation_id: "op-project" },
-    });
-    const operations = {
-      importProjectSessions,
-      importChatTranscript: vi.fn(),
-      refreshMentalModel,
-    } as never;
-
-    await maybeOfferHistoricalImportForSetup({
-      ctx,
-      operations,
-      setupProfile: "project-user",
-      appliedTemplates: [
-        {
-          bank: "shared-bank",
-          location: "Project",
-          label: "Coding / Project",
-          profileId: "coding-project",
-          mentalModels: [{ id: "project-context", name: "Project Context", source_query: "q" }],
-        },
-        {
-          bank: "shared-bank",
-          location: "User",
-          label: "Assistant / Personal",
-          profileId: "assistant-personal",
-          mentalModels: [{ id: "user-profile", name: "User Profile", source_query: "q" }],
-        },
-      ],
-      cwd: "/repo",
-      projectBankId: "shared-bank",
-      globalBankId: "shared-bank",
-    });
-
-    expect(refreshMentalModel).toHaveBeenCalledTimes(1);
-    expect(refreshMentalModel).toHaveBeenCalledWith({
-      bank: "shared-bank",
-      mentalModelId: "project-context",
-    });
   });
 
   it("uses existing configured global bank ID when profile enables global memory", () => {

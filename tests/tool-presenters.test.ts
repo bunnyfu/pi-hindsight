@@ -2,13 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   createDirectiveToolResponse,
   deleteDirectiveToolResponse,
-  exportBankTemplateToolResponse,
   bankProfileToolResponse,
-  importBankTemplateToolResponse,
   documentToolResponse,
   entityToolResponse,
   graphToolResponse,
-  getBankTemplateSchemaToolResponse,
   getDirectiveToolResponse,
   listMemoriesToolResponse,
   listDirectivesToolResponse,
@@ -163,29 +160,7 @@ describe("tool presenters", () => {
     expect(memories.content[0]?.text).toContain("mem-1 · observation · Exact fact");
   });
 
-  it("presents saved bank template export paths", () => {
-    const response = exportBankTemplateToolResponse({
-      bankId: "bank",
-      outputPath: "/tmp/template.json",
-      manifest: { version: "1", bank: { retain_mission: "Remember" } },
-    });
-
-    expect(response.content[0]?.text).toContain("Exported bank template from bank.");
-    expect(response.content[0]?.text).toContain("Saved manifest: /tmp/template.json");
-    expect(response.content[0]?.text).toContain("Bank overrides: 1");
-  });
-
-  it("presents bank template import previews and bank config updates", () => {
-    const imported = importBankTemplateToolResponse({
-      bankId: "bank",
-      manifest: { version: "1" },
-      dryRun: true,
-      sourceFile: "template.json",
-      result: { dry_run: true, config_applied: true, mental_models_created: 2 },
-    });
-    expect(imported.content[0]?.text).toContain("Previewed bank template for bank.");
-    expect(imported.content[0]?.text).toContain("mental_models_created: 2");
-
+  it("presents bank config updates", () => {
     const updated = updateBankConfigToolResponse({
       bankId: "bank",
       updates: { recall_budget_function: "fixed" },
@@ -199,24 +174,5 @@ describe("tool presenters", () => {
     expect(updated.content[0]?.text).toContain("Updated bank config overrides for bank.");
     expect(updated.content[0]?.text).toContain("Updated fields: 1");
     expect(updated.content[0]?.text).toContain("After: Bank overrides: 1");
-  });
-
-  it("presents bank template schema summary and raw JSON", () => {
-    const result = {
-      schema: {
-        title: "BankTemplateManifest",
-        properties: {
-          version: { type: "string" },
-          bank: { type: "object" },
-        },
-      },
-    };
-
-    const response = getBankTemplateSchemaToolResponse(result);
-
-    expect(response.details).toBe(result);
-    expect(response.content[0]?.text).toContain("Fetched Hindsight bank template JSON Schema.");
-    expect(response.content[0]?.text).toContain("BankTemplateManifest; top-level fields: 2");
-    expect(response.content[0]?.text).toContain('"version"');
   });
 });

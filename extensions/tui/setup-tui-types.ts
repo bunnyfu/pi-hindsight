@@ -10,16 +10,9 @@ export type SetupActionId =
   | "toggle-advanced"
   | "done";
 
-export type SetupStep = "config" | "profile" | "banks" | "template" | "review" | "done";
+export type SetupStep = "config" | "profile" | "banks" | "review" | "done";
 
 export type SetupProfileChoice = "project-user" | "project-only" | "user-only" | "recall-only";
-
-export type SetupTemplateChoice =
-  | "none"
-  | "coding-project"
-  | "assistant-personal"
-  | "general-user"
-  | "paste-json";
 
 export type SetupUiState = {
   step?: SetupStep;
@@ -27,7 +20,6 @@ export type SetupUiState = {
   selectedByTab: Partial<Record<TabId, number>>;
   showAdvanced?: boolean;
   profileChoice?: SetupProfileChoice;
-  templateChoice?: SetupTemplateChoice;
 };
 
 export type ThemeLike = {

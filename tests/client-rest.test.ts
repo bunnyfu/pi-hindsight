@@ -7,9 +7,6 @@ import {
   bankBackgroundPath,
   bankConfigPath,
   bankProfilePath,
-  bankTemplateExportPath,
-  bankTemplateImportPath,
-  bankTemplateSchemaPath,
   chunkItemPath,
   consolidationPath,
   consolidationRecoverPath,
@@ -110,11 +107,6 @@ describe("Hindsight REST transport helpers", () => {
     expect(directiveItemPath("bank/id", "directive/id")).toBe(
       "/v1/default/banks/bank%2Fid/directives/directive%2Fid",
     );
-    expect(bankTemplateImportPath("bank/id", { dryRun: true })).toBe(
-      "/v1/default/banks/bank%2Fid/import?dry_run=true",
-    );
-    expect(bankTemplateExportPath("bank/id")).toBe("/v1/default/banks/bank%2Fid/export");
-    expect(bankTemplateSchemaPath()).toBe("/v1/bank-template-schema");
     expect(
       updateBankConfigRequestBody({ retain_custom_instructions: "Extract carefully" }),
     ).toEqual({

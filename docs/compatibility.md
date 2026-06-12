@@ -34,7 +34,6 @@ These tools are part of the 1.0 Pi surface, but the exact fields and behavior ca
 - document, entity, graph, tag, memory-unit, and chunk inspection
 - memory history and delete-observations repair tools
 - mental model history/refresh operation details
-- bank template schema import/export
 - bank config override fields
 - advanced recall/reflect options such as trace, source facts, included chunks, response schemas, and tool-call facts
 
@@ -51,7 +50,7 @@ In scope:
 - deterministic project/user bank routing
 - explicit retain/recall/reflect tools
 - Pi session and seed import
-- scoped bank profile/config/template operations
+- scoped bank profile/config operations
 - inspection and repair tools useful during Pi memory work
 - live smoke and package/release verification
 

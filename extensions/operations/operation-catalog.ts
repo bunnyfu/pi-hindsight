@@ -25,13 +25,10 @@ import {
   deleteDocumentToolResponse,
   documentToolResponse,
   entityToolResponse,
-  exportBankTemplateToolResponse,
   chatTranscriptImportToolResponse,
   getBankConfigToolResponse,
-  getBankTemplateSchemaToolResponse,
   getDirectiveToolResponse,
   graphToolResponse,
-  importBankTemplateToolResponse,
   importToolResponse,
   jsonToolResponse,
   listDirectivesToolResponse,
@@ -833,7 +830,7 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
       name: "hindsight_delete_mental_model",
       label: "Hindsight Delete Mental Model",
       description:
-        "Delete one Hindsight mental model. Destructive and irreversible; requires confirm=true. Export a bank template first if the model may be needed later.",
+        "Delete one Hindsight mental model. Destructive and irreversible; requires confirm=true.",
       parameters: Type.Object({
         mentalModelId: Type.String({ description: "Mental model ID." }),
         bank: Type.Optional(
@@ -1480,7 +1477,7 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
       name: "hindsight_delete_directive",
       label: "Hindsight Delete Directive",
       description:
-        "Delete a bank-owned Hindsight directive. Destructive and irreversible; requires confirm=true. Export a bank template first if the directive may be needed later.",
+        "Delete a bank-owned Hindsight directive. Destructive and irreversible; requires confirm=true.",
       parameters: Type.Object({
         directiveId: Type.String({ description: "Directive ID." }),
         bank: Type.Optional(
@@ -1498,84 +1495,6 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
           confirm: params.confirm,
         });
         return deleteDirectiveToolResponse(result);
-      },
-    }),
-    defineCatalogTool({
-      name: "hindsight_get_bank_template_schema",
-      label: "Hindsight Get Bank Template Schema",
-      description:
-        "Fetch the Hindsight bank-template JSON Schema used to validate portable manifests.",
-      parameters: Type.Object({}),
-      async execute(_id, _params, _signal, _onUpdate, ctx) {
-        useCwd(ctx.cwd);
-        const result = await operations.getBankTemplateSchema();
-        return getBankTemplateSchemaToolResponse(result);
-      },
-    }),
-    defineCatalogTool({
-      name: "hindsight_export_bank_template",
-      label: "Hindsight Export Bank Template",
-      description:
-        "Export a portable Hindsight bank template manifest for reuse in another project or bank.",
-      parameters: Type.Object({
-        bank: Type.Optional(
-          Type.String({ description: "Optional bank id. Defaults to project bank." }),
-        ),
-        outputFile: Type.Optional(
-          Type.String({
-            description:
-              "Optional path to save the exported manifest JSON. Relative paths resolve against cwd.",
-          }),
-        ),
-      }),
-      async execute(_id, params, _signal, _onUpdate, ctx) {
-        useCwd(ctx.cwd);
-        const result = await operations.exportBankTemplate({
-          ...(params.bank ? { bank: params.bank } : {}),
-          cwd: ctx.cwd,
-          ...(params.outputFile ? { outputFile: params.outputFile } : {}),
-        });
-        return exportBankTemplateToolResponse(result);
-      },
-    }),
-    defineCatalogTool({
-      name: "hindsight_import_bank_template",
-      label: "Hindsight Import Bank Template",
-      description:
-        "Dry-run or apply a portable Hindsight bank template manifest from a local JSON file or inline JSON.",
-      parameters: Type.Object({
-        bank: Type.Optional(
-          Type.String({ description: "Optional bank id. Defaults to project bank." }),
-        ),
-        sourceFile: Type.Optional(
-          Type.String({
-            description:
-              "Local bank template manifest JSON path. Relative paths resolve against cwd.",
-          }),
-        ),
-        manifestJson: Type.Optional(
-          Type.String({ description: "Inline bank template manifest JSON." }),
-        ),
-        dryRun: Type.Optional(
-          Type.Boolean({ description: "Preview without writing. Defaults to true." }),
-        ),
-        confirmApply: Type.Optional(
-          Type.Literal(true, {
-            description: "Required when dryRun is false. Must be true to apply changes.",
-          }),
-        ),
-      }),
-      async execute(_id, params, _signal, _onUpdate, ctx) {
-        useCwd(ctx.cwd);
-        const result = await operations.importBankTemplate({
-          ...(params.bank ? { bank: params.bank } : {}),
-          ...(params.sourceFile ? { sourceFile: params.sourceFile } : {}),
-          ...(params.manifestJson ? { manifestJson: params.manifestJson } : {}),
-          cwd: ctx.cwd,
-          ...(params.dryRun !== undefined ? { dryRun: params.dryRun } : {}),
-          ...(params.confirmApply !== undefined ? { confirmApply: params.confirmApply } : {}),
-        });
-        return importBankTemplateToolResponse(result);
       },
     }),
     defineCatalogTool({

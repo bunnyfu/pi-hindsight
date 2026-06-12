@@ -343,18 +343,6 @@ export function directiveItemPath(bankId: string, directiveId: string): string {
   return `${encodeBankPath(bankId, "/directives")}/${encodeURIComponent(directiveId)}`;
 }
 
-export function bankTemplateImportPath(bankId: string, options: { dryRun?: boolean } = {}): string {
-  return `${encodeBankPath(bankId, "/import")}${options.dryRun ? "?dry_run=true" : ""}`;
-}
-
-export function bankTemplateExportPath(bankId: string): string {
-  return encodeBankPath(bankId, "/export");
-}
-
-export function bankTemplateSchemaPath(): string {
-  return "/v1/bank-template-schema";
-}
-
 export function updateBankConfigRequestBody(
   updates: Record<string, unknown>,
 ): Record<string, unknown> {

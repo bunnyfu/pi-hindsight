@@ -1,7 +1,4 @@
-import {
-  bankConfigOverrideSummaryLines,
-  exportedBankTemplateSummaryLines,
-} from "../banks/bank-settings-presenter.js";
+import { bankConfigOverrideSummaryLines } from "../banks/bank-settings-presenter.js";
 import type { MemoryOperations } from "../operations/memory-operation-service.js";
 
 type ToolTextResponse<Details> = {
@@ -22,18 +19,9 @@ export type GetDirectiveToolResult = Awaited<ReturnType<MemoryOperations["getDir
 export type CreateDirectiveToolResult = Awaited<ReturnType<MemoryOperations["createDirective"]>>;
 export type UpdateDirectiveToolResult = Awaited<ReturnType<MemoryOperations["updateDirective"]>>;
 export type DeleteDirectiveToolResult = Awaited<ReturnType<MemoryOperations["deleteDirective"]>>;
-export type GetBankTemplateSchemaToolResult = Awaited<
-  ReturnType<MemoryOperations["getBankTemplateSchema"]>
->;
-export type ExportBankTemplateToolResult = Awaited<
-  ReturnType<MemoryOperations["exportBankTemplate"]>
->;
 export type GetBankConfigToolResult = Awaited<ReturnType<MemoryOperations["getBankConfig"]>>;
 export type UpdateBankConfigToolResult = Awaited<ReturnType<MemoryOperations["updateBankConfig"]>>;
 export type ResetBankConfigToolResult = Awaited<ReturnType<MemoryOperations["resetBankConfig"]>>;
-export type ImportBankTemplateToolResult = Awaited<
-  ReturnType<MemoryOperations["importBankTemplate"]>
->;
 export type RetainReceiptListResult = Awaited<ReturnType<MemoryOperations["listRetainReceipts"]>>;
 export type ListOperationsToolResult = Awaited<ReturnType<MemoryOperations["listOperations"]>>;
 export type OperationToolResult =
@@ -589,24 +577,6 @@ function schemaSummary(schema: unknown): string {
   return `${title}; top-level fields: ${propertyCount}`;
 }
 
-export function getBankTemplateSchemaToolResponse(
-  result: GetBankTemplateSchemaToolResult,
-): ToolTextResponse<GetBankTemplateSchemaToolResult> {
-  return {
-    content: [
-      {
-        type: "text",
-        text: [
-          "Fetched Hindsight bank template JSON Schema.",
-          schemaSummary(result.schema),
-          JSON.stringify(result.schema, null, 2),
-        ].join("\n"),
-      },
-    ],
-    details: result,
-  };
-}
-
 export function getBankConfigToolResponse(
   result: GetBankConfigToolResult,
 ): ToolTextResponse<GetBankConfigToolResult> {
@@ -669,64 +639,6 @@ export function resetBankConfigToolResponse(
           `Reset bank config overrides for ${result.bankId}.`,
           `Before: ${summary.before}`,
           `After: ${summary.after}`,
-        ].join("\n"),
-      },
-    ],
-    details: result,
-  };
-}
-
-export function importBankTemplateToolResponse(
-  result: ImportBankTemplateToolResult,
-): ToolTextResponse<ImportBankTemplateToolResult> {
-  const mode = result.dryRun ? "Previewed" : "Imported";
-  return {
-    content: [
-      {
-        type: "text",
-        text: [
-          `${mode} bank template for ${result.bankId}.`,
-          summarizeImportResult(result.result),
-          JSON.stringify(result.result, null, 2),
-        ].join("\n"),
-      },
-    ],
-    details: result,
-  };
-}
-
-function summarizeImportResult(result: unknown): string {
-  if (typeof result !== "object" || !result || Array.isArray(result))
-    return "Import result: unavailable";
-  const record = result as Record<string, unknown>;
-  const preferred = [
-    "dry_run",
-    "config_applied",
-    "mental_models_created",
-    "mental_models_updated",
-    "directives_created",
-    "directives_updated",
-    "operation_ids",
-  ];
-  const lines = preferred
-    .filter((key) => key in record)
-    .map((key) => `${key}: ${JSON.stringify(record[key])}`);
-  return lines.length ? lines.join("; ") : "Import result fields: unknown";
-}
-
-export function exportBankTemplateToolResponse(
-  result: ExportBankTemplateToolResult,
-): ToolTextResponse<ExportBankTemplateToolResult> {
-  const summary = exportedBankTemplateSummaryLines(result.manifest).join("; ");
-  return {
-    content: [
-      {
-        type: "text",
-        text: [
-          `Exported bank template from ${result.bankId}.`,
-          ...(result.outputPath ? [`Saved manifest: ${result.outputPath}`] : []),
-          summary,
-          JSON.stringify(result.manifest, null, 2),
         ].join("\n"),
       },
     ],

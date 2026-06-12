@@ -59,18 +59,6 @@ describe("Hindsight client adapter integration", () => {
         sendJson(res, 200, { text: "reflection" });
         return;
       }
-      if (req.method === "POST" && req.url === "/v1/default/banks/test-bank/import?dry_run=true") {
-        sendJson(res, 200, { dry_run: true, config_applied: true });
-        return;
-      }
-      if (req.method === "GET" && req.url === "/v1/default/banks/test-bank/export") {
-        sendJson(res, 200, { version: "1", bank: { retain_mission: "Exported" } });
-        return;
-      }
-      if (req.method === "GET" && req.url === "/v1/bank-template-schema") {
-        sendJson(res, 200, { title: "BankTemplateManifest", properties: { version: {} } });
-        return;
-      }
       if (
         req.method === "GET" &&
         req.url ===
@@ -332,13 +320,6 @@ describe("Hindsight client adapter integration", () => {
       includeToolCalls: false,
       tagGroups: [{ tags: ["source:pi"], match: "any_strict" }],
     });
-    const templateDryRun = await client.importBankTemplate?.(
-      "test-bank",
-      { version: "1", bank: { retain_mission: "Retain useful facts." } },
-      { dryRun: true },
-    );
-    const exportedTemplate = await client.exportBankTemplate?.("test-bank");
-    const bankTemplateSchema = await client.getBankTemplateSchema?.();
     const directives = await client.listDirectives?.("test-bank", {
       tags: ["project"],
       tagsMatch: "all",
@@ -431,12 +412,6 @@ describe("Hindsight client adapter integration", () => {
 
     expect(recall).toEqual({ results: [{ text: "remembered fact" }] });
     expect(reflection).toEqual({ text: "reflection" });
-    expect(templateDryRun).toEqual({ dry_run: true, config_applied: true });
-    expect(exportedTemplate).toEqual({ version: "1", bank: { retain_mission: "Exported" } });
-    expect(bankTemplateSchema).toEqual({
-      title: "BankTemplateManifest",
-      properties: { version: {} },
-    });
     expect(directives).toEqual({
       items: [{ id: "directive-1", bank_id: "test-bank", name: "Rule", content: "Use facts." }],
     });
@@ -491,9 +466,6 @@ describe("Hindsight client adapter integration", () => {
       "POST /v1/default/banks/test-bank/memories",
       "POST /v1/default/banks/test-bank/memories/recall",
       "POST /v1/default/banks/test-bank/reflect",
-      "POST /v1/default/banks/test-bank/import?dry_run=true",
-      "GET /v1/default/banks/test-bank/export",
-      "GET /v1/bank-template-schema",
       "GET /v1/default/banks/test-bank/directives?tags=project&tags_match=all&active_only=false&limit=10&offset=1",
       "GET /v1/default/banks/test-bank/directives/directive-1",
       "POST /v1/default/banks/test-bank/directives",
@@ -569,36 +541,32 @@ describe("Hindsight client adapter integration", () => {
       include: { facts: {}, tool_calls: null },
       tag_groups: [{ tags: ["source:pi"], match: "any_strict" }],
     });
-    expect(requests[6]?.body).toEqual({
-      version: "1",
-      bank: { retain_mission: "Retain useful facts." },
-    });
-    expect(requests[11]?.body).toEqual({
+    expect(requests[8]?.body).toEqual({
       name: "New",
       content: "Be exact.",
       priority: 3,
       is_active: true,
       tags: ["project"],
     });
-    expect(requests[12]?.body).toEqual({ content: "Updated.", tags: null });
-    expect(requests[15]?.body).toEqual({
+    expect(requests[9]?.body).toEqual({ content: "Updated.", tags: null });
+    expect(requests[12]?.body).toEqual({
       updates: { retain_custom_instructions: "Write to db" },
     });
-    expect(requests[19]?.body).toEqual({ tags: ["updated"] });
-    expect(requests[26]?.body).toEqual({
+    expect(requests[16]?.body).toEqual({ tags: ["updated"] });
+    expect(requests[23]?.body).toEqual({
       name: "Updated",
       reflect_mission: "Reflect precisely",
     });
-    expect(requests[27]?.body).toEqual({
+    expect(requests[24]?.body).toEqual({
       disposition: { skepticism: 1, literalism: 2, empathy: 3 },
     });
-    expect(requests[28]?.body).toEqual({ content: "Background", update_disposition: true });
-    expect(requests[31]?.body).toEqual({
+    expect(requests[25]?.body).toEqual({ content: "Background", update_disposition: true });
+    expect(requests[28]?.body).toEqual({
       name: "Model",
       source_query: "What should recur?",
       tags: ["source:pi"],
       max_tokens: 256,
     });
-    expect(requests[32]?.body).toEqual({ source_query: "Updated query", tags: null });
+    expect(requests[29]?.body).toEqual({ source_query: "Updated query", tags: null });
   });
 });

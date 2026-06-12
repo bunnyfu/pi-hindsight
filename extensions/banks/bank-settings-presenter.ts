@@ -1,7 +1,3 @@
-import {
-  summarizeBankTemplateManifest,
-  type BankTemplateManifest,
-} from "./bank-template-catalog.js";
 import { isRecord } from "../client/client-rest.js";
 
 export type BankSettingsLocation = "Project" | "User";
@@ -36,30 +32,8 @@ export function bankSettingsTargetLines(target: BankSettingsTarget): string[] {
   return [display.locationLabel, display.bankLabel];
 }
 
-export function bankTemplateSummaryLines(manifest: BankTemplateManifest): string[] {
-  const summary = summarizeBankTemplateManifest(manifest);
-  return [
-    `Bank overrides: ${summary.bankOverrideCount}`,
-    `Mental models: ${summary.mentalModelCount}`,
-    `Directives: ${summary.directiveCount}`,
-  ];
-}
-
 function objectCount(value: unknown): number {
   return isRecord(value) ? Object.keys(value).length : 0;
-}
-
-function arrayCount(value: unknown): number {
-  return Array.isArray(value) ? value.length : 0;
-}
-
-export function exportedBankTemplateSummaryLines(manifest: unknown): string[] {
-  if (!isRecord(manifest)) return ["Bank overrides: 0", "Mental models: 0", "Directives: 0"];
-  return [
-    `Bank overrides: ${objectCount(manifest.bank)}`,
-    `Mental models: ${arrayCount(manifest.mental_models)}`,
-    `Directives: ${arrayCount(manifest.directives)}`,
-  ];
 }
 
 export function bankConfigOverrideSummaryLines(response: unknown): string[] {
