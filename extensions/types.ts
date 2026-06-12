@@ -203,86 +203,6 @@ export interface HindsightCapabilities {
   probeDocumentId?: string;
 }
 
-export interface ListOperationsOptions {
-  status?: OperationStatus;
-  taskType?: string;
-  limit?: number;
-  offset?: number;
-}
-
-export interface ListMemoriesOptions {
-  type?: string;
-  q?: string;
-  limit?: number;
-  offset?: number;
-}
-
-export interface ListDocumentsOptions {
-  q?: string;
-  tags?: string[];
-  tagsMatch?: DocumentTagsMatch;
-  limit?: number;
-  offset?: number;
-}
-
-export interface UpdateDocumentRequest {
-  tags?: string[] | null;
-}
-
-export interface RetainFileMetadata {
-  context?: string;
-  documentId?: string;
-  tags?: string[];
-  metadata?: Record<string, string>;
-}
-
-export interface ListEntitiesOptions {
-  limit?: number;
-  offset?: number;
-}
-
-export interface GetGraphOptions {
-  type?: string;
-  q?: string;
-  limit?: number;
-  tags?: string[];
-  tagsMatch?: string;
-  documentId?: string;
-  chunkId?: string;
-}
-
-export interface GetEntityGraphOptions {
-  limit?: number;
-  minCount?: number;
-}
-
-export interface ListTagsOptions {
-  q?: string;
-  source?: TagSource;
-  limit?: number;
-  offset?: number;
-}
-
-export interface DispositionTraits {
-  skepticism: number;
-  literalism: number;
-  empathy: number;
-}
-
-export interface UpdateBankProfileRequest {
-  name?: string | null;
-  mission?: string | null;
-  background?: string | null;
-  reflectMission?: string | null;
-  retainMission?: string | null;
-  observationsMission?: string | null;
-}
-
-export interface AddBankBackgroundRequest {
-  content: string;
-  updateDisposition?: boolean;
-}
-
 export interface HindsightLikeClient {
   retain(
     bankId: string,
@@ -318,15 +238,6 @@ export interface HindsightLikeClient {
       documentId?: string;
       documentTags?: string[];
       async?: boolean;
-      signal?: AbortSignal;
-    },
-  ): Promise<unknown>;
-  retainFiles?(
-    bankId: string,
-    files: Array<File | Blob>,
-    options?: {
-      context?: string;
-      filesMetadata?: RetainFileMetadata[];
       signal?: AbortSignal;
     },
   ): Promise<unknown>;
@@ -384,35 +295,5 @@ export interface HindsightLikeClient {
   getBankProfile?(bankId: string): Promise<unknown>;
   getBankStats?(bankId: string): Promise<unknown>;
   getBankConfig?(bankId: string): Promise<unknown>;
-  updateBankConfig?(bankId: string, updates: Record<string, unknown>): Promise<unknown>;
-  resetBankConfig?(bankId: string): Promise<unknown>;
   health?(): Promise<unknown>;
-  listDocuments?(bankId: string, options?: ListDocumentsOptions): Promise<unknown>;
-  getDocument?(bankId: string, documentId: string): Promise<unknown>;
-  updateDocument?(
-    bankId: string,
-    documentId: string,
-    request: UpdateDocumentRequest,
-  ): Promise<unknown>;
-  deleteDocument?(bankId: string, documentId: string): Promise<unknown>;
-  listEntities?(bankId: string, options?: ListEntitiesOptions): Promise<unknown>;
-  getEntity?(bankId: string, entityId: string): Promise<unknown>;
-  regenerateEntity?(bankId: string, entityId: string): Promise<unknown>;
-  getGraph?(bankId: string, options?: GetGraphOptions): Promise<unknown>;
-  getEntityGraph?(bankId: string, options?: GetEntityGraphOptions): Promise<unknown>;
-  listTags?(bankId: string, options?: ListTagsOptions): Promise<unknown>;
-  updateBankProfile?(bankId: string, request: UpdateBankProfileRequest): Promise<unknown>;
-  updateBankDisposition?(bankId: string, disposition: DispositionTraits): Promise<unknown>;
-  addBankBackground?(bankId: string, request: AddBankBackgroundRequest): Promise<unknown>;
-  triggerConsolidation?(bankId: string): Promise<unknown>;
-  recoverConsolidation?(bankId: string): Promise<unknown>;
-  clearObservations?(bankId: string): Promise<unknown>;
-  listOperations?(bankId: string, options?: ListOperationsOptions): Promise<unknown>;
-  cancelOperation?(bankId: string, operationId: string): Promise<unknown>;
-  retryOperation?(bankId: string, operationId: string): Promise<unknown>;
-  listMemories?(bankId: string, options?: ListMemoriesOptions): Promise<unknown>;
-  getMemory?(bankId: string, memoryId: string): Promise<unknown>;
-  getChunk?(chunkId: string): Promise<unknown>;
-  getMemoryHistory?(bankId: string, memoryId: string): Promise<unknown>;
-  deleteMemoryObservations?(bankId: string, memoryId: string): Promise<unknown>;
 }

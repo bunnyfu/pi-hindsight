@@ -6,6 +6,8 @@ Accepted and partially implemented. Reviewed 2026-05-09; still relevant.
 
 The typed strategy seam, richer dry-run presenter output, and expanded eval fixtures have shipped. The broader guidance remains active for future routing work, especially named-bank or identity-aware routing.
 
+Amendment (2026-06): the `hindsight_route_memory` dry-run tool was removed in the slim-surface rewrite (#417). The router itself and the strategy seam remain; dry-run inspection would return through the `/hindsight` TUI if needed. References to the tool below are historical.
+
 ## Context
 
 Pi Hindsight defaults to safe project-local automatic retain. User Bank automatic retain is disabled unless the user selects a profile or config mode that explicitly enables it. Legacy config/tool aliases still use `global` for this User Bank route.

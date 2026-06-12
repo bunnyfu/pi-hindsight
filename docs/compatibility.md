@@ -28,16 +28,12 @@ If append retain is unavailable, live automatic retain is not considered support
 
 ## Capability-gated surfaces
 
-These tools are part of the 1.0 Pi surface, but the exact fields and behavior can depend on the connected Hindsight server version:
+These surfaces are part of the 1.0 Pi surface, but the exact fields and behavior can depend on the connected Hindsight server version:
 
-- native file retain and async operation tracking
-- document, entity, graph, tag, memory-unit, and chunk inspection
-- memory history and delete-observations repair tools
-- mental model history/refresh operation details
-- bank config override fields
 - advanced recall/reflect options such as trace, source facts, included chunks, response schemas, and tool-call facts
+- read-only bank config/stats facts in status
 
-When a server does not expose one of these endpoints or fields, Pi Hindsight should fail with a clear unsupported-capability message rather than silently changing request shape.
+When a server does not expose one of these endpoints or fields, Pi Hindsight should fail with a clear unsupported-capability message rather than silently changing request shape. Admin and browsing surfaces (documents, entities, graphs, tags, memory units, mental models, directives, bank templates, operations) live in the Hindsight control-plane web UI.
 
 ## 1.0 scope decision
 
@@ -49,9 +45,7 @@ In scope:
 - queue-first retain and diagnostics
 - deterministic project/user bank routing
 - explicit retain/recall/reflect tools
-- Pi session and seed import
-- scoped bank profile/config operations
-- inspection and repair tools useful during Pi memory work
+- Pi session import
 - live smoke and package/release verification
 
 Out of scope for 1.0 unless a follow-up issue explicitly pulls them in:

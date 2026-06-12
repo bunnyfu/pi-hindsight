@@ -24,29 +24,11 @@ Treat last-recall snapshots as sensitive local debug data because they can inclu
 
 ## Inspect retain receipts
 
-Use the explicit receipt tool when available:
-
-```text
-hindsight_retain_receipts
-```
-
-Receipts help identify exact retained document IDs before deletion or deeper debugging.
+Recent retain receipts appear in the `/hindsight` status facts. Receipts help identify exact retained document IDs before deletion (in the Hindsight web UI) or deeper debugging.
 
 ## Delete exact retained content
 
-Exact deletion is intentionally strict. Use:
-
-```text
-hindsight_delete_document
-```
-
-Deletion requires:
-
-- exact Memory Bank ID
-- exact Document ID
-- `confirm: true`
-
-Do not guess IDs. Inspect receipts or import manifests first.
+Document deletion happens in the Hindsight control-plane web UI. Use the exact Memory Bank ID and Document ID from receipts or import manifests; do not guess IDs.
 
 ## Keep debug data local
 

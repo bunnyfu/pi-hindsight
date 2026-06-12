@@ -7,7 +7,6 @@ import { HindsightClient } from "@vectorize-io/hindsight-client";
 import { createHindsightClient } from "../extensions/client/client.js";
 import { DEFAULT_CONFIG } from "../extensions/config/config.js";
 import { createMemoryOperations } from "../extensions/operations/memory-operation-service.js";
-import { operationIdsFromResponse } from "../extensions/queue/queue-delivery.js";
 import {
   cleanupSmokeBank,
   createSmokeRecorder,
@@ -93,77 +92,6 @@ async function capabilityStep(
     }
     throw error;
   }
-}
-
-function recordItems(value: unknown): unknown[] {
-  if (typeof value !== "object" || !value) return [];
-  if ("items" in value && Array.isArray(value.items)) return value.items;
-  if ("results" in value && Array.isArray(value.results)) return value.results;
-  if ("operations" in value && Array.isArray(value.operations)) return value.operations;
-  if ("memories" in value && Array.isArray(value.memories)) return value.memories;
-  if ("documents" in value && Array.isArray(value.documents)) return value.documents;
-  return [];
-}
-
-function fieldValue(value: unknown, keys: string[]): string | undefined {
-  if (typeof value !== "object" || !value) return undefined;
-  const record = value as Record<string, unknown>;
-  for (const key of keys) {
-    const raw = record[key];
-    if (typeof raw === "string" && raw) return raw;
-  }
-  return undefined;
-}
-
-function collectStringsByKey(value: unknown, keys: Set<string>, found = new Set<string>()) {
-  if (typeof value !== "object" || !value) return found;
-  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
-    if (keys.has(key) && typeof raw === "string" && raw) found.add(raw);
-    if (typeof raw === "object" && raw) collectStringsByKey(raw, keys, found);
-  }
-  return found;
-}
-
-function chunkIds(value: unknown): string[] {
-  return [
-    ...collectStringsByKey(
-      value,
-      new Set(["chunk_id", "chunkId", "source_chunk_id", "sourceChunkId"]),
-    ),
-  ];
-}
-
-function successfulOperationStatus(status: string | undefined) {
-  return status ? ["completed", "succeeded"].includes(status) : false;
-}
-
-async function waitForOperationTerminal(ids: string[]) {
-  if (!ids.length) return { operationIds: [], operationTracking: "not-reported" };
-  const result = await retry(
-    async () => operations.listOperations({ options: { limit: 50 } }),
-    (listResult) => {
-      const items = recordItems(listResult.result);
-      return ids.every((id) => {
-        const item = items.find((candidate) =>
-          ["id", "operation_id", "operationId"].some((key) => fieldValue(candidate, [key]) === id),
-        );
-        return item ? successfulOperationStatus(fieldValue(item, ["status"])) : false;
-      });
-    },
-    {
-      attempts: config.attempts,
-      delayMs: 2000,
-      onWait: ({ attempt, delayMs }) =>
-        recorder.step("file_operation_terminal_wait", { attempt, delayMs, operationIds: ids }),
-      failureMessage: ({ attempts, preview }) =>
-        `file retain operation did not reach terminal status after ${attempts} attempts: ${preview}`,
-    },
-  );
-  return {
-    operationIds: ids,
-    operationTracking: "completed",
-    responsePreview: JSON.stringify(result.result).slice(0, 500),
-  };
 }
 
 try {
@@ -349,148 +277,6 @@ try {
   }
   recorder.step("operations_receipts_ok", { count: receipts.length });
 
-  const smokeTextFile = join(operationsCwd, "smoke-file.txt");
-  const fileMarker = smokeMarker();
-  await writeFile(smokeTextFile, `File retain smoke marker: ${fileMarker}\n`, "utf8");
-  let fileRetainResult: Awaited<ReturnType<typeof operations.retainFiles>> | undefined;
-  const fileRetainCapability = await capabilityStep(
-    "file_retain_capability",
-    async () => {
-      fileRetainResult = await operations.retainFiles({
-        cwd: operationsCwd,
-        files: [{ path: smokeTextFile, context: "Pi Hindsight smoke file retain" }],
-        context: "Pi Hindsight smoke file retain",
-        tags: ["test:smoke", "test:file-retain"],
-      });
-      return { responsePreview: JSON.stringify(fileRetainResult).slice(0, 500) };
-    },
-    { allowSkip: true, endpointProbe: true },
-  );
-  if (fileRetainCapability.ok) {
-    if (!fileRetainResult)
-      throw new Error("file retain result missing after successful retainFiles");
-    const ids = operationIdsFromResponse(fileRetainResult.result);
-    const operationTracking = await capabilityStep(
-      "file_operation_tracking",
-      async () => waitForOperationTerminal(ids),
-      { allowSkip: true, endpointProbe: true },
-    );
-    recorder.step("file_retain_ok", {
-      operationIds: ids,
-      operationTracking: operationTracking.ok ? "checked-or-not-reported" : "unsupported",
-      responsePreview: JSON.stringify(fileRetainResult).slice(0, 500),
-    });
-  }
-
-  const documentCapability = await capabilityStep(
-    "document_inspection_capability",
-    async () => {
-      await operations.listDocuments({ options: { limit: 1 } });
-    },
-    { allowSkip: true, endpointProbe: true },
-  );
-  if (documentCapability.ok) {
-    const disposableDocumentId = `pi-smoke-delete:${operationsMarker}`;
-    await operations.retainExplicit({
-      cwd: operationsCwd,
-      content: `Disposable document smoke marker: ${operationsMarker}`,
-      context: "Pi Hindsight disposable document smoke test",
-      bank: "project",
-      documentId: disposableDocumentId,
-      tags: ["test:smoke", "test:document-delete"],
-      async: false,
-    });
-    await operations.flush(operationsCwd);
-    await operations.listDocuments({ options: { q: operationsMarker, limit: 5 } });
-    const document = await operations.getDocument({ documentId: operationsRetain.documentId });
-    const chunks = chunkIds(document.result);
-    if (chunks[0]) await operations.getChunk({ chunkId: chunks[0] });
-    await operations.updateDocumentTags({
-      documentId: operationsRetain.documentId,
-      request: { tags: ["source:pi", "test:smoke", "test:operations", "test:document-update"] },
-      confirm: true,
-    });
-    await operations.getDocument({ documentId: disposableDocumentId });
-    await operations.deleteDocument({
-      bank: "project",
-      documentId: disposableDocumentId,
-      confirm: true,
-    });
-    let deleteVerified = false;
-    try {
-      await operations.getDocument({ documentId: disposableDocumentId });
-    } catch (error) {
-      if (/not found|404/i.test(error instanceof Error ? error.message : String(error))) {
-        deleteVerified = true;
-      } else {
-        throw error;
-      }
-    }
-    if (!deleteVerified) throw new Error("deleted document remained fetchable");
-    recorder.step("document_inspection_ok", {
-      documentId: operationsRetain.documentId,
-      deletedDocumentId: disposableDocumentId,
-      deleteVerified,
-      chunkId: chunks[0] ?? "none",
-    });
-  }
-
-  await capabilityStep(
-    "operations_list",
-    async () => {
-      const result = await operations.listOperations({ options: { limit: 5 } });
-      return { responsePreview: JSON.stringify(result.result).slice(0, 500) };
-    },
-    { allowSkip: true, endpointProbe: true },
-  );
-
-  const memoryCapability = await capabilityStep(
-    "memory_inspection_capability",
-    async () => {
-      await operations.listMemories({ options: { limit: 1 } });
-    },
-    { allowSkip: true, endpointProbe: true },
-  );
-  if (memoryCapability.ok) {
-    const result = await retry(
-      async () => operations.listMemories({ options: { q: operationsMarker, limit: 5 } }),
-      (listResult) => recordItems(listResult.result).length > 0,
-      {
-        attempts: config.attempts,
-        delayMs: 2000,
-        onWait: ({ attempt, delayMs }) => recorder.step("memory_list_wait", { attempt, delayMs }),
-        failureMessage: ({ attempts, preview }) =>
-          `memory inspection did not find retained marker after ${attempts} attempts: ${preview}`,
-      },
-    );
-    const items = recordItems(result.result);
-    const first = items[0];
-    const memoryId = fieldValue(first, ["id", "memory_id", "memoryId"]);
-    if (!memoryId) throw new Error("memory inspection returned item without memory ID");
-    const memory = await operations.getMemory({ memoryId });
-    const chunks = [...chunkIds(memory.result), ...chunkIds(first)];
-    if (!chunks[0]) throw new Error("memory inspection returned no chunk ID to fetch");
-    await operations.getChunk({ chunkId: chunks[0] });
-    await capabilityStep(
-      "memory_history",
-      async () => {
-        await operations.getMemoryHistory({ memoryId });
-      },
-      { allowSkip: true, endpointProbe: true },
-    );
-    if (config.bankIsTemporary) {
-      await operations.deleteMemoryObservations({ memoryId, confirm: true });
-    } else {
-      recorder.step("delete_memory_observations_skipped", { reason: "configured_bank", memoryId });
-    }
-    recorder.step("memory_inspection_ok", {
-      memoryId,
-      chunkId: chunks[0],
-      count: items.length,
-      deletedObservations: config.bankIsTemporary,
-    });
-  }
-
   const importSessionFile = join(operationsCwd, "smoke-import.jsonl");
   await writeFile(
     importSessionFile,
@@ -622,19 +408,6 @@ try {
   }
   if (importRecallText.includes(importNoiseMarker)) {
     throw new Error("strict import recall contained dropped process-noise marker");
-  }
-
-  if (config.bankIsTemporary) {
-    await capabilityStep(
-      "clear_observations",
-      async () => {
-        const result = await operations.clearObservations({ confirm: true });
-        return { responsePreview: JSON.stringify(result.result).slice(0, 300) };
-      },
-      { allowSkip: true, endpointProbe: true },
-    );
-  } else {
-    recorder.step("clear_observations_skipped", { reason: "configured_bank" });
   }
 
   recorder.step("success", {

@@ -217,58 +217,8 @@ describe("memory operations", () => {
     ]);
   });
 
-  it("reports unavailable bank config APIs", async () => {
-    const operations = createMemoryOperations({
-      getClient: () => ({
-        retain: async () => undefined,
-        recall: async () => [],
-        reflect: async () => ({}),
-      }),
-      getConfig: () => DEFAULT_CONFIG,
-      getProjectBankId: () => "project-bank",
-    });
-
-    await expect(operations.getBankConfig({ bank: "project" })).rejects.toThrow(
-      "Hindsight client does not support bank config read.",
-    );
-    await expect(
-      operations.updateBankConfig({
-        bank: "project",
-        updates: { recall_budget_function: "fixed" },
-        confirm: true,
-      }),
-    ).rejects.toThrow("Hindsight client does not support bank config update.");
-    await expect(operations.resetBankConfig({ bank: "project", confirm: true })).rejects.toThrow(
-      "Hindsight client does not support bank config reset.",
-    );
-  });
-
-  it("requires explicit confirmation for destructive config operations", async () => {
-    const operations = createMemoryOperations({
-      getClient: () => ({
-        retain: async () => undefined,
-        recall: async () => [],
-        reflect: async () => ({}),
-        updateBankConfig: async () => ({}),
-        resetBankConfig: async () => ({}),
-      }),
-      getConfig: () => DEFAULT_CONFIG,
-      getProjectBankId: () => "project-bank",
-    });
-
-    await expect(
-      operations.updateBankConfig({
-        bank: "project",
-        updates: { recall_budget_function: "fixed" },
-      }),
-    ).rejects.toThrow("confirm:true is required to update bank config");
-    await expect(operations.resetBankConfig({ bank: "project" })).rejects.toThrow(
-      "confirm:true is required to reset bank config",
-    );
-  });
-
   it("resolves project/global bank aliases for explicit operations", async () => {
-    const calls: Array<{ method: string; bank: string; request?: unknown; updates?: unknown }> = [];
+    const calls: Array<{ method: string; bank: string }> = [];
     const config = {
       ...DEFAULT_CONFIG,
       banks: { ...DEFAULT_CONFIG.banks, user: { enabled: true, bankId: "global-luxus" } },
@@ -287,22 +237,6 @@ describe("memory operations", () => {
           calls.push({ method: "reflect", bank });
           return {};
         },
-        deleteDocument: async (bank) => {
-          calls.push({ method: "delete", bank });
-          return {};
-        },
-        getBankConfig: async (bank) => {
-          calls.push({ method: "getBankConfig", bank });
-          return { config: {}, overrides: {} };
-        },
-        updateBankConfig: async (bank, updates) => {
-          calls.push({ method: "updateBankConfig", bank, updates });
-          return { config: updates, overrides: updates };
-        },
-        resetBankConfig: async (bank) => {
-          calls.push({ method: "resetBankConfig", bank });
-          return { ok: true };
-        },
       }),
       getConfig: () => config,
       getProjectBankId: () => "project-bank",
@@ -317,29 +251,12 @@ describe("memory operations", () => {
       bank: "global",
     });
     await operations.reflect(cwd, "query", undefined, "project");
-    await operations.deleteDocument({ bank: "global", documentId: "doc", confirm: true });
-    await operations.getBankConfig({ bank: "global" });
-    await operations.updateBankConfig({
-      bank: "global",
-      updates: { recall_budget_function: "fixed", max_observations_per_scope: 20 },
-      confirm: true,
-    });
-    await operations.resetBankConfig({ bank: "global", confirm: true });
 
     expect(calls).toEqual(
       expect.arrayContaining([
         { method: "recall", bank: "global-luxus" },
         { method: "retain", bank: "global-luxus" },
         { method: "reflect", bank: "project-bank" },
-        { method: "delete", bank: "global-luxus" },
-        { method: "getBankConfig", bank: "global-luxus" },
-        {
-          method: "updateBankConfig",
-          bank: "global-luxus",
-          updates: { recall_budget_function: "fixed", max_observations_per_scope: 20 },
-        },
-        { method: "resetBankConfig", bank: "global-luxus" },
-        { method: "getBankConfig", bank: "global-luxus" },
       ]),
     );
   });

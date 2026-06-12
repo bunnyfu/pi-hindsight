@@ -43,16 +43,9 @@ If the preview looks right, rerun without `--dry-run`. Non-dry-run imports annou
 
 Use `--all-leaves` only when you intentionally want every fork leaf from a session file. Default import follows the current branch.
 
-## Use tools for agent/script workflows
+## Use commands for script workflows
 
-Tool equivalents:
-
-```text
-hindsight_import({ dryRun: true })
-hindsight_import_chat_transcript({ sourceFile: "/path/to/chat.jsonl", dryRun: true })
-```
-
-`hindsight_import` targets Pi session JSONL. `hindsight_import_chat_transcript` targets chat transcript JSONL and defaults to the configured User Bank.
+Imports run through the `/hindsight:import*` commands; there are no import tools. `/hindsight:import` and `/hindsight:import-file` target Pi session JSONL. Chat transcript import is available through guided setup and defaults to the configured User Bank.
 
 ## Preview output
 

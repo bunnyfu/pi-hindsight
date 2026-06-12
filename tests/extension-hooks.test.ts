@@ -424,9 +424,7 @@ describe("extension hooks", () => {
     expect(result.details).toMatchObject({ bankId: "global-luxus" });
   });
 
-  it("dry-runs memory routing without retaining", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-tools-"));
-    mkdirSync(join(cwd, ".git"));
+  it("registers only the slim memory tool surface", async () => {
     const tools: Record<string, any> = {};
     const pi = {
       on: vi.fn(),
@@ -438,20 +436,13 @@ describe("extension hooks", () => {
 
     const { default: hindsightExtension } = await import("../extensions/index.js");
     hindsightExtension(pi as any);
-    mocked.client.retain.mockClear();
-    const result = await tools.hindsight_route_memory.execute(
-      "tool-call",
-      { content: "Kai prefers terse replies across projects" },
-      undefined,
-      undefined,
-      { cwd, ui: { setStatus: vi.fn(), notify: vi.fn() }, sessionManager: {} },
-    );
 
-    expect(result.details).toMatchObject({ route: "global", mode: "explicit-only", writes: [] });
-    expect(result.details.targets).toEqual([]);
-    expect(result.content[0].text).toContain("Targets: none");
-    expect(result.content[0].text).toContain("Writes now: none");
-    expect(mocked.client.retain).not.toHaveBeenCalled();
+    expect(Object.keys(tools).sort()).toEqual([
+      "hindsight_recall",
+      "hindsight_reflect",
+      "hindsight_retain",
+      "hindsight_retain_global",
+    ]);
   });
 
   it("routes automatic retain to global bank when router mode selects global", async () => {
@@ -570,47 +561,6 @@ describe("extension hooks", () => {
     );
 
     expect(mocked.client.retain).not.toHaveBeenCalled();
-  });
-
-  it("deletes an exact Hindsight document only with confirmation", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-tools-"));
-    mkdirSync(join(cwd, ".git"));
-    const tools: Record<string, any> = {};
-    const pi = {
-      on: vi.fn(),
-      registerTool: vi.fn((tool: any) => {
-        tools[tool.name] = tool;
-      }),
-      registerCommand: vi.fn(),
-    };
-    const ctx = {
-      cwd,
-      ui: { setStatus: vi.fn(), notify: vi.fn() },
-      sessionManager: { getSessionFile: () => join(cwd, "session.jsonl") },
-    };
-
-    const { default: hindsightExtension } = await import("../extensions/index.js");
-    hindsightExtension(pi as any);
-    await expect(
-      tools.hindsight_delete_document.execute(
-        "tool-call",
-        { bank: "pi-global", documentId: "pi-explicit:abc", confirm: false },
-        undefined,
-        undefined,
-        ctx,
-      ),
-    ).rejects.toThrow(/confirm=true/);
-
-    const result = await tools.hindsight_delete_document.execute(
-      "tool-call",
-      { bank: "pi-global", documentId: "pi-explicit:abc", confirm: true },
-      undefined,
-      undefined,
-      ctx,
-    );
-
-    expect(mocked.client.deleteDocument).toHaveBeenCalledWith("pi-global", "pi-explicit:abc");
-    expect(result.details).toMatchObject({ bankId: "pi-global", documentId: "pi-explicit:abc" });
   });
 
   it("writes opt-in last recall snapshot to sidecar", async () => {

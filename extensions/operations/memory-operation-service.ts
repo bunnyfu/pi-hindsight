@@ -4,19 +4,11 @@ import {
   importMemoryProjectSessions,
   importMemorySession,
 } from "../imports/import-operations.js";
-import { createBankConfigOperations } from "../banks/bank-config-operations.js";
-import { createBankProfileOperations } from "./memory-bank-profile-operations.js";
-import { createAdminOperations } from "./memory-admin-operations.js";
 import { createConfigOperations } from "./memory-config-operations.js";
-import { createDocumentOperations } from "./memory-document-operations.js";
-import { createExplorationOperations } from "./memory-exploration-operations.js";
-import { createFileRetainOperations } from "./file-retain-operations.js";
 import { createQueueOperations } from "../queue/queue-operations.js";
 import { createRecallOperations } from "./memory-recall-operations.js";
 import { createRetainOperations } from "./memory-retain-operations.js";
-import { createRoutingOperations } from "./memory-routing-operations.js";
 import { createSessionOperations } from "./memory-session-operations.js";
-import { createSeedImportOperations } from "./seed-import-operations.js";
 import type { ResolvedConfig } from "../types.js";
 import type { ImportProgressReporter } from "../imports/import-sessions.js";
 
@@ -63,16 +55,8 @@ export function createMemoryOperations(deps: MemoryOperationsDeps) {
   return {
     ...createRecallOperations(deps),
     ...createRetainOperations(deps),
-    ...createFileRetainOperations(deps),
-    ...createDocumentOperations(deps),
-    ...createExplorationOperations(deps),
-    ...createRoutingOperations(deps),
     ...createConfigOperations(deps),
-    ...createBankConfigOperations(deps),
-    ...createBankProfileOperations(deps),
-    ...createAdminOperations(deps),
     ...createImportOperations(deps),
-    ...createSeedImportOperations(deps),
     ...createQueueOperations(deps),
     ...createSessionOperations(),
   };

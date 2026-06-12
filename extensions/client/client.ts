@@ -6,34 +6,10 @@ import {
   assertHealthResponse,
   assertReflectResponse,
   bankConfigPath,
-  bankBackgroundPath,
-  bankProfilePath,
-  chunkItemPath,
-  consolidationPath,
-  consolidationRecoverPath,
   createHindsightRestTransport,
   withRetry,
-  documentItemPath,
-  documentsCollectionPath,
   encodeBankPath,
-  entitiesCollectionPath,
-  entityGraphPath,
-  entityItemPath,
-  entityRegeneratePath,
-  graphPath,
-  memoriesCollectionPath,
-  memoryHistoryPath,
-  memoryItemPath,
-  memoryObservationsPath,
-  operationCancelPath,
-  operationRetryPath,
-  operationsCollectionPath,
-  observationsPath,
   reflectRequestBody,
-  tagsCollectionPath,
-  updateBankConfigRequestBody,
-  updateBankProfileRequestBody,
-  updateDocumentRequestBody,
 } from "./client-rest.js";
 import { installFetchRequestCompat } from "./fetch-compat.js";
 import { withTimeout } from "./timeout.js";
@@ -128,27 +104,6 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
         },
         args[2]?.signal,
       ),
-    retainFiles: (bankId, files, options) =>
-      withTimeout(
-        "hindsight retainFiles",
-        timeoutMs,
-        (signal) =>
-          raw.retainFiles(bankId, files, {
-            ...(options?.context ? { context: options.context } : {}),
-            ...(options?.filesMetadata
-              ? {
-                  filesMetadata: options.filesMetadata.map((metadata) => ({
-                    ...(metadata.context ? { context: metadata.context } : {}),
-                    ...(metadata.documentId ? { document_id: metadata.documentId } : {}),
-                    ...(metadata.tags ? { tags: metadata.tags } : {}),
-                    ...(metadata.metadata ? { metadata: metadata.metadata } : {}),
-                  })),
-                }
-              : {}),
-            signal,
-          }),
-        options?.signal,
-      ),
     recall: (...args) => {
       const [bankId, query, options] = args;
       return withTimeout(
@@ -184,138 +139,9 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
       withTimeout("hindsight getBankConfig", timeoutMs, (signal) =>
         rest.request(bankConfigPath(bankId), { signal }),
       ),
-    updateBankProfile: (bankId, request) =>
-      withTimeout("hindsight updateBankProfile", timeoutMs, (signal) =>
-        rest.request(encodeBankPath(bankId, ""), {
-          method: "PATCH",
-          signal,
-          body: JSON.stringify(updateBankProfileRequestBody(request)),
-        }),
-      ),
-    updateBankDisposition: (bankId, disposition) =>
-      withTimeout("hindsight updateBankDisposition", timeoutMs, (signal) =>
-        rest.request(bankProfilePath(bankId), {
-          method: "PUT",
-          signal,
-          body: JSON.stringify({ disposition }),
-        }),
-      ),
-    addBankBackground: (bankId, request) =>
-      withTimeout("hindsight addBankBackground", timeoutMs, (signal) =>
-        rest.request(bankBackgroundPath(bankId), {
-          method: "POST",
-          signal,
-          body: JSON.stringify({
-            content: request.content,
-            ...(request.updateDisposition !== undefined
-              ? { update_disposition: request.updateDisposition }
-              : {}),
-          }),
-        }),
-      ),
-    updateBankConfig: (bankId, updates) =>
-      withTimeout("hindsight updateBankConfig", timeoutMs, (signal) =>
-        rest.request(bankConfigPath(bankId), {
-          method: "PATCH",
-          signal,
-          body: JSON.stringify(updateBankConfigRequestBody(updates)),
-        }),
-      ),
-    resetBankConfig: (bankId) =>
-      withTimeout("hindsight resetBankConfig", timeoutMs, (signal) =>
-        rest.request(bankConfigPath(bankId), { method: "DELETE", signal }),
-      ),
     health: () =>
       withTimeout("hindsight health", timeoutMs, async (signal) =>
         assertHealthResponse(await rest.request("/health", { signal })),
-      ),
-    listDocuments: (bankId, options) =>
-      withTimeout("hindsight listDocuments", timeoutMs, (signal) =>
-        rest.request(documentsCollectionPath(bankId, options), { signal }),
-      ),
-    getDocument: (bankId, documentId) =>
-      withTimeout("hindsight getDocument", timeoutMs, (signal) =>
-        rest.request(documentItemPath(bankId, documentId), { signal }),
-      ),
-    updateDocument: (bankId, documentId, request) =>
-      withTimeout("hindsight updateDocument", timeoutMs, (signal) =>
-        rest.request(documentItemPath(bankId, documentId), {
-          method: "PATCH",
-          signal,
-          body: JSON.stringify(updateDocumentRequestBody(request)),
-        }),
-      ),
-    deleteDocument: (bankId, documentId) =>
-      withTimeout("hindsight deleteDocument", timeoutMs, (signal) =>
-        rest.request(documentItemPath(bankId, documentId), { method: "DELETE", signal }),
-      ),
-    listEntities: (bankId, options) =>
-      withTimeout("hindsight listEntities", timeoutMs, (signal) =>
-        rest.request(entitiesCollectionPath(bankId, options), { signal }),
-      ),
-    getEntity: (bankId, entityId) =>
-      withTimeout("hindsight getEntity", timeoutMs, (signal) =>
-        rest.request(entityItemPath(bankId, entityId), { signal }),
-      ),
-    regenerateEntity: (bankId, entityId) =>
-      withTimeout("hindsight regenerateEntity", timeoutMs, (signal) =>
-        rest.request(entityRegeneratePath(bankId, entityId), { method: "POST", signal }),
-      ),
-    getGraph: (bankId, options) =>
-      withTimeout("hindsight getGraph", timeoutMs, (signal) =>
-        rest.request(graphPath(bankId, options), { signal }),
-      ),
-    getEntityGraph: (bankId, options) =>
-      withTimeout("hindsight getEntityGraph", timeoutMs, (signal) =>
-        rest.request(entityGraphPath(bankId, options), { signal }),
-      ),
-    listTags: (bankId, options) =>
-      withTimeout("hindsight listTags", timeoutMs, (signal) =>
-        rest.request(tagsCollectionPath(bankId, options), { signal }),
-      ),
-    triggerConsolidation: (bankId) =>
-      withTimeout("hindsight triggerConsolidation", timeoutMs, (signal) =>
-        rest.request(consolidationPath(bankId), { method: "POST", signal }),
-      ),
-    recoverConsolidation: (bankId) =>
-      withTimeout("hindsight recoverConsolidation", timeoutMs, (signal) =>
-        rest.request(consolidationRecoverPath(bankId), { method: "POST", signal }),
-      ),
-    clearObservations: (bankId) =>
-      withTimeout("hindsight clearObservations", timeoutMs, (signal) =>
-        rest.request(observationsPath(bankId), { method: "DELETE", signal }),
-      ),
-    listOperations: (bankId, options) =>
-      withTimeout("hindsight listOperations", timeoutMs, (signal) =>
-        rest.request(operationsCollectionPath(bankId, options), { signal }),
-      ),
-    cancelOperation: (bankId, operationId) =>
-      withTimeout("hindsight cancelOperation", timeoutMs, (signal) =>
-        rest.request(operationCancelPath(bankId, operationId), { method: "DELETE", signal }),
-      ),
-    retryOperation: (bankId, operationId) =>
-      withTimeout("hindsight retryOperation", timeoutMs, (signal) =>
-        rest.request(operationRetryPath(bankId, operationId), { method: "POST", signal }),
-      ),
-    listMemories: (bankId, options) =>
-      withTimeout("hindsight listMemories", timeoutMs, (signal) =>
-        rest.request(memoriesCollectionPath(bankId, options), { signal }),
-      ),
-    getMemory: (bankId, memoryId) =>
-      withTimeout("hindsight getMemory", timeoutMs, (signal) =>
-        rest.request(memoryItemPath(bankId, memoryId), { signal }),
-      ),
-    getChunk: (chunkId) =>
-      withTimeout("hindsight getChunk", timeoutMs, (signal) =>
-        rest.request(chunkItemPath(chunkId), { signal }),
-      ),
-    getMemoryHistory: (bankId, memoryId) =>
-      withTimeout("hindsight getMemoryHistory", timeoutMs, (signal) =>
-        rest.request(memoryHistoryPath(bankId, memoryId), { signal }),
-      ),
-    deleteMemoryObservations: (bankId, memoryId) =>
-      withTimeout("hindsight deleteMemoryObservations", timeoutMs, (signal) =>
-        rest.request(memoryObservationsPath(bankId, memoryId), { method: "DELETE", signal }),
       ),
   };
 }
