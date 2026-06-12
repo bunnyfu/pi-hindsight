@@ -5,78 +5,21 @@ import {
   isAppendUnsupportedError,
   resolveRetainDocumentTarget,
 } from "../extensions/client/capabilities.js";
-import type { HindsightLikeClient } from "../extensions/types.js";
-
-function client(retain: HindsightLikeClient["retain"]): HindsightLikeClient {
-  return {
-    retain,
-    recall: async () => [],
-    reflect: async () => ({}),
-  };
-}
 
 describe("append capabilities", () => {
-  it("detects append support with an isolated probe document", async () => {
-    const calls: unknown[] = [];
-    const capabilities = await detectAppendCapability(
-      client(async (...args: unknown[]) => {
-        calls.push(args);
-      }),
-      "bank",
-    );
+  it("assumes append support with hindsight-client 0.8 without a live probe", async () => {
+    const capabilities = await detectAppendCapability({} as never, "bank");
 
     expect(capabilities.appendUpdateMode).toBe(true);
+    expect(capabilities.version).toBeTruthy();
     expect(capabilities.probeDocumentId).toBe("pi-hindsight-capability:append:bank");
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toMatchObject([
-      "bank",
-      "Pi Hindsight append capability probe. Safe to ignore.",
-      {
-        async: true,
-        documentId: "pi-hindsight-capability:append:bank",
-        updateMode: "append",
-        tags: ["source:pi-hindsight-diagnostic", "test:capability", "feature:append-probe"],
-      },
-    ]);
   });
 
-  it("reports unsupported append when the probe fails with an append-specific error", async () => {
-    const capabilities = await detectAppendCapability(
-      client(async () => {
-        throw new Error("update_mode append unsupported");
-      }),
-      "bank",
-    );
-
-    expect(capabilities.appendUpdateMode).toBe(false);
-    expect(capabilities.error).toContain("append unsupported");
-  });
-
-  it("detects append validation errors from servers without append support", async () => {
+  it("detects append validation errors from servers without append support", () => {
     const error = new Error(
       `retain failed: [{"loc":["body","items",0,"update_mode"],"msg":"Input should be 'replace'","input":"append"}]`,
     );
     expect(isAppendUnsupportedError(error)).toBe(true);
-
-    const capabilities = await detectAppendCapability(
-      client(async () => {
-        throw error;
-      }),
-      "bank",
-    );
-    expect(capabilities.appendUpdateMode).toBe(false);
-  });
-
-  it("does not mark generic probe failures as unsupported", async () => {
-    const capabilities = await detectAppendCapability(
-      client(async () => {
-        throw new Error("ECONNREFUSED");
-      }),
-      "bank",
-    );
-
-    expect(capabilities.appendUpdateMode).toBe(true);
-    expect(capabilities.error).toContain("Probe inconclusive");
   });
 
   it("keeps stable append document IDs when append is supported or unknown", () => {

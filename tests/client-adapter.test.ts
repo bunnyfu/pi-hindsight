@@ -8,15 +8,19 @@ const mocks = vi.hoisted(() => ({
   retainBatch: vi.fn(async () => ({ accepted: true })),
 }));
 
-vi.mock("@vectorize-io/hindsight-client", () => ({
-  HindsightClient: vi.fn(function (options) {
-    mocks.constructor(options);
-    return {
-      retain: mocks.retain,
-      retainBatch: mocks.retainBatch,
-    };
-  }),
-}));
+vi.mock("@vectorize-io/hindsight-client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@vectorize-io/hindsight-client")>();
+  return {
+    ...actual,
+    HindsightClient: vi.fn(function (options) {
+      mocks.constructor(options);
+      return {
+        retain: mocks.retain,
+        retainBatch: mocks.retainBatch,
+      };
+    }),
+  };
+});
 
 describe("Hindsight client adapter", () => {
   beforeEach(() => {

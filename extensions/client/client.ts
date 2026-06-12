@@ -1,21 +1,109 @@
-import { HindsightClient } from "@vectorize-io/hindsight-client";
+import {
+  CLIENT_VERSION,
+  HindsightClient,
+  HindsightError,
+  createClient,
+  createConfig,
+  sdk,
+} from "@vectorize-io/hindsight-client";
+import type { Client, ReflectRequest } from "@vectorize-io/hindsight-client";
 import { redactError } from "../utils/sanitize.js";
 import type { HindsightLikeClient, ResolvedConfig } from "../types.js";
 import { PI_HINDSIGHT_USER_AGENT } from "../version.js";
-import {
-  assertHealthResponse,
-  assertReflectResponse,
-  bankConfigPath,
-  createHindsightRestTransport,
-  withRetry,
-  encodeBankPath,
-  reflectRequestBody,
-} from "./client-rest.js";
+import { isRetryableError } from "./client-rest.js";
 import { installFetchRequestCompat } from "./fetch-compat.js";
 import { withTimeout } from "./timeout.js";
 
 type ReflectOptions = Parameters<HindsightLikeClient["reflect"]>[2];
 type RetainOptions = Parameters<HindsightLikeClient["retain"]>[2];
+
+function sdkHeaders(config: ResolvedConfig): Record<string, string> {
+  const headers: Record<string, string> = {
+    "User-Agent": PI_HINDSIGHT_USER_AGENT,
+  };
+  if (config.hindsight.apiKey) headers.Authorization = `Bearer ${config.hindsight.apiKey}`;
+  return headers;
+}
+
+function createLowLevelClient(config: ResolvedConfig): Client {
+  return createClient(
+    createConfig({
+      baseUrl: config.hindsight.baseUrl.replace(/\/$/, ""),
+      headers: sdkHeaders(config),
+    }),
+  );
+}
+
+function unwrapSdkResponse<T>(
+  response: { data?: T; error?: unknown; response?: Response },
+  operation: string,
+): T {
+  if (response.data !== undefined) return response.data;
+  const error = response.error as { detail?: unknown; message?: string } | undefined;
+  const statusCode = response.response?.status;
+  const details = error?.detail ?? error?.message ?? error;
+  throw new HindsightError(`${operation} failed: ${JSON.stringify(details)}`, statusCode, details);
+}
+
+async function withSdkRetry<T>(
+  operation: string,
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  baseDelayMs = 1000,
+): Promise<T> {
+  let lastError: Error | undefined;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      const jitter = Math.random() * baseDelayMs * 0.5;
+      const delay = baseDelayMs * 2 ** (attempt - 1) + jitter;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+    try {
+      return await fn();
+    } catch (error) {
+      if (!isRetryableError(error)) throw error;
+      lastError = error as Error;
+    }
+  }
+  throw lastError ?? new Error(`${operation} failed after retries`);
+}
+
+function reflectInclude(options: ReflectOptions): ReflectRequest["include"] | undefined {
+  if (options?.includeFacts === undefined && options?.includeToolCalls === undefined) {
+    return undefined;
+  }
+  const include: NonNullable<ReflectRequest["include"]> = {};
+  if (options?.includeFacts !== undefined) {
+    include.facts = options.includeFacts ? {} : null;
+  }
+  if (options?.includeToolCalls !== undefined) {
+    include.tool_calls = options.includeToolCalls ? {} : null;
+  }
+  return include;
+}
+
+function reflectRequestBody(query: string, options: ReflectOptions | undefined): ReflectRequest {
+  const body: ReflectRequest = {
+    query,
+    budget: options?.budget ?? "low",
+  };
+  if (options?.context) body.context = options.context;
+  if (options?.maxTokens !== undefined) body.max_tokens = options.maxTokens;
+  if (options?.responseSchema) body.response_schema = options.responseSchema;
+  if (options?.factTypes) body.fact_types = options.factTypes;
+  if (options?.excludeMentalModels !== undefined) {
+    body.exclude_mental_models = options.excludeMentalModels;
+  }
+  if (options?.excludeMentalModelIds) {
+    body.exclude_mental_model_ids = options.excludeMentalModelIds;
+  }
+  if (options?.tagGroups) body.tag_groups = options.tagGroups;
+  else if (options?.tags) body.tags = options.tags;
+  if (!options?.tagGroups && options?.tagsMatch) body.tags_match = options.tagsMatch;
+  const include = reflectInclude(options);
+  if (include) body.include = include;
+  return body;
+}
 
 function retainBatchItem(content: string, options: RetainOptions) {
   return {
@@ -55,25 +143,24 @@ function retainSingle(
 async function reflect(
   args: {
     raw: HindsightClient;
-    rest: ReturnType<typeof createHindsightRestTransport>;
+    lowLevel: Client;
     bankId: string;
     query: string;
     options: ReflectOptions;
   },
   signal: AbortSignal,
 ): Promise<unknown> {
-  const needsRestShim =
-    args.options?.responseSchema ||
-    args.options?.maxTokens !== undefined ||
-    args.options?.includeFacts !== undefined ||
-    args.options?.includeToolCalls !== undefined;
-  if (!needsRestShim) return args.raw.reflect(args.bankId, args.query, { ...args.options, signal });
-  const response = await args.rest.request(encodeBankPath(args.bankId, "/reflect"), {
-    method: "POST",
-    signal,
-    body: JSON.stringify(reflectRequestBody(args.query, args.options)),
-  });
-  return assertReflectResponse(response);
+  if (args.options?.maxTokens !== undefined) {
+    const response = await sdk.reflect({
+      client: args.lowLevel,
+      path: { bank_id: args.bankId },
+      body: reflectRequestBody(args.query, args.options),
+      signal,
+    });
+    return unwrapSdkResponse(response, "reflect");
+  }
+
+  return args.raw.reflect(args.bankId, args.query, { ...args.options, signal });
 }
 
 export function createHindsightClient(config: ResolvedConfig): HindsightLikeClient {
@@ -84,8 +171,9 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
     ...(config.hindsight.apiKey ? { apiKey: config.hindsight.apiKey } : {}),
     userAgent: PI_HINDSIGHT_USER_AGENT,
   });
-  const rest = withRetry(createHindsightRestTransport(config));
+  const lowLevel = createLowLevelClient(config);
   const timeoutMs = config.hindsight.timeoutMs;
+
   return {
     retain: (bankId, content, options) =>
       withTimeout(
@@ -109,9 +197,7 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
       return withTimeout(
         "hindsight recall",
         timeoutMs,
-        (signal) => {
-          return raw.recall(bankId, query, { ...options, signal });
-        },
+        (signal) => raw.recall(bankId, query, { ...options, signal }),
         options?.signal,
       );
     },
@@ -119,7 +205,7 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
       withTimeout(
         "hindsight reflect",
         timeoutMs,
-        (signal) => reflect({ raw, rest, bankId, query, options }, signal),
+        (signal) => reflect({ raw, lowLevel, bankId, query, options }, signal),
         options?.signal,
       ),
     createBank: (...args) =>
@@ -129,19 +215,29 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
       }),
     getBankProfile: (...args) =>
       withTimeout("hindsight getBankProfile", timeoutMs, (signal) =>
-        raw.getBankProfile(args[0], { signal }),
+        withSdkRetry("getBankProfile", () => raw.getBankProfile(args[0], { signal })),
       ),
     getBankStats: (bankId) =>
       withTimeout("hindsight getBankStats", timeoutMs, (signal) =>
-        rest.request(encodeBankPath(bankId, "/stats"), { signal }),
+        withSdkRetry("getBankStats", async () => {
+          const response = await sdk.getAgentStats({
+            client: lowLevel,
+            path: { bank_id: bankId },
+            signal,
+          });
+          return unwrapSdkResponse(response, "getBankStats");
+        }),
       ),
     getBankConfig: (bankId) =>
       withTimeout("hindsight getBankConfig", timeoutMs, (signal) =>
-        rest.request(bankConfigPath(bankId), { signal }),
+        withSdkRetry("getBankConfig", () => raw.getBankConfig(bankId, { signal })),
       ),
     health: () =>
-      withTimeout("hindsight health", timeoutMs, async (signal) =>
-        assertHealthResponse(await rest.request("/health", { signal })),
+      withTimeout("hindsight health", timeoutMs, (signal) =>
+        withSdkRetry("health", async () => {
+          const response = await sdk.healthEndpointHealthGet({ client: lowLevel, signal });
+          return unwrapSdkResponse(response, "health");
+        }),
       ),
   };
 }
@@ -159,3 +255,5 @@ export async function checkHindsight(
     return { ok: false, error: redactError(error) };
   }
 }
+
+export const HINDSIGHT_CLIENT_VERSION = CLIENT_VERSION;

@@ -1,4 +1,4 @@
-import { redactError } from "../utils/sanitize.js";
+import { CLIENT_VERSION } from "@vectorize-io/hindsight-client";
 import type {
   HindsightCapabilities,
   HindsightLikeClient,
@@ -33,34 +33,15 @@ export function isAppendUnsupportedError(error: unknown): boolean {
 }
 
 export async function detectAppendCapability(
-  client: HindsightLikeClient,
+  _client: HindsightLikeClient,
   bankId: string,
 ): Promise<HindsightCapabilities> {
-  const checkedAt = new Date().toISOString();
-  const documentId = `pi-hindsight-capability:append:${bankId}`;
-  try {
-    await client.retain(bankId, "Pi Hindsight append capability probe. Safe to ignore.", {
-      async: true,
-      documentId,
-      updateMode: "append",
-      context: "Pi Hindsight append capability detection",
-      tags: ["source:pi-hindsight-diagnostic", "test:capability", "feature:append-probe"],
-      metadata: {
-        source: "pi-hindsight",
-        capability: "append-update-mode",
-      },
-    });
-    return { appendUpdateMode: true, checkedAt, probeDocumentId: documentId };
-  } catch (error) {
-    const message = redactError(error);
-    const appendUnsupported = isAppendUnsupportedError(error);
-    return {
-      appendUpdateMode: !appendUnsupported,
-      checkedAt,
-      error: appendUnsupported
-        ? message
-        : `Probe inconclusive; assuming append support: ${message}`,
-      probeDocumentId: documentId,
-    };
-  }
+  // hindsight-client 0.8+ and matching Hindsight servers support append update mode.
+  // Runtime retain failures still surface through isAppendUnsupportedError().
+  return {
+    version: CLIENT_VERSION,
+    appendUpdateMode: true,
+    checkedAt: new Date().toISOString(),
+    probeDocumentId: `pi-hindsight-capability:append:${bankId}`,
+  };
 }

@@ -1,106 +1,96 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_CONFIG } from "../extensions/config/config.js";
-import { PI_HINDSIGHT_USER_AGENT } from "../extensions/version.js";
-import {
-  assertHealthResponse,
-  assertReflectResponse,
-  bankConfigPath,
-  createHindsightRestTransport,
-  encodeBankPath,
-  reflectRequestBody,
-} from "../extensions/client/client-rest.js";
+import { describe, expect, it, vi } from "vitest";
+import { withRetry } from "../extensions/client/client-rest.js";
+import type { HindsightRestTransport } from "../extensions/client/client-rest.js";
 
-describe("Hindsight REST transport helpers", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
+function createMockTransport(
+  failures: Array<{ status?: number; message?: string }>,
+): HindsightRestTransport {
+  let callCount = 0;
+  return {
+    request: vi.fn(async (_path, _init) => {
+      const failure = failures[callCount++];
+      if (failure && (failure.status !== undefined || failure.message !== undefined)) {
+        const error = new Error(failure.message ?? `Error ${failure.status}`) as Error & {
+          status?: number;
+        };
+        if (failure.status !== undefined) error.status = failure.status;
+        throw error;
+      }
+      return { ok: true };
+    }),
+  };
+}
+
+describe("Hindsight client retry", () => {
+  it("succeeds on first attempt when transport succeeds", async () => {
+    const transport = createMockTransport([]);
+    const retrying = withRetry(transport, 3, 10);
+    const result = await retrying.request("/test", {});
+    expect(result).toEqual({ ok: true });
+    expect(transport.request).toHaveBeenCalledTimes(1);
   });
 
-  it("maps reflect response schema options to Hindsight REST request shape", () => {
-    expect(
-      reflectRequestBody("query", {
-        context: "ctx",
-        budget: "mid",
-        maxTokens: 0,
-        responseSchema: { type: "object" },
-        includeFacts: true,
-        includeToolCalls: false,
-        tags: ["source:pi"],
-        tagsMatch: "any_strict",
-      }),
-    ).toEqual({
-      query: "query",
-      context: "ctx",
-      budget: "mid",
-      max_tokens: 0,
-      response_schema: { type: "object" },
-      include: { facts: {}, tool_calls: null },
-      tags: ["source:pi"],
-      tags_match: "any_strict",
-    });
+  it("retries on 5xx error and succeeds on second attempt", async () => {
+    const transport = createMockTransport([{ status: 503 }, {}]);
+    const retrying = withRetry(transport, 3, 10);
+    const result = await retrying.request("/test", {});
+    expect(result).toEqual({ ok: true });
+    expect(transport.request).toHaveBeenCalledTimes(2);
   });
 
-  it("sets the package-aligned user-agent on REST requests", async () => {
-    const fetch = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
-    vi.stubGlobal("fetch", fetch);
-
-    await createHindsightRestTransport(DEFAULT_CONFIG).request("/v1/health");
-
-    const headers = (fetch as unknown as { mock: { calls: Array<[string, RequestInit]> } }).mock
-      .calls[0]?.[1].headers as Headers;
-    expect(headers.get("User-Agent")).toBe(PI_HINDSIGHT_USER_AGENT);
+  it("fails after max retries exhausted", async () => {
+    const transport = createMockTransport([
+      { status: 503 },
+      { status: 503 },
+      { status: 503 },
+      { status: 503 },
+    ]);
+    const retrying = withRetry(transport, 3, 10);
+    await expect(retrying.request("/test", {})).rejects.toThrow();
+    expect(transport.request).toHaveBeenCalledTimes(4);
   });
 
-  it("encodes bank ids in REST paths", () => {
-    expect(encodeBankPath("bank/id", "/reflect")).toBe("/v1/default/banks/bank%2Fid/reflect");
-    expect(bankConfigPath("bank/id")).toBe("/v1/default/banks/bank%2Fid/config");
+  it("does not retry on 4xx client error", async () => {
+    const transport = createMockTransport([{ status: 404 }]);
+    const retrying = withRetry(transport, 3, 10);
+    await expect(retrying.request("/test", {})).rejects.toThrow();
+    expect(transport.request).toHaveBeenCalledTimes(1);
   });
 
-  it("asserts REST fallback response shapes", () => {
-    expect(assertHealthResponse({ status: "ok" })).toEqual({ status: "ok" });
-    expect(assertHealthResponse(null)).toEqual({});
-    expect(assertHealthResponse("ok")).toEqual({});
-    expect(assertReflectResponse({ text: "answer" })).toEqual({ text: "answer" });
-    expect(() => assertReflectResponse(null)).toThrow("non-object response");
+  it("retries on network error (fetch failed)", async () => {
+    const transport = createMockTransport([{ message: "fetch failed" }, {}]);
+    const retrying = withRetry(transport, 3, 10);
+    const result = await retrying.request("/test", {});
+    expect(result).toEqual({ ok: true });
+    expect(transport.request).toHaveBeenCalledTimes(2);
   });
 
-  it("preserves REST status and body for admin-tool error presentation", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({
-        ok: false,
-        status: 409,
-        json: async () => ({ detail: "operation is not pending" }),
-      })),
-    );
-    const transport = createHindsightRestTransport({
-      hindsight: { baseUrl: "http://hindsight.test/", apiKey: "secret", timeoutMs: 1000 },
-    } as never);
-
-    await expect(transport.request("/v1/default/banks/bank/operations/op")).rejects.toMatchObject({
-      status: 409,
-      body: { detail: "operation is not pending" },
-      message: 'Hindsight request failed with status 409: {"detail":"operation is not pending"}',
-    });
+  it("does not retry non-idempotent POST requests", async () => {
+    const transport = createMockTransport([{ status: 503 }, {}]);
+    const retrying = withRetry(transport, 3, 10);
+    await expect(retrying.request("/test", { method: "POST" })).rejects.toThrow();
+    expect(transport.request).toHaveBeenCalledTimes(1);
   });
 
-  it("redacts secrets from REST error messages while preserving structured body", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({
-        ok: false,
-        status: 401,
-        json: async () => ({ detail: "authorization: Bearer sk-testsecret1234567890" }),
-      })),
-    );
-    const transport = createHindsightRestTransport({
-      hindsight: { baseUrl: "http://hindsight.test/", apiKey: "secret", timeoutMs: 1000 },
-    } as never);
+  it("does not retry non-idempotent PATCH requests", async () => {
+    const transport = createMockTransport([{ status: 503 }, {}]);
+    const retrying = withRetry(transport, 3, 10);
+    await expect(retrying.request("/test", { method: "PATCH" })).rejects.toThrow();
+    expect(transport.request).toHaveBeenCalledTimes(1);
+  });
 
-    await expect(transport.request("/v1/default/banks/bank/profile")).rejects.toMatchObject({
-      status: 401,
-      body: { detail: "authorization: Bearer sk-testsecret1234567890" },
-      message:
-        'Hindsight request failed with status 401: {"detail":"authorization: [REDACTED] [REDACTED]"}',
-    });
+  it("does not retry non-idempotent PUT requests", async () => {
+    const transport = createMockTransport([{ status: 503 }, {}]);
+    const retrying = withRetry(transport, 3, 10);
+    await expect(retrying.request("/test", { method: "PUT" })).rejects.toThrow();
+    expect(transport.request).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries idempotent DELETE requests", async () => {
+    const transport = createMockTransport([{ status: 503 }, {}]);
+    const retrying = withRetry(transport, 3, 10);
+    const result = await retrying.request("/test", { method: "DELETE" });
+    expect(result).toEqual({ ok: true });
+    expect(transport.request).toHaveBeenCalledTimes(2);
   });
 });

@@ -995,7 +995,7 @@ describe("extension hooks", () => {
     );
   });
 
-  it("probes append capability even if global bank ensure fails", async () => {
+  it("records append capability without a live probe when global bank ensure fails", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-hooks-"));
     mkdirSync(join(cwd, ".git"));
     mkdirSync(join(cwd, ".pi"));
@@ -1022,14 +1022,11 @@ describe("extension hooks", () => {
     hindsightExtension(pi as any);
     await handlers.session_start?.[0]?.({}, ctx);
 
-    expect(mocked.client.retain).toHaveBeenCalledWith(
-      expect.stringMatching(/^pi-project-/),
-      "Pi Hindsight append capability probe. Safe to ignore.",
-      expect.objectContaining({
-        updateMode: "append",
-        documentId: expect.stringMatching(/^pi-hindsight-capability:append:/),
-      }),
-    );
+    expect(
+      mocked.client.retain.mock.calls.some(
+        (call) => call[1] === "Pi Hindsight append capability probe. Safe to ignore.",
+      ),
+    ).toBe(false);
     expect(ctx.ui.notify).toHaveBeenCalledWith(
       expect.stringContaining("Hindsight global bank ensure failed: global down"),
       "warning",
@@ -1417,11 +1414,6 @@ describe("extension hooks", () => {
     const { default: hindsightExtension } = await import("../extensions/index.js");
     hindsightExtension(pi as any);
     await handlers.session_start?.[0]?.({}, ctx);
-    expect(mocked.client.retain).toHaveBeenCalledWith(
-      "global-bank",
-      "Pi Hindsight append capability probe. Safe to ignore.",
-      expect.objectContaining({ updateMode: "append" }),
-    );
     mocked.client.retain.mockClear();
     await handlers.agent_end?.[0]?.(
       { messages: [{ role: "user", content: "remember", timestamp: 1 }] },
