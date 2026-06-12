@@ -324,10 +324,12 @@ export async function advanceRetainCursor(
   const path = retainCursorPath(cwd);
   const store = await readRetainCursorStore(path);
   const existing = store.sessions[sessionId];
+  const lastIndex = allMessages.length - 1;
   let effectiveIndex = retainedThroughIndex;
   if (isSessionRetainCursor(existing)) {
     effectiveIndex = Math.max(existing.index, retainedThroughIndex);
   }
+  effectiveIndex = Math.min(lastIndex, effectiveIndex);
   store.sessions[sessionId] = buildCursor(allMessages, effectiveIndex);
   await writeRetainCursorStore(path, store);
 }

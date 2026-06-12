@@ -142,6 +142,27 @@ describe("retain cursor", () => {
     expect(filterNewRetainMessages(edited, afterEditMark)).toEqual([]);
   });
 
+  it("clamps cursor index when a shorter branch replaces a longer retained transcript", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-cursor-"));
+    const sessionId = "shrink-branch";
+    const original = transcript(10);
+    const shortBranch = [
+      ...original.slice(0, 3),
+      msg("m3b", "assistant", "branched-response", 4),
+      msg("m4", "user", "message-4", 5),
+    ];
+
+    await advanceRetainCursor(cwd, sessionId, original, original.length - 1);
+    const beforeShrink = await readSessionRetainState(cwd, sessionId);
+    expect(beforeShrink?.cursor?.index).toBe(9);
+
+    await advanceRetainCursor(cwd, sessionId, shortBranch, shortBranch.length - 1);
+    const afterShrink = await readSessionRetainState(cwd, sessionId);
+
+    expect(afterShrink?.cursor?.index).toBe(shortBranch.length - 1);
+    expect(filterNewRetainMessages(shortBranch, afterShrink)).toEqual([]);
+  });
+
   it("retains branched suffixes without replaying the shared prefix", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-cursor-"));
     const sessionId = "branch-session";
