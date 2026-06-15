@@ -47,7 +47,11 @@ describe("recall quality fixtures", () => {
       client,
       config: DEFAULT_CONFIG,
       scopes: [
-        { kind: "project", bankId: "project-bank", tags: ["repo:abc"], tagsMatch: "any_strict" },
+        {
+          kind: "project",
+          bankId: "project-bank",
+          tagGroups: [{ tags: ["repo:abc"], match: "any_strict" }],
+        },
       ],
       messages: [user("Continue #248 after PR #252.")],
       cwd: process.cwd(),

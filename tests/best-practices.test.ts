@@ -130,8 +130,7 @@ describe("Hindsight best-practice invariants", () => {
     ]);
 
     expect(composeScopedTagFilter(["repo:abc"])).toEqual({
-      tags: ["repo:abc"],
-      tagsMatch: "any_strict",
+      tagGroups: [{ tags: ["repo:abc"], match: "any_strict" }],
     });
     expect(
       composeScopedTagFilter(["repo:abc"], { tags: ["topic:auth"], tagsMatch: "all" }),
@@ -156,17 +155,16 @@ describe("Hindsight best-practice invariants", () => {
       expect.objectContaining({
         kind: "project",
         bankId: expect.stringMatching(/^pi-project-/),
-        tags: [expect.stringMatching(/^repo:/)],
-        tagsMatch: "any_strict",
+        tagGroups: [{ tags: [expect.stringMatching(/^repo:/)], match: "any_strict" }],
       }),
       expect.objectContaining({
         kind: "global",
         bankId: "pi-global",
-        tags: ["source:pi"],
-        tagsMatch: "any_strict",
+        tagGroups: [{ tags: ["source:pi"], match: "any_strict" }],
       }),
     ]);
     expect(JSON.stringify(scopes)).not.toContain("metadata");
+    expect(scopes[0]!.tagGroups).not.toEqual(scopes[1]!.tagGroups);
   });
 
   it("uses deterministic replace documents for historical imports", async () => {

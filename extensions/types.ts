@@ -162,8 +162,7 @@ export interface RecallFailure {
   query: string;
   error: string;
   kind?: "project" | "global";
-  tags?: string[];
-  tagsMatch?: TagsMatch;
+  tagGroups?: HindsightTagGroup[];
 }
 
 export interface RecallBlock {

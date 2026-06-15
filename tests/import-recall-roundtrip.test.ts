@@ -276,7 +276,13 @@ describe("retain/import to recall roundtrip quality", () => {
     const recall = await recallForContext({
       client: store.client,
       config: DEFAULT_CONFIG,
-      scopes: [{ kind: "project", bankId: "project-bank", tags: [tag], tagsMatch: "any_strict" }],
+      scopes: [
+        {
+          kind: "project",
+          bankId: "project-bank",
+          tagGroups: [{ tags: [tag], match: "any_strict" }],
+        },
+      ],
       messages: [
         { role: "user", content: "What did issue #282 automatic retain decide?" } as never,
       ],
@@ -293,7 +299,7 @@ describe("retain/import to recall roundtrip quality", () => {
     );
     expect(store.recallCalls[0]).toMatchObject({
       bankId: "project-bank",
-      options: { tags: [tag], tagsMatch: "any_strict" },
+      options: { tagGroups: [{ tags: [tag], match: "any_strict" }] },
     });
     expect(recall.rendered).toContain("Keep issue #282 recall roundtrip coverage test-only");
     expect(recall.rendered).toContain("npm run check failed once");
@@ -340,7 +346,13 @@ describe("retain/import to recall roundtrip quality", () => {
     const recall = await recallForContext({
       client: store.client,
       config: strictConfig,
-      scopes: [{ kind: "project", bankId: "project-bank", tags: [tag], tagsMatch: "any_strict" }],
+      scopes: [
+        {
+          kind: "project",
+          bankId: "project-bank",
+          tagGroups: [{ tags: [tag], match: "any_strict" }],
+        },
+      ],
       messages: [{ role: "user", content: "What happened with issue #248?" } as never],
       cwd: fixture.dir,
     });
@@ -364,7 +376,7 @@ describe("retain/import to recall roundtrip quality", () => {
     });
     expect(store.recallCalls[0]).toMatchObject({
       bankId: "project-bank",
-      options: { tags: [tag], tagsMatch: "any_strict" },
+      options: { tagGroups: [{ tags: [tag], match: "any_strict" }] },
     });
     expect(recall.rendered).toContain("Fix retain queue race for issue #248");
     expect(recall.rendered).toContain("npm test failed: expected 2 got 1");

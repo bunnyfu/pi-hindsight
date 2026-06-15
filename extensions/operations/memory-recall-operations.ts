@@ -10,7 +10,7 @@ import {
   getEffectiveSessionMemoryMode,
   readSessionMemoryMeta,
 } from "../utils/session-memory-meta.js";
-import type { HindsightTagGroup, ResolvedConfig, TagsMatch } from "../types.js";
+import type { HindsightTagGroup, TagsMatch } from "../types.js";
 
 interface ExplicitRecallFilters {
   budget?: import("../types.js").Budget;

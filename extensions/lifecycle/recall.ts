@@ -2,12 +2,12 @@ import { basename } from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type {
   HindsightLikeClient,
+  HindsightTagGroup,
   RecallBlock,
   RecallFailure,
   RecallResultItem,
   RecallRole,
   ResolvedConfig,
-  TagsMatch,
 } from "../types.js";
 import { isInjectedHindsightMemory, projectMessageText } from "../utils/messages.js";
 import { createMemoryIdentity } from "../operations/memory-identity.js";
@@ -17,8 +17,7 @@ import { withTimeout } from "../client/timeout.js";
 export interface RecallScope {
   kind?: "project" | "global";
   bankId: string;
-  tags?: string[];
-  tagsMatch?: TagsMatch;
+  tagGroups?: HindsightTagGroup[];
 }
 
 function textFromRecallResponse(response: unknown): RecallResultItem[] {
@@ -168,8 +167,7 @@ export async function recallForContext(args: {
           ...(args.config.recall.queryTimestamp
             ? { queryTimestamp: args.config.recall.queryTimestamp }
             : {}),
-          ...(scope.tags ? { tags: scope.tags } : {}),
-          ...(scope.tagsMatch ? { tagsMatch: scope.tagsMatch } : {}),
+          ...(scope.tagGroups?.length ? { tagGroups: scope.tagGroups } : {}),
         }),
       );
       const results = filterRecallQuality(textFromRecallResponse(response)).items;
@@ -186,8 +184,7 @@ export async function recallForContext(args: {
         query,
         error: redactError(error),
         ...(scope.kind ? { kind: scope.kind } : {}),
-        ...(scope.tags ? { tags: scope.tags } : {}),
-        ...(scope.tagsMatch ? { tagsMatch: scope.tagsMatch } : {}),
+        ...(scope.tagGroups?.length ? { tagGroups: scope.tagGroups } : {}),
       });
     }
   }
