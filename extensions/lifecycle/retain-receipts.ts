@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { redactSecrets } from "../utils/sanitize.js";
-import type { UpdateMode } from "../types.js";
+import type { RetainOutcome, UpdateMode } from "../types.js";
 
 export interface RetainReceipt {
   createdAt: string;
@@ -9,9 +9,10 @@ export interface RetainReceipt {
   documentId: string;
   queueJobId: string;
   updateMode: UpdateMode;
-  source: "tool" | "import";
+  source: "tool" | "import" | "queue";
   context: string;
   tags: string[];
+  outcome?: RetainOutcome;
 }
 
 export interface RetainReceiptHistory {
@@ -50,21 +51,25 @@ function isRetainReceipt(value: unknown): value is RetainReceipt {
     typeof receipt.documentId === "string" &&
     typeof receipt.queueJobId === "string" &&
     (receipt.updateMode === "append" || receipt.updateMode === "replace") &&
-    (receipt.source === "tool" || receipt.source === "import") &&
+    (receipt.source === "tool" || receipt.source === "import" || receipt.source === "queue") &&
     typeof receipt.context === "string" &&
     Array.isArray(receipt.tags) &&
     receipt.tags.every((tag) => typeof tag === "string")
   );
 }
 
-export async function appendRetainReceipt(
-  cwd: string,
-  receipt: Omit<RetainReceipt, "createdAt"> & { createdAt?: string },
-  options: { redactSecrets?: boolean; maxContextChars?: number } = {},
-): Promise<RetainReceiptHistory> {
-  const path = retainReceiptsPath(cwd);
-  const current = await readRetainReceipts(path);
-  const nextReceipt: RetainReceipt = {
+type ReceiptInput = Omit<RetainReceipt, "createdAt"> & { createdAt?: string };
+type ReceiptOptions = { redactSecrets?: boolean; maxContextChars?: number };
+
+function receiptContext(context: string, options: ReceiptOptions): string {
+  const redacted = options.redactSecrets === false ? context : redactSecrets(context);
+  const maxChars = options.maxContextChars ?? MAX_RECEIPT_CONTEXT_CHARS;
+  if (redacted.length <= maxChars) return redacted;
+  return `${redacted.slice(0, maxChars)}…[truncated]`;
+}
+
+function buildReceipt(receipt: ReceiptInput, options: ReceiptOptions): RetainReceipt {
+  return {
     createdAt: receipt.createdAt ?? new Date().toISOString(),
     bankId: receipt.bankId,
     documentId: receipt.documentId,
@@ -73,30 +78,52 @@ export async function appendRetainReceipt(
     source: receipt.source,
     context: receiptContext(receipt.context, options),
     tags: receipt.tags,
+    ...(receipt.outcome ? { outcome: receipt.outcome } : {}),
   };
+}
 
-  function receiptContext(
-    context: string,
-    options: { redactSecrets?: boolean; maxContextChars?: number },
-  ): string {
-    const redacted = options.redactSecrets === false ? context : redactSecrets(context);
-    const maxChars = options.maxContextChars ?? MAX_RECEIPT_CONTEXT_CHARS;
-    if (redacted.length <= maxChars) return redacted;
-    return `${redacted.slice(0, maxChars)}…[truncated]`;
-  }
-  const receipts = [
-    nextReceipt,
-    ...current.receipts.filter(
-      (existing) =>
-        existing.documentId !== nextReceipt.documentId || existing.bankId !== nextReceipt.bankId,
+function mergeReceipt(receipts: RetainReceipt[], next: RetainReceipt): RetainReceipt[] {
+  return [
+    next,
+    ...receipts.filter(
+      (existing) => existing.documentId !== next.documentId || existing.bankId !== next.bankId,
     ),
-  ].slice(0, MAX_RECEIPTS);
-  const history = { version: 1 as const, receipts };
+  ];
+}
+
+async function writeReceiptHistory(
+  cwd: string,
+  receipts: RetainReceipt[],
+): Promise<RetainReceiptHistory> {
+  const path = retainReceiptsPath(cwd);
+  const history = { version: 1 as const, receipts: receipts.slice(0, MAX_RECEIPTS) };
   await mkdir(dirname(path), { recursive: true });
   const tempPath = `${path}.${process.pid}.${Date.now()}.tmp`;
   await writeFile(tempPath, `${JSON.stringify(history, null, 2)}\n`, "utf8");
   await rename(tempPath, path);
   return history;
+}
+
+export async function appendRetainReceipt(
+  cwd: string,
+  receipt: ReceiptInput,
+  options: ReceiptOptions = {},
+): Promise<RetainReceiptHistory> {
+  const current = await readRetainReceipts(retainReceiptsPath(cwd));
+  return writeReceiptHistory(cwd, mergeReceipt(current.receipts, buildReceipt(receipt, options)));
+}
+
+export async function appendRetainReceipts(
+  cwd: string,
+  receiptInputs: ReceiptInput[],
+  options: ReceiptOptions = {},
+): Promise<RetainReceiptHistory> {
+  if (receiptInputs.length === 0) return readRetainReceipts(retainReceiptsPath(cwd));
+  const current = await readRetainReceipts(retainReceiptsPath(cwd));
+  let receipts = current.receipts;
+  for (const input of receiptInputs)
+    receipts = mergeReceipt(receipts, buildReceipt(input, options));
+  return writeReceiptHistory(cwd, receipts);
 }
 
 export async function listRetainReceipts(cwd: string, limit = 10): Promise<RetainReceipt[]> {

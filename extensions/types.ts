@@ -177,6 +177,12 @@ export interface RecallBlock {
   results: RecallResultItem[];
 }
 
+export interface RetainOutcome {
+  itemsCount?: number;
+  operations?: number;
+  tokens?: number;
+}
+
 export interface RetainJob {
   id: string;
   bankId: string;

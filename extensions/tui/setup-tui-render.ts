@@ -2,6 +2,7 @@ import { DynamicBorder } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth, type Component } from "@earendil-works/pi-tui";
 import type { ConfigEditingTab } from "../config/config-editing-model.js";
 import type { RetainReceipt } from "../lifecycle/retain-receipts.js";
+import { formatRetainOutcome } from "../queue/flush-presenter.js";
 import {
   applySetupIntent,
   currentSetupTab,
@@ -83,12 +84,13 @@ function wrapWords(text: string, width: number): string[] {
 
 export function buildRetainReceiptStatusFacts(receipts: RetainReceipt[]): Array<[string, string]> {
   if (receipts.length === 0) return [["Retain receipts", "none"]];
-  return receipts
-    .slice(0, RECEIPT_FACT_LIMIT)
-    .map((receipt, index) => [
-      index === 0 ? "Recent retain" : `Recent retain ${index + 1}`,
-      `${receipt.bankId} ${shortDocumentId(receipt.documentId)}`,
-    ]);
+  return receipts.slice(0, RECEIPT_FACT_LIMIT).map((receipt, index) => {
+    const outcome = formatRetainOutcome(receipt.outcome);
+    const value = `${receipt.bankId} ${shortDocumentId(receipt.documentId)}${
+      outcome ? ` (${outcome})` : ""
+    }`;
+    return [index === 0 ? "Recent retain" : `Recent retain ${index + 1}`, value];
+  });
 }
 
 export function createSetupComponent(

@@ -4,15 +4,52 @@ import type {
   HindsightObservationScopes,
   ResolvedConfig,
   RetainJob,
+  RetainOutcome,
   UpdateMode,
 } from "../types.js";
 import { baseTags } from "../banks/banking.js";
 import { projectMessages } from "../utils/messages.js";
 import { contextLabel, liveDocumentId, stableSessionId } from "../utils/session.js";
-import { enqueueRetain, flushRetain, summarizeRetain } from "../queue/queue.js";
+import {
+  enqueueRetain,
+  flushRetain,
+  summarizeRetain,
+  type FlushRetainQueueResult,
+} from "../queue/queue.js";
 import { createMemoryIdentity } from "../operations/memory-identity.js";
 import { expandObservationScopes } from "./observation-scopes.js";
 import { buildRetainJob as buildRetainJobCore } from "./retain-job-builder.js";
+import { appendRetainReceipts } from "./retain-receipts.js";
+
+function hasRetainOutcome(outcome: { itemsCount?: number; operations?: number; tokens?: number }) {
+  return (
+    outcome.itemsCount !== undefined ||
+    outcome.operations !== undefined ||
+    outcome.tokens !== undefined
+  );
+}
+
+export async function recordRetainDeliveries(
+  cwd: string,
+  config: ResolvedConfig,
+  result: FlushRetainQueueResult,
+): Promise<void> {
+  if (!result.delivered?.length) return;
+  await appendRetainReceipts(
+    cwd,
+    result.delivered.map((delivery) => ({
+      queueJobId: delivery.queueJobId,
+      bankId: delivery.bankId,
+      documentId: delivery.documentId,
+      updateMode: delivery.updateMode,
+      source: "queue" as const,
+      context: delivery.context,
+      tags: delivery.tags,
+      ...(hasRetainOutcome(delivery.outcome) ? { outcome: delivery.outcome } : {}),
+    })),
+    { redactSecrets: config.retain.redactSecrets },
+  );
+}
 
 export function buildRetainJob(args: {
   config: ResolvedConfig;
@@ -72,6 +109,7 @@ export async function enqueueRetainFromAgentEnd(args: {
   if (!job) return { queued: false, sent: 0, remaining: 0 };
   await enqueueRetain(args.cwd, args.config, job);
   const result = await flushRetain(args.cwd, args.config, args.client);
+  await recordRetainDeliveries(args.cwd, args.config, result);
   if (args.config.retain.postRetainReflect) {
     try {
       await args.client.reflect(
@@ -117,6 +155,7 @@ export interface RetainDurablyResult {
   queueJobId: string;
   updateMode: UpdateMode;
   operationIds?: string[];
+  outcome?: RetainOutcome;
 }
 
 export function buildDurableRetainJob(args: Omit<RetainDurablyArgs, "client">): RetainJob {
@@ -150,5 +189,13 @@ export async function retainDurably(args: RetainDurablyArgs): Promise<RetainDura
     };
   }
   const result = await flushRetain(args.cwd, args.config, args.client, { maxJobs: 1 });
-  return { ...receipt, enqueued: true, ...result };
+  return {
+    ...receipt,
+    enqueued: true,
+    sent: result.sent,
+    remaining: result.remaining,
+    deadLettered: result.deadLettered,
+    ...(result.operationIds ? { operationIds: result.operationIds } : {}),
+    ...(result.outcome ? { outcome: result.outcome } : {}),
+  };
 }

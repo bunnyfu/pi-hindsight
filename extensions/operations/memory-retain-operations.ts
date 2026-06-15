@@ -109,6 +109,7 @@ export function createRetainOperations(deps: MemoryOperationsDeps) {
           source: "tool",
           context: args.context,
           tags,
+          ...(result.outcome ? { outcome: result.outcome } : {}),
         },
         { redactSecrets: config.retain.redactSecrets },
       );

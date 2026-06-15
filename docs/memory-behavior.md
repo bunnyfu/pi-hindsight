@@ -83,6 +83,8 @@ Retain also flushes on new retain attempts and shutdown. Set `retain.flushInterv
 
 Shutdown flushing is bounded by `retain.shutdownFlushMaxJobs` and `retain.shutdownFlushTimeoutMs`. If jobs remain after shutdown, they stay on disk and are visible through `/hindsight`.
 
+When Hindsight 0.8+ returns retain outcome metadata, flush reporting, `/hindsight:queue`, and the `/hindsight` status tab surface lightweight aggregates (items extracted, async operations, token usage), and the latest per-document outcome is kept in `retain-receipts.json`. Only aggregates are persisted — never raw retained payloads. Older servers that omit this metadata degrade gracefully with no outcome shown.
+
 ## Banks and missions
 
 Project and global bank missions live in Hindsight's bank configuration/database, not as normal Pi JSON settings. Pi's local JSON should identify which banks to use; Hindsight owns the extraction, reflection, and observation instructions for those banks.

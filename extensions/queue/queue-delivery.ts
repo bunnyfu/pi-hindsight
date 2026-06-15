@@ -1,5 +1,11 @@
 import type { HindsightLikeClient, RetainJob } from "../types.js";
 
+export interface RetainDeliveryOutcome {
+  itemsCount?: number;
+  operationIds: string[];
+  tokens?: number;
+}
+
 export function redactQueueError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   const text = message
@@ -70,6 +76,27 @@ export function operationIdsFromResponse(response: unknown): string[] {
     }
   }
   return [...new Set(operationIds)];
+}
+
+function positiveNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
+export function parseRetainOutcome(response: unknown): RetainDeliveryOutcome {
+  const operationIds = operationIdsFromResponse(response);
+  if (!response || typeof response !== "object") return { operationIds };
+  const record = response as Record<string, unknown>;
+  const usage =
+    record.usage && typeof record.usage === "object"
+      ? (record.usage as Record<string, unknown>)
+      : undefined;
+  const itemsCount = positiveNumber(record.items_count ?? record.itemsCount);
+  const tokens = usage ? positiveNumber(usage.total_tokens) : undefined;
+  return {
+    operationIds,
+    ...(itemsCount !== undefined ? { itemsCount } : {}),
+    ...(tokens !== undefined ? { tokens } : {}),
+  };
 }
 
 export async function deliverRetainJob(

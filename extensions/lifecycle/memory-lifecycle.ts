@@ -5,6 +5,7 @@ import { deriveProjectBankId } from "../banks/banking.js";
 import { createHindsightClient } from "../client/client.js";
 import { ensureGlobalBank, ensureProjectBank } from "../banks/bank-operations.js";
 import { flushRetainQueue, retainQueuePath } from "../queue/queue.js";
+import { recordRetainDeliveries } from "./retain.js";
 import { formatFlushRetainQueueResult } from "../queue/flush-presenter.js";
 import { bankSelectionMessage } from "../utils/diagnostics.js";
 import type { HindsightLikeClient, ResolvedConfig } from "../types.js";
@@ -82,7 +83,8 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
         maxJobs: config.retain.periodicFlushMaxJobs,
         maxElapsedMs: config.retain.periodicFlushTimeoutMs,
       })
-        .then((result) => {
+        .then(async (result) => {
+          await recordRetainDeliveries(runtime.cwd, config, result);
           if (result.deadLettered || result.remaining) {
             notify(runtime, formatFlushRetainQueueResult(result), "warning");
           }
@@ -224,6 +226,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
           maxElapsedMs: config.retain.shutdownFlushTimeoutMs,
           stopOnFirstFailure: true,
         });
+        await recordRetainDeliveries(runtime.cwd, config, result);
         if (result.deadLettered || result.remaining) {
           notify(runtime, formatFlushRetainQueueResult(result), "warning");
         }
