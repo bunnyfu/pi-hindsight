@@ -59,6 +59,8 @@ export interface ResolvedConfig {
     budget: Budget;
     maxTokens: number;
     types: string[];
+    includeSourceFacts: boolean;
+    maxSourceFactsTokens: number;
     contextTurns: number;
     roles: RecallRole[];
     maxQueryChars: number;
@@ -155,6 +157,8 @@ export interface RecallResultItem {
   tags?: string[];
   metadata?: Record<string, string>;
   occurred_start?: string | null;
+  source_fact_ids?: string[];
+  sourceFacts?: string[];
 }
 
 export interface RecallFailure {

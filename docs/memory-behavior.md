@@ -20,6 +20,8 @@ Set `recall.types` to include `world` or `experience`, or to an empty list, only
 
 Each recall scope is enforced with a strict Hindsight `tag_groups` filter (`any_strict`), so project and user memory stay isolated. The `hindsight_recall` and `hindsight_reflect` tools accept an optional `tagGroups` filter that is AND-ed with the automatic scope.
 
+Set `recall.includeSourceFacts: true` (bounded by `recall.maxSourceFactsTokens`) to attach supporting evidence lines to recalled observations. It is off by default to keep recall conservative.
+
 `recall.queryTimestamp` should normally be omitted. Set it only when recall should be anchored to a specific point in time.
 
 ## Last-recall snapshots

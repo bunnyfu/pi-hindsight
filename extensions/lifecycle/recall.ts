@@ -20,6 +20,12 @@ export interface RecallScope {
   tagGroups?: HindsightTagGroup[];
 }
 
+function sourceFactText(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const text = (value as { text?: unknown }).text;
+  return typeof text === "string" && text.trim() ? text : undefined;
+}
+
 function textFromRecallResponse(response: unknown): RecallResultItem[] {
   const record = response as Record<string, unknown>;
   const raw = Array.isArray(record.results)
@@ -29,7 +35,18 @@ function textFromRecallResponse(response: unknown): RecallResultItem[] {
       : Array.isArray(response)
         ? response
         : [];
-  return raw.map((item) => item as RecallResultItem);
+  const sourceFacts =
+    record.source_facts && typeof record.source_facts === "object"
+      ? (record.source_facts as Record<string, unknown>)
+      : undefined;
+  return raw.map((entry) => {
+    const item = entry as RecallResultItem;
+    if (!sourceFacts || !item.source_fact_ids?.length) return item;
+    const evidence = item.source_fact_ids
+      .map((id) => sourceFactText(sourceFacts[id]))
+      .filter((text): text is string => Boolean(text));
+    return evidence.length ? { ...item, sourceFacts: evidence } : item;
+  });
 }
 
 function itemText(item: RecallResultItem): string {
@@ -104,6 +121,8 @@ export function composeRecallQuery(messages: AgentMessage[], policy: RecallQuery
   );
 }
 
+const RECALL_SOURCE_FACT_LINES = 3;
+
 export function renderRecallBlocks(blocks: RecallBlock[], topK = 12): string {
   const nonEmpty = blocks.filter((block) => block.memoryCount > 0);
   if (nonEmpty.length === 0) return "";
@@ -116,6 +135,9 @@ export function renderRecallBlocks(blocks: RecallBlock[], topK = 12): string {
     block.results.slice(0, topK).forEach((item, index) => {
       const tags = item.tags?.length ? ` [${item.tags.join(", ")}]` : "";
       lines.push(`${index + 1}. ${itemText(item)}${tags}`);
+      for (const fact of (item.sourceFacts ?? []).slice(0, RECALL_SOURCE_FACT_LINES)) {
+        lines.push(`   - evidence: ${fact}`);
+      }
     });
   }
   lines.push("</hindsight-memory>");
@@ -164,6 +186,12 @@ export async function recallForContext(args: {
           budget: args.config.recall.budget,
           maxTokens: args.config.recall.maxTokens,
           types: args.config.recall.types,
+          ...(args.config.recall.includeSourceFacts
+            ? {
+                includeSourceFacts: true,
+                maxSourceFactsTokens: args.config.recall.maxSourceFactsTokens,
+              }
+            : {}),
           ...(args.config.recall.queryTimestamp
             ? { queryTimestamp: args.config.recall.queryTimestamp }
             : {}),

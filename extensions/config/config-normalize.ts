@@ -227,6 +227,14 @@ export function normalizeConfig(
       ),
       maxTokens: positiveInt(config.recall?.maxTokens, DEFAULT_CONFIG.recall.maxTokens),
       types: stringArray(config.recall?.types, DEFAULT_CONFIG.recall.types),
+      includeSourceFacts: bool(
+        config.recall?.includeSourceFacts,
+        DEFAULT_CONFIG.recall.includeSourceFacts,
+      ),
+      maxSourceFactsTokens: positiveInt(
+        config.recall?.maxSourceFactsTokens,
+        DEFAULT_CONFIG.recall.maxSourceFactsTokens,
+      ),
       contextTurns: positiveInt(config.recall?.contextTurns, DEFAULT_CONFIG.recall.contextTurns),
       roles: enumArray(
         config.recall?.roles,

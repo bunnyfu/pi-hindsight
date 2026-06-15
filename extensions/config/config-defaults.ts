@@ -13,6 +13,8 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
     budget: "mid",
     maxTokens: 800,
     types: ["observation"],
+    includeSourceFacts: false,
+    maxSourceFactsTokens: 4096,
     contextTurns: 2,
     roles: ["user", "assistant"],
     maxQueryChars: 800,

@@ -93,6 +93,8 @@ Bank missions are intentionally absent from this JSON example. Hindsight bank co
     "budget": "mid",
     "maxTokens": 800,
     "types": ["observation"],
+    "includeSourceFacts": false,
+    "maxSourceFactsTokens": 4096,
     "roles": ["user", "assistant"],
     "contextTurns": 2,
     "maxQueryChars": 800,
