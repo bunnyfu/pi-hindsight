@@ -96,6 +96,26 @@ npm run smoke:hindsight
 
 The GitHub `Hindsight Integration` workflow also runs live smoke when configured. An unconfigured workflow skip is not proof for memory-path changes.
 
+## Memory benchmark
+
+`npm run bench:memory` replays scripted multi-session scenarios (a lifeOS personal-facts scenario and a coding-decisions scenario, each spanning several sessions) through the real recall/retain lifecycle against a live Hindsight, then scores memory quality:
+
+```bash
+export HINDSIGHT_INTEGRATION_ENABLED=true
+export HINDSIGHT_BASE_URL=http://localhost:8888
+# export HINDSIGHT_API_KEY=... # if needed
+npm run bench:memory
+```
+
+The run prints and saves a JSON report (path is logged; override with `PI_HINDSIGHT_BENCH_REPORT`). Metrics, all in `[0,1]`:
+
+- `recallHitRate` — fraction of later-session questions whose planted fact surfaced in the injected recall block (higher is better).
+- `contaminationRate` — `1` if a recall block leaked into a retained payload, else `0` (must stay `0`).
+- `duplicateRetainRate` — fraction of messages re-retained when replaying an already-retained session (must stay `0`).
+- `tokenBudgetAdherence` — fraction of recalls whose injected block fit the configured `recall.maxTokens` budget (higher is better).
+
+The benchmark is gated like live smoke: it skips unless `HINDSIGHT_INTEGRATION_ENABLED=true`, and runs in the label-gated `Hindsight Integration` lane (labels `ci:live-smoke` or `memory-path`). Compare reports across runs to catch regressions from refactors or Hindsight upgrades.
+
 ## Source-of-truth order
 
 1. Official Hindsight docs and API behavior
