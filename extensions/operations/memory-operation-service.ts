@@ -3,7 +3,7 @@ import {
   importMemoryChatTranscript,
   importMemoryProjectSessions,
   importMemorySession,
-} from "../imports/import-operations.js";
+} from "../imports/import-sessions.js";
 import { createConfigOperations } from "./memory-config-operations.js";
 import { createQueueOperations } from "../queue/queue-operations.js";
 import { createRecallOperations } from "./memory-recall-operations.js";

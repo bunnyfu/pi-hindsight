@@ -12,8 +12,8 @@ import {
   parsePiSessionJsonl,
   selectImportBranches,
 } from "../extensions/imports/import-sessions.js";
-import { readImportCheckpoint } from "../extensions/imports/import-checkpoint.js";
-import { hashImportContent, readImportManifest } from "../extensions/imports/import-manifest.js";
+import { readImportCheckpoint } from "../extensions/imports/import-plan.js";
+import { hashImportContent, readImportManifest } from "../extensions/imports/import-plan.js";
 import { enqueueRetainJob, readRetainQueue, resolveQueuePath } from "../extensions/queue/queue.js";
 import { stableSessionId } from "../extensions/utils/session.js";
 import { setNextSessionRetainMode } from "../extensions/utils/session-memory-meta.js";

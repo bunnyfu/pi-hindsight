@@ -69,14 +69,11 @@ Related hand-authored docs: [Retain Queue and durable delivery](/pi-hindsight/co
 
 Related hand-authored docs: [Historical import](/pi-hindsight/guides/importing-sessions/)
 
-- `extensions/import-sessions.ts` — Imports Pi session JSONL history.
-- `extensions/import-chat-transcript.ts` — Imports chat transcript JSONL.
-- `extensions/import-parser.ts` — Projects raw session records into importable messages.
-- `extensions/import-plan.ts` — Builds preview and execution plans.
-- `extensions/import-execution.ts` — Runs import plans.
-- `extensions/import-retain.ts` — Transforms import batches into Hindsight retain calls.
-- `extensions/import-checkpoint.ts` — Tracks deterministic import progress.
-- `extensions/import-manifest.ts` — Records import provenance.
+- `extensions/imports/import-parse.ts` — Parses Pi session and chat-transcript JSONL into messages and branches.
+- `extensions/imports/import-plan.ts` — Builds import plans and tracks checkpoint/manifest provenance.
+- `extensions/imports/import-execute.ts` — Curates messages and delivers import retain payloads through the queue.
+- `extensions/imports/import-presentation.ts` — Renders import preview and result messages.
+- `extensions/imports/import-sessions.ts` — Orchestrates session and chat-transcript imports and exposes the public import API.
 
 ## Diagnostics, status, and safety
 

@@ -12,7 +12,7 @@ import { baseTags, findRepoRoot } from "../banks/banking.js";
 import { stableSessionId } from "./session.js";
 import { createMemoryIdentity } from "../operations/memory-identity.js";
 import { expandObservationScopes } from "../lifecycle/observation-scopes.js";
-import type { ImportManifestEntry } from "../imports/import-manifest.js";
+import type { ImportManifestEntry } from "../imports/import-plan.js";
 import {
   formatHindsightActivity,
   formatHindsightStatus,

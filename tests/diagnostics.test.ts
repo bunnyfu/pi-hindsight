@@ -6,7 +6,7 @@ import {
   observationScopeDiagnostics,
   safeConfig,
 } from "../extensions/utils/diagnostics.js";
-import type { ImportManifestEntry } from "../extensions/imports/import-manifest.js";
+import type { ImportManifestEntry } from "../extensions/imports/import-plan.js";
 import {
   PI_HINDSIGHT_CLIENT_RANGE,
   PI_HINDSIGHT_SUPPORTED_NODE,
