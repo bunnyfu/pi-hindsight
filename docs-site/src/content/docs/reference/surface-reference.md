@@ -91,19 +91,23 @@ Retain explicit durable user memory in the configured user bank. Use for stable 
 
 Ask Hindsight to synthesize an answer from memory. Use explicitly, not for default recall.
 
-| Parameter          | Type                                   | Required | Description                                                                                   |
-| ------------------ | -------------------------------------- | -------- | --------------------------------------------------------------------------------------------- |
-| `query`            | string                                 | yes      |                                                                                               |
-| `context`          | string                                 | no       |                                                                                               |
-| `bank`             | string                                 | no       |                                                                                               |
-| `budget`           | low \| mid \| high                     | no       | Optional Hindsight reflect budget override for this tool call.                                |
-| `maxTokens`        | integer                                | no       | Optional Hindsight reflect token cap override for this tool call.                             |
-| `responseSchema`   | object/map                             | no       |                                                                                               |
-| `includeFacts`     | boolean                                | no       | Ask Hindsight reflect to include facts when supported.                                        |
-| `includeToolCalls` | boolean                                | no       | Ask Hindsight reflect to include tool-call trace data when supported.                         |
-| `tags`             | array<string>                          | no       | Additional tag filter.                                                                        |
-| `tagsMatch`        | any \| all \| any_strict \| all_strict | no       |                                                                                               |
-| `tagGroups`        | array<object>                          | no       | Compound Hindsight tag_groups filter. AND-ed with the automatic Pi project/user scope filter. |
+| Parameter               | Type                                      | Required | Description                                                                                                 |
+| ----------------------- | ----------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
+| `query`                 | string                                    | yes      |                                                                                                             |
+| `context`               | string                                    | no       |                                                                                                             |
+| `bank`                  | string                                    | no       |                                                                                                             |
+| `budget`                | low \| mid \| high                        | no       | Optional Hindsight reflect budget override for this tool call.                                              |
+| `maxTokens`             | integer                                   | no       | Optional Hindsight reflect token cap override for this tool call.                                           |
+| `responseSchema`        | object/map                                | no       |                                                                                                             |
+| `includeFacts`          | boolean                                   | no       | Ask Hindsight reflect to include facts when supported.                                                      |
+| `includeToolCalls`      | boolean                                   | no       | Ask Hindsight reflect to include tool-call trace data when supported.                                       |
+| `includeToolCallOutput` | boolean                                   | no       | When includeToolCalls is set, include tool-call outputs (default true); set false for an inputs-only trace. |
+| `factTypes`             | array<world \| experience \| observation> | no       | Restrict reflection to these Hindsight fact types.                                                          |
+| `excludeMentalModels`   | boolean                                   | no       | Exclude all mental models from reflection.                                                                  |
+| `excludeMentalModelIds` | array<string>                             | no       | Exclude specific mental models by id from reflection.                                                       |
+| `tags`                  | array<string>                             | no       | Additional tag filter.                                                                                      |
+| `tagsMatch`             | any \| all \| any_strict \| all_strict    | no       |                                                                                                             |
+| `tagGroups`             | array<object>                             | no       | Compound Hindsight tag_groups filter. AND-ed with the automatic Pi project/user scope filter.               |
 
 ## Commands
 

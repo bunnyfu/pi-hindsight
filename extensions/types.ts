@@ -274,6 +274,7 @@ export interface HindsightLikeClient {
       responseSchema?: Record<string, unknown>;
       includeFacts?: boolean;
       includeToolCalls?: boolean;
+      includeToolCallOutput?: boolean;
       factTypes?: Array<"world" | "experience" | "observation">;
       excludeMentalModels?: boolean;
       excludeMentalModelIds?: string[];

@@ -54,7 +54,11 @@ function reflectInclude(options: ReflectOptions): ReflectRequest["include"] | un
     include.facts = options.includeFacts ? {} : null;
   }
   if (options?.includeToolCalls !== undefined) {
-    include.tool_calls = options.includeToolCalls ? {} : null;
+    include.tool_calls = options.includeToolCalls
+      ? options.includeToolCallOutput === false
+        ? { output: false }
+        : {}
+      : null;
   }
   return include;
 }

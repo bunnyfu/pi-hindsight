@@ -33,6 +33,7 @@ interface ExplicitRecallFilters {
 interface ExplicitReflectFilters extends Omit<ExplicitRecallFilters, "queryTimestamp" | "types"> {
   includeFacts?: boolean;
   includeToolCalls?: boolean;
+  includeToolCallOutput?: boolean;
   factTypes?: Array<"world" | "experience" | "observation">;
   excludeMentalModels?: boolean;
   excludeMentalModelIds?: string[];
@@ -108,6 +109,9 @@ export function createRecallOperations(deps: MemoryOperationsDeps) {
         ...(filters.includeFacts !== undefined ? { includeFacts: filters.includeFacts } : {}),
         ...(filters.includeToolCalls !== undefined
           ? { includeToolCalls: filters.includeToolCalls }
+          : {}),
+        ...(filters.includeToolCallOutput !== undefined
+          ? { includeToolCallOutput: filters.includeToolCallOutput }
           : {}),
         ...(filters.factTypes ? { factTypes: filters.factTypes } : {}),
         ...(filters.excludeMentalModels !== undefined

@@ -274,6 +274,10 @@ describe("operation catalog", () => {
     expect(properties.maxTokens?.minimum).toBe(0);
     expect(properties.includeFacts?.type).toBe("boolean");
     expect(properties.includeToolCalls?.type).toBe("boolean");
+    expect(properties.includeToolCallOutput?.type).toBe("boolean");
+    expect(properties.factTypes?.type).toBe("array");
+    expect(properties.excludeMentalModels?.type).toBe("boolean");
+    expect(properties.excludeMentalModelIds?.type).toBe("array");
 
     await tool.execute(
       "call",

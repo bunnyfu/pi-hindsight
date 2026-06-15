@@ -145,6 +145,8 @@ describe("memory operations", () => {
         factTypes: ["observation"],
         excludeMentalModels: true,
         excludeMentalModelIds: ["model:stale"],
+        includeToolCalls: true,
+        includeToolCallOutput: false,
         tags: ["topic:hindsight"],
         tagsMatch: "all_strict",
         tagGroups: [{ tags: ["kind:decision"], match: "any_strict" }],
@@ -180,6 +182,8 @@ describe("memory operations", () => {
       factTypes: ["observation"],
       excludeMentalModels: true,
       excludeMentalModelIds: ["model:stale"],
+      includeToolCalls: true,
+      includeToolCallOutput: false,
       tagGroups: [
         { tags: [expect.stringMatching(/^repo:/)], match: "any_strict" },
         { tags: ["topic:hindsight"], match: "all_strict" },

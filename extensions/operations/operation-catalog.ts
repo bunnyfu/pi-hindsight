@@ -9,6 +9,7 @@ import { maintenanceCommandOperations } from "../tui/command-maintenance.js";
 import { sessionCommandOperations } from "../tui/command-session.js";
 import type { MemoryOperationsDeps } from "./memory-operation-service.js";
 import { createMemoryOperations } from "./memory-operation-service.js";
+import { formatReflectResult } from "./reflect-presenter.js";
 import { runHindsightSetupTui } from "../tui/setup-tui.js";
 import { retainToolResponse } from "../tui/tool-presenters.js";
 
@@ -344,6 +345,25 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
             description: "Ask Hindsight reflect to include tool-call trace data when supported.",
           }),
         ),
+        includeToolCallOutput: Type.Optional(
+          Type.Boolean({
+            description:
+              "When includeToolCalls is set, include tool-call outputs (default true); set false for an inputs-only trace.",
+          }),
+        ),
+        factTypes: Type.Optional(
+          Type.Array(recallTypeSchema, {
+            description: "Restrict reflection to these Hindsight fact types.",
+          }),
+        ),
+        excludeMentalModels: Type.Optional(
+          Type.Boolean({ description: "Exclude all mental models from reflection." }),
+        ),
+        excludeMentalModelIds: Type.Optional(
+          Type.Array(Type.String(), {
+            description: "Exclude specific mental models by id from reflection.",
+          }),
+        ),
         tags: Type.Optional(Type.Array(Type.String(), { description: "Additional tag filter." })),
         tagsMatch: Type.Optional(tagMatchSchema),
         tagGroups: tagGroupsSchema(
@@ -365,6 +385,16 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
             ...(params.includeToolCalls !== undefined
               ? { includeToolCalls: params.includeToolCalls }
               : {}),
+            ...(params.includeToolCallOutput !== undefined
+              ? { includeToolCallOutput: params.includeToolCallOutput }
+              : {}),
+            ...(params.factTypes ? { factTypes: params.factTypes } : {}),
+            ...(params.excludeMentalModels !== undefined
+              ? { excludeMentalModels: params.excludeMentalModels }
+              : {}),
+            ...(params.excludeMentalModelIds
+              ? { excludeMentalModelIds: params.excludeMentalModelIds }
+              : {}),
             ...(params.tags ? { tags: params.tags } : {}),
             ...(params.tagsMatch ? { tagsMatch: params.tagsMatch } : {}),
             ...(params.tagGroups
@@ -374,12 +404,7 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
           },
         );
         return {
-          content: [
-            {
-              type: "text",
-              text: typeof result === "string" ? result : JSON.stringify(result, null, 2),
-            },
-          ],
+          content: [{ type: "text", text: formatReflectResult(result) }],
           details: { bankId },
         };
       },
