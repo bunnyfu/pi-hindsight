@@ -161,6 +161,30 @@ async function bankFact(client: HindsightLikeClient, route: BankRoute): Promise<
   }
 }
 
+async function serverVersionFact(
+  client: HindsightLikeClient,
+): Promise<[string, string] | undefined> {
+  if (!client.getVersion) return undefined;
+  try {
+    const version = await withStatusTimeout(client.getVersion(), "Hindsight version");
+    const apiVersion = textField(version, "api_version");
+    if (!apiVersion) return undefined;
+    const features = nestedRecord(version, "features");
+    const enabled = features
+      ? Object.keys(features)
+          .filter((key) => features[key] === true)
+          .sort()
+      : [];
+    return [
+      "Server version",
+      enabled.length ? `${apiVersion} · features: ${enabled.join(", ")}` : apiVersion,
+    ];
+  } catch {
+    // Version endpoint is optional enrichment; older servers lack /version.
+    return undefined;
+  }
+}
+
 export async function collectStatusHealthFacts(args: {
   client: HindsightLikeClient;
   config: ResolvedConfig;
@@ -170,6 +194,8 @@ export async function collectStatusHealthFacts(args: {
   try {
     if (args.client.health) await withStatusTimeout(args.client.health(), "Hindsight health");
     facts.push(["Server", "reachable"]);
+    const versionFact = await serverVersionFact(args.client);
+    if (versionFact) facts.push(versionFact);
   } catch (error) {
     facts.push(["Server", `unreachable · ${redactError(error)}`]);
   }
