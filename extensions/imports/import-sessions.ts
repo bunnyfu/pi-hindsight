@@ -29,12 +29,7 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { redactError, redactSecrets } from "../utils/sanitize.js";
 import { removeQueuedRetains } from "../queue/queue.js";
 import { resolveOperationBank } from "../banks/bank-selection.js";
-import {
-  type ParsedSession,
-  parseImportSessionJsonl,
-  parsePiSessionJsonl,
-  selectImportBranches,
-} from "./import-parse.js";
+import { type ParsedSession, parseImportSessionJsonl } from "./import-parse.js";
 export { parseImportSessionJsonl, parsePiSessionJsonl } from "./import-parse.js";
 export { selectImportBranches } from "./import-parse.js";
 export type { ImportBranch } from "./import-parse.js";

@@ -4,7 +4,6 @@ import type {
   MemoryRoute,
   MemoryRouteClassification,
   MemoryRouteDecision,
-  MemoryRouterAdapter,
   MemoryRouteSignal,
   MemoryRouteTargetPreview,
   RoutingBankRole,
