@@ -299,4 +299,5 @@ export interface HindsightLikeClient {
   getBankStats?(bankId: string): Promise<unknown>;
   getBankConfig?(bankId: string): Promise<unknown>;
   health?(): Promise<unknown>;
+  getVersion?(): Promise<unknown>;
 }

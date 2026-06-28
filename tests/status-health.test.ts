@@ -11,6 +11,10 @@ describe("status health", () => {
       recall: vi.fn(),
       reflect: vi.fn(),
       health: vi.fn(async () => ({ ok: true })),
+      getVersion: vi.fn(async () => ({
+        api_version: "0.8.3",
+        features: { observations: true, mcp: false, worker: true, bank_config_api: false },
+      })),
       getBankProfile: vi.fn(async (bankId: string) => ({
         bank_id: bankId,
         name: `${bankId} name`,
@@ -48,6 +52,7 @@ describe("status health", () => {
     expect(facts).toEqual(
       expect.arrayContaining([
         ["Server", "reachable"],
+        ["Server version", "0.8.3 · features: observations, worker"],
         ["Project bank", "reachable · project-bank name · Project → Bank: project-bank"],
         ["User bank", "reachable · global-bank name · User → Bank: global-bank"],
         ["Project bank config", "Bank overrides: 1 · Resolved config fields: 2"],
@@ -83,5 +88,48 @@ describe("status health", () => {
 
     expect(facts.find(([key]) => key === "Server")?.[1]).toContain("unreachable");
     expect(facts.find(([key]) => key === "Project bank")?.[1]).toContain("unreachable");
+  });
+
+  it("omits server version when getVersion is unavailable", async () => {
+    const client: HindsightLikeClient = {
+      retain: vi.fn(),
+      retainBatch: vi.fn(),
+      recall: vi.fn(),
+      reflect: vi.fn(),
+      health: vi.fn(async () => ({ ok: true })),
+      getBankProfile: vi.fn(async (bankId: string) => ({ bank_id: bankId, name: bankId })),
+    };
+
+    const facts = await collectStatusHealthFacts({
+      client,
+      config: DEFAULT_CONFIG,
+      projectBankId: "bank",
+    });
+
+    expect(facts.find(([key]) => key === "Server")?.[1]).toBe("reachable");
+    expect(facts.some(([key]) => key === "Server version")).toBe(false);
+  });
+
+  it("degrades silently when getVersion throws or returns no api_version", async () => {
+    const client: HindsightLikeClient = {
+      retain: vi.fn(),
+      retainBatch: vi.fn(),
+      recall: vi.fn(),
+      reflect: vi.fn(),
+      health: vi.fn(async () => ({ ok: true })),
+      getVersion: vi.fn(async () => {
+        throw new Error("no /version endpoint");
+      }),
+      getBankProfile: vi.fn(async (bankId: string) => ({ bank_id: bankId, name: bankId })),
+    };
+
+    const facts = await collectStatusHealthFacts({
+      client,
+      config: DEFAULT_CONFIG,
+      projectBankId: "bank",
+    });
+
+    expect(facts.find(([key]) => key === "Server")?.[1]).toBe("reachable");
+    expect(facts.some(([key]) => key === "Server version")).toBe(false);
   });
 });

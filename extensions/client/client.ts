@@ -220,6 +220,10 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
           return unwrapSdkResponse(response, "health");
         }),
       ),
+    getVersion: () =>
+      withTimeout("hindsight getVersion", timeoutMs, (signal) =>
+        withRetry("getVersion", () => raw.getVersion({ signal })),
+      ),
   };
 }
 
