@@ -1,5 +1,5 @@
 import type { ConfigureMemoryArgs, MemoryOperationsDeps } from "./memory-operation-types.js";
-import { configureMemory, initMemoryConfig } from "../config/config-operations.js";
+import { configureMemory, initMemoryConfig } from "../config/config-writer.js";
 
 export function createConfigOperations(deps: MemoryOperationsDeps) {
   return {

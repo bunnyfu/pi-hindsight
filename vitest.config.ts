@@ -13,7 +13,7 @@ export default defineConfig({
         "extensions/config*.ts",
         "extensions/memory-lifecycle*.ts",
         "extensions/client.ts",
-        "extensions/client-rest.ts",
+        "extensions/client/client-retry.ts",
         "extensions/timeout.ts",
       ],
       thresholds: {
@@ -99,7 +99,7 @@ export default defineConfig({
           functions: 55,
           lines: 65,
         },
-        "extensions/client-rest.ts": {
+        "extensions/client/client-retry.ts": {
           statements: 70,
           branches: 65,
           functions: 70,

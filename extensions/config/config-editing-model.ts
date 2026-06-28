@@ -5,11 +5,10 @@ import type {
   ConfigEditingTab,
   ConfigLayers,
   TabId,
-} from "./config-editing-types.js";
+} from "./config-editing-registry.js";
 import {
   buildConfigEditingFieldsFromRegistry,
   buildStatusFacts,
-  enabledDisabled,
 } from "./config-editing-registry.js";
 
 export type {
@@ -19,7 +18,7 @@ export type {
   ConfigLayers,
   FieldId,
   TabId,
-} from "./config-editing-types.js";
+} from "./config-editing-registry.js";
 export {
   enabledDisabled,
   inputDefaultForConfigEditingField,

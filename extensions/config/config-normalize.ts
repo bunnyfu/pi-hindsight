@@ -1,19 +1,80 @@
 import type { HindsightEntityInput, ResolvedConfig } from "../types.js";
 import { DEFAULT_CONFIG } from "./config-defaults.js";
-import {
-  bool,
-  enumArray,
-  enumValue,
-  isRecord,
-  optionalString,
-  optionalStringArray,
-  positiveInt,
-  stringArray,
-  stringMatrix,
-  stringValue,
-  validEnvVarName,
-} from "./config-utils.js";
 
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function merge<T>(base: T, patch: unknown): T {
+  if (!isRecord(base) || !isRecord(patch)) return (patch ?? base) as T;
+  const out: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    out[key] = isRecord(value) && isRecord(out[key]) ? merge(out[key], value) : value;
+  }
+  return out as T;
+}
+
+export function envBool(env: NodeJS.ProcessEnv, name: string): boolean | undefined {
+  const value = env[name];
+  if (value === undefined) return undefined;
+  return ["1", "true", "yes", "on"].includes(value.toLowerCase());
+}
+
+export function bool(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+export function positiveInt(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+export function stringValue(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+
+export function optionalString(value: unknown, fallback?: string): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+
+export function validEnvVarName(value: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(value);
+}
+
+export function enumValue<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
+  return typeof value === "string" && (allowed as readonly string[]).includes(value)
+    ? (value as T)
+    : fallback;
+}
+
+export function stringArray(value: unknown, fallback: string[]): string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string") ? value : fallback;
+}
+
+export function stringMatrix(value: unknown, fallback: string[][]): string[][] {
+  return Array.isArray(value) &&
+    value.every(
+      (scope) =>
+        Array.isArray(scope) && scope.length > 0 && scope.every((item) => typeof item === "string"),
+    )
+    ? value
+    : fallback;
+}
+
+export function enumArray<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+  fallback: T[],
+): T[] {
+  return Array.isArray(value) && value.every((item) => allowed.includes(item as T))
+    ? (value as T[])
+    : fallback;
+}
+
+export function optionalStringArray(value: unknown): string[] | undefined {
+  return Array.isArray(value) && value.every((item) => typeof item === "string")
+    ? value
+    : undefined;
+}
 function normalizeApiKeyRefString(value: unknown): string | undefined {
   if (typeof value !== "string" || !value.startsWith("env:")) return undefined;
   const name = value.slice("env:".length);
@@ -166,6 +227,14 @@ export function normalizeConfig(
       ),
       maxTokens: positiveInt(config.recall?.maxTokens, DEFAULT_CONFIG.recall.maxTokens),
       types: stringArray(config.recall?.types, DEFAULT_CONFIG.recall.types),
+      includeSourceFacts: bool(
+        config.recall?.includeSourceFacts,
+        DEFAULT_CONFIG.recall.includeSourceFacts,
+      ),
+      maxSourceFactsTokens: positiveInt(
+        config.recall?.maxSourceFactsTokens,
+        DEFAULT_CONFIG.recall.maxSourceFactsTokens,
+      ),
       contextTurns: positiveInt(config.recall?.contextTurns, DEFAULT_CONFIG.recall.contextTurns),
       roles: enumArray(
         config.recall?.roles,
@@ -216,6 +285,7 @@ export function normalizeConfig(
           : DEFAULT_CONFIG.recall.lastRecallPath,
       topK: positiveInt(config.recall?.topK, DEFAULT_CONFIG.recall.topK),
       timeoutMs: positiveInt(config.recall?.timeoutMs, DEFAULT_CONFIG.recall.timeoutMs),
+      cacheTtlMs: positiveInt(config.recall?.cacheTtlMs, DEFAULT_CONFIG.recall.cacheTtlMs),
       injectionMode: "context",
       injectionPosition: enumValue(
         config.recall?.injectionPosition,

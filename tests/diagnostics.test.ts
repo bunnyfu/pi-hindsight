@@ -6,7 +6,7 @@ import {
   observationScopeDiagnostics,
   safeConfig,
 } from "../extensions/utils/diagnostics.js";
-import type { ImportManifestEntry } from "../extensions/imports/import-manifest.js";
+import type { ImportManifestEntry } from "../extensions/imports/import-plan.js";
 import {
   PI_HINDSIGHT_CLIENT_RANGE,
   PI_HINDSIGHT_SUPPORTED_NODE,
@@ -85,7 +85,7 @@ describe("diagnostics", () => {
         npm: PI_HINDSIGHT_SUPPORTED_NPM,
         typebox: PI_HINDSIGHT_SUPPORTED_TYPEBOX,
         hindsightServer:
-          "Official-client-compatible Hindsight server; advanced tools are capability-gated.",
+          "Hindsight 0.8+ with append update_mode support; advanced tools are capability-gated.",
         policy: "Pi-first 1.0 integration; global platform admin parity is out of scope.",
       },
     });
@@ -101,8 +101,9 @@ describe("diagnostics", () => {
       deadLetterError: null,
       action: null,
     });
-    expect(report.capabilities).toMatchObject({
-      appendUpdateMode: "not checked",
+    expect(report.serverRequirements).toMatchObject({
+      appendUpdateMode: "required (Hindsight 0.8+)",
+      action: "Upgrade to Hindsight 0.8+ if live append retain fails.",
     });
     expect(report.memoryProfile).toBe("project-only");
     expect(report.memoryRoutes).toEqual({ recall: ["project"], autoRetain: "project" });
@@ -195,27 +196,20 @@ describe("diagnostics", () => {
     expect(result.action).toContain("observations.scopes");
   });
 
-  it("formats append capability diagnostics", () => {
+  it("formats server floor diagnostics", () => {
     const report = JSON.parse(
       formatDebugReport({
         cwd: process.cwd(),
         projectBankId: "bank",
         config: DEFAULT_CONFIG,
         queueLength: 0,
-        capabilities: {
-          appendUpdateMode: false,
-          checkedAt: "2026-04-27T12:00:00.000Z",
-          error: "unsupported",
-          probeDocumentId: "pi-hindsight-capability:append:bank",
-        },
       }),
     ) as Record<string, unknown>;
 
-    expect(report.capabilities).toMatchObject({
-      appendUpdateMode: "unsupported",
-      error: "unsupported",
-      probeDocumentId: "pi-hindsight-capability:append:bank",
-      action: "Upgrade Hindsight; append update mode is required for live retain.",
+    expect(report.serverRequirements).toMatchObject({
+      appendUpdateMode: "required (Hindsight 0.8+)",
+      clientPackage: "@vectorize-io/hindsight-client",
+      action: "Upgrade to Hindsight 0.8+ if live append retain fails.",
     });
   });
 

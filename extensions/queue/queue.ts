@@ -1,19 +1,24 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
-import type { HindsightLikeClient, RetainJob } from "../types.js";
-import { deliverRetainJob, operationIdsFromResponse, redactQueueError } from "./queue-delivery.js";
+import type {
+  HindsightLikeClient,
+  ResolvedConfig,
+  RetainJob,
+  RetainOutcome,
+  UpdateMode,
+} from "../types.js";
+import { deliverRetainJob, parseRetainOutcome, redactQueueError } from "./queue-delivery.js";
 import { JsonlQueueStore, type JsonlQueueFileSummary } from "./jsonl-queue-store.js";
-import {
-  RETAIN_QUEUE_LOCK,
-  isQueueLockOwnerStale,
-  type QueueLockOwner,
-  withQueueLock,
-} from "./queue-lock.js";
+import { withQueueLock } from "./queue-lock.js";
 
 export { RETAIN_QUEUE_LOCK, isQueueLockOwnerStale, type QueueLockOwner } from "./queue-lock.js";
 
 export function resolveQueuePath(cwd: string, queuePath: string): string {
   return isAbsolute(queuePath) ? queuePath : join(cwd, queuePath);
+}
+
+export function retainQueuePath(cwd: string, config: ResolvedConfig): string {
+  return resolveQueuePath(cwd, config.retain.queuePath);
 }
 
 export function resolveDeadLetterQueuePath(path: string): string {
@@ -119,12 +124,24 @@ export type FlushRetainQueueOptions = {
   maxElapsedMs?: number;
 };
 
+export interface RetainDeliverySummary {
+  queueJobId: string;
+  bankId: string;
+  documentId: string;
+  updateMode: UpdateMode;
+  context: string;
+  tags: string[];
+  outcome: RetainOutcome;
+}
+
 export interface FlushRetainQueueResult {
   sent: number;
   remaining: number;
   deadLettered: number;
   malformed: number;
   operationIds?: string[];
+  outcome?: RetainOutcome;
+  delivered?: RetainDeliverySummary[];
 }
 
 function isRetainJob(value: unknown): value is RetainJob {
@@ -184,6 +201,11 @@ export async function flushRetainQueue(
     const remaining: RetainJob[] = [];
     const deadLetteredJobs: RetainJob[] = [];
     const operationIds: string[] = [];
+    const delivered: RetainDeliverySummary[] = [];
+    let itemsCount = 0;
+    let hasItemsCount = false;
+    let tokens = 0;
+    let hasTokens = false;
     let sent = 0;
     for (const [index, job] of jobs.entries()) {
       if (index >= maxJobs || Date.now() - started >= maxElapsedMs) {
@@ -192,7 +214,30 @@ export async function flushRetainQueue(
       }
       try {
         const response = await deliverRetainJob(client, job);
-        operationIds.push(...operationIdsFromResponse(response));
+        const outcome = parseRetainOutcome(response);
+        operationIds.push(...outcome.operationIds);
+        if (outcome.itemsCount !== undefined) {
+          itemsCount += outcome.itemsCount;
+          hasItemsCount = true;
+        }
+        if (outcome.tokens !== undefined) {
+          tokens += outcome.tokens;
+          hasTokens = true;
+        }
+        const jobOutcome: RetainOutcome = {
+          ...(outcome.itemsCount !== undefined ? { itemsCount: outcome.itemsCount } : {}),
+          ...(outcome.operationIds.length ? { operations: outcome.operationIds.length } : {}),
+          ...(outcome.tokens !== undefined ? { tokens: outcome.tokens } : {}),
+        };
+        delivered.push({
+          queueJobId: job.id,
+          bankId: job.bankId,
+          documentId: job.documentId,
+          updateMode: job.updateMode,
+          context: job.item.context,
+          tags: job.item.tags ?? [],
+          outcome: jobOutcome,
+        });
         sent += 1;
       } catch (error) {
         const errorMessage = redactQueueError(error);
@@ -220,12 +265,56 @@ export async function flushRetainQueue(
     await appendMalformedQueueLines(path, parsed.malformedLines);
     const appendedDeadLetterJobs = await appendDeadLetterJobs(path, deadLetteredJobs);
     await writeRetainQueue(path, remaining);
+    const uniqueOperationIds = [...new Set(operationIds)];
+    const aggregate: RetainOutcome = {
+      ...(hasItemsCount ? { itemsCount } : {}),
+      ...(uniqueOperationIds.length ? { operations: uniqueOperationIds.length } : {}),
+      ...(hasTokens ? { tokens } : {}),
+    };
     return {
       sent,
       remaining: remaining.length,
       deadLettered: appendedDeadLetterJobs,
       malformed: parsed.malformedLines.length,
-      ...(operationIds.length ? { operationIds: [...new Set(operationIds)] } : {}),
+      ...(uniqueOperationIds.length ? { operationIds: uniqueOperationIds } : {}),
+      ...(hasItemsCount || uniqueOperationIds.length || hasTokens ? { outcome: aggregate } : {}),
+      ...(delivered.length ? { delivered } : {}),
     };
   });
+}
+
+export async function enqueueRetain(
+  cwd: string,
+  config: ResolvedConfig,
+  job: RetainJob,
+): Promise<EnqueueRetainJobResult> {
+  return enqueueRetainJobWithStats(retainQueuePath(cwd, config), job);
+}
+
+export async function flushRetain(
+  cwd: string,
+  config: ResolvedConfig,
+  client: HindsightLikeClient,
+  options?: FlushRetainQueueOptions,
+): Promise<FlushRetainQueueResult> {
+  return flushRetainQueue(retainQueuePath(cwd, config), client, options);
+}
+
+export async function readQueuedRetains(cwd: string, config: ResolvedConfig): Promise<RetainJob[]> {
+  return readRetainQueue(retainQueuePath(cwd, config));
+}
+
+export async function removeQueuedRetains(
+  cwd: string,
+  config: ResolvedConfig,
+  predicate: (job: RetainJob) => boolean,
+): Promise<number> {
+  return removeRetainQueueJobs(retainQueuePath(cwd, config), predicate);
+}
+
+export async function summarizeRetain(
+  cwd: string,
+  config: ResolvedConfig,
+): Promise<RetainQueueSummary> {
+  return summarizeRetainQueue(retainQueuePath(cwd, config));
 }

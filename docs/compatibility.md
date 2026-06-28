@@ -4,14 +4,14 @@ Pi Hindsight 1.0 is a Pi-first Hindsight integration. This page is the support c
 
 ## Supported runtime matrix
 
-| Component                   | 1.0 support policy                                                                                                                                                 | Source of truth                                                      |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| Node.js                     | `>=20`                                                                                                                                                             | `package.json#engines.node`                                          |
-| npm                         | `>=10`                                                                                                                                                             | `package.json#engines.npm`                                           |
-| Pi runtime packages         | Tested with the `@earendil-works/pi-*` versions pinned in `devDependencies`; peer dependencies accept Pi runtime packages supplied by the host Pi installation.    | `package.json#devDependencies` and `package.json#peerDependencies`   |
-| TypeBox                     | `>=1.1.24 <2`                                                                                                                                                      | `package.json#peerDependencies.typebox`                              |
-| Hindsight TypeScript client | `@vectorize-io/hindsight-client ^0.6.1`                                                                                                                            | `package.json#dependencies`                                          |
-| Hindsight server            | Any server compatible with the official client and the endpoints used by the selected tools. Advanced surfaces are capability-gated where upstream support varies. | `/hindsight:doctor`, live smoke, and official Hindsight API behavior |
+| Component                   | 1.0 support policy                                                                                                                                                                   | Source of truth                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| Node.js                     | `>=20`                                                                                                                                                                               | `package.json#engines.node`                                          |
+| npm                         | `>=10`                                                                                                                                                                               | `package.json#engines.npm`                                           |
+| Pi runtime packages         | Tested with the `@earendil-works/pi-*` versions pinned in `devDependencies`; peer dependencies accept Pi runtime packages supplied by the host Pi installation.                      | `package.json#devDependencies` and `package.json#peerDependencies`   |
+| TypeBox                     | `>=1.1.24 <2`                                                                                                                                                                        | `package.json#peerDependencies.typebox`                              |
+| Hindsight TypeScript client | `@vectorize-io/hindsight-client ^0.8.1`                                                                                                                                              | `package.json#dependencies`                                          |
+| Hindsight server            | **Hindsight 0.8+** with append `update_mode` support, compatible with `@vectorize-io/hindsight-client ^0.8.1`. Advanced surfaces are capability-gated where upstream support varies. | `/hindsight:doctor`, live smoke, and official Hindsight API behavior |
 
 ## Required Hindsight capabilities
 
@@ -24,21 +24,16 @@ The automatic memory path requires:
 - deterministic document IDs accepted by retain
 - tag filters for scoped recall
 
-If append retain is unavailable, live automatic retain is not considered supported for 1.0. `/hindsight:doctor` reports append capability and a remediation action.
+If append retain is unavailable, live automatic retain is not considered supported for 1.0. Upgrade to Hindsight 0.8+; `/hindsight:doctor` documents the server floor and remediation action.
 
 ## Capability-gated surfaces
 
-These tools are part of the 1.0 Pi surface, but the exact fields and behavior can depend on the connected Hindsight server version:
+These surfaces are part of the 1.0 Pi surface, but the exact fields and behavior can depend on the connected Hindsight server version:
 
-- native file retain and async operation tracking
-- document, entity, graph, tag, memory-unit, and chunk inspection
-- memory history and delete-observations repair tools
-- mental model history/refresh operation details
-- bank template schema import/export
-- bank config override fields
 - advanced recall/reflect options such as trace, source facts, included chunks, response schemas, and tool-call facts
+- read-only bank config/stats facts in status
 
-When a server does not expose one of these endpoints or fields, Pi Hindsight should fail with a clear unsupported-capability message rather than silently changing request shape.
+When a server does not expose one of these endpoints or fields, Pi Hindsight should fail with a clear unsupported-capability message rather than silently changing request shape. Admin and browsing surfaces (documents, entities, graphs, tags, memory units, mental models, directives, bank templates, operations) live in the Hindsight control-plane web UI.
 
 ## 1.0 scope decision
 
@@ -50,9 +45,7 @@ In scope:
 - queue-first retain and diagnostics
 - deterministic project/user bank routing
 - explicit retain/recall/reflect tools
-- Pi session and seed import
-- scoped bank profile/config/template operations
-- inspection and repair tools useful during Pi memory work
+- Pi session import
 - live smoke and package/release verification
 
 Out of scope for 1.0 unless a follow-up issue explicitly pulls them in:
@@ -75,7 +68,7 @@ Rationale: global-admin and platform surfaces carry broader safety, permission, 
 - configured Hindsight base URL without secrets
 - official Hindsight client package and supported range
 - health reachability
-- append capability and action if unsupported
+- server floor (Hindsight 0.8+ append retain) and remediation action
 - memory profile, routes, selected banks, queue state, import state, and activity
 
 Diagnostics must redact API keys and avoid printing raw retained payloads in normal mode.

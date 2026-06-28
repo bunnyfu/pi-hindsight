@@ -39,6 +39,22 @@ describe("resolveConfig", () => {
     expect(config.banks.project.retainMission).toBe("Project retain mission");
   });
 
+  it("defaults to conservative source-facts recall and normalizes overrides", () => {
+    const cwd = tmp();
+    const defaults = resolveConfig(cwd, { HINDSIGHT_BASE_URL: "http://h" });
+    expect(defaults.recall.includeSourceFacts).toBe(false);
+    expect(defaults.recall.maxSourceFactsTokens).toBe(4096);
+
+    mkdirSync(join(cwd, ".pi"));
+    writeFileSync(
+      join(cwd, ".pi", "hindsight.json"),
+      JSON.stringify({ recall: { includeSourceFacts: true, maxSourceFactsTokens: 256 } }),
+    );
+    const configured = resolveConfig(cwd, { HINDSIGHT_BASE_URL: "http://h" });
+    expect(configured.recall.includeSourceFacts).toBe(true);
+    expect(configured.recall.maxSourceFactsTokens).toBe(256);
+  });
+
   it("normalizes granular bank missions", () => {
     const cwd = tmp();
     mkdirSync(join(cwd, ".pi"));
@@ -357,6 +373,7 @@ describe("resolveConfig", () => {
     expect(config.recall.lastRecallPath).toBe(".pi/hindsight/last-recall.json");
     expect(config.recall.topK).toBe(8);
     expect(config.recall.timeoutMs).toBe(40_000);
+    expect(config.recall.cacheTtlMs).toBe(60_000);
     expect(config.recall.injectionPosition).toBe("append");
     expect(config.recall.queryTimestamp).toBeUndefined();
     expect(config.globalRetain.mode).toBe("explicit-only");

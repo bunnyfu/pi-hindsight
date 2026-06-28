@@ -55,15 +55,11 @@ Pi Hindsight distinguishes local Pi behavior from bank-owned Hindsight settings.
 - `Location: Project` or `Location: User` describes the Pi memory route.
 - `Bank: <bank-id>` names the concrete Hindsight bank that owns missions, config overrides, mental models, and directives.
 
-Mission text and mental models remain Hindsight bank settings, not normal Pi JSON config. Use `hindsight_get_bank_config` to inspect resolved bank config and override counts. Use `hindsight_update_bank_config` with `confirm: true` for raw Hindsight per-bank config override fields. Use `hindsight_reset_bank_config` only when you intentionally want to clear bank config overrides and fall back to Hindsight defaults/template state. Use `hindsight_get_bank_template_schema` to fetch the server JSON Schema for portable bank template manifests. Use `hindsight_export_bank_template` with `outputFile` to save a portable manifest JSON file. Use `hindsight_import_bank_template` to dry-run or apply a local/inline manifest; applying requires `dryRun: false` and `confirmApply: true`. Use `hindsight_list_directives`, `hindsight_get_directive`, `hindsight_create_directive`, `hindsight_update_directive`, and `hindsight_delete_directive` to manage bank-owned hard rules.
-
-### Bank config surface audit
-
-Current Hindsight OpenAPI exposes generic per-bank config updates through `BankConfigUpdate.updates`, so Pi exposes raw field updates via `hindsight_update_bank_config` instead of adding local Pi config keys for every server field. High-value per-bank fields supported through raw updates or bank-template manifests include retain extraction/chunking, observation/consolidation limits, reflect source-fact budgets, MCP tool allowlists, retain strategies, and recall budget mapping fields. Keep server-admin or credential-like fields out of Pi local config unless Hindsight documents them as safe per-bank overrides.
+Mission text, bank config overrides, bank templates, mental models, and directives remain Hindsight bank settings, not normal Pi JSON config. Manage them in the Hindsight control-plane web UI. `/hindsight` status surfaces resolved bank config and override counts read-only.
 
 ## Compatibility and runtime identity
 
-Pi Hindsight targets the official `@vectorize-io/hindsight-client` package and the current documented Hindsight REST/OpenAPI behavior. The runtime client sends a `pi-hindsight/<package-version>` user-agent on both official-client and REST fallback paths. `/hindsight` and debug/status diagnostics surface local package identity, configured server URL, append-mode support, bank reachability, queue state, and failed-consolidation hints where the server exposes them.
+Pi Hindsight targets the official `@vectorize-io/hindsight-client` package and the current documented Hindsight REST/OpenAPI behavior. The runtime client sends a `pi-hindsight/<package-version>` user-agent on SDK requests. `/hindsight` and debug/status diagnostics surface local package identity, configured server URL, append-mode support, bank reachability, queue state, and failed-consolidation hints where the server exposes them.
 
 ## Setup TUI
 
@@ -97,6 +93,8 @@ Bank missions are intentionally absent from this JSON example. Hindsight bank co
     "budget": "mid",
     "maxTokens": 800,
     "types": ["observation"],
+    "includeSourceFacts": false,
+    "maxSourceFactsTokens": 4096,
     "roles": ["user", "assistant"],
     "contextTurns": 2,
     "maxQueryChars": 800,
@@ -106,6 +104,7 @@ Bank missions are intentionally absent from this JSON example. Hindsight bank co
     "lastRecallPath": ".pi/hindsight/last-recall.json",
     "topK": 8,
     "timeoutMs": 40000,
+    "cacheTtlMs": 60000,
     "injectionPosition": "append"
   },
   "observations": {

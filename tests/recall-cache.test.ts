@@ -54,4 +54,15 @@ describe("createRecallCache", () => {
     await new Promise((resolve) => setTimeout(resolve, 5));
     expect(cache.get("key")).toBeUndefined();
   });
+
+  it("reads TTL dynamically when given a getter", async () => {
+    let ttl = 60_000;
+    const cache = createRecallCache(() => ttl);
+    const entry = makeEntry("dynamic");
+    cache.set("key", entry);
+    expect(cache.get("key")).toEqual(entry);
+    ttl = 1;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(cache.get("key")).toBeUndefined();
+  });
 });

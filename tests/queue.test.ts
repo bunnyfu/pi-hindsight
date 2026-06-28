@@ -26,6 +26,7 @@ import {
 } from "../extensions/queue/queue.js";
 import {
   operationIdsFromResponse,
+  parseRetainOutcome,
   retainOptionsForJob,
 } from "../extensions/queue/queue-delivery.js";
 import type { RetainJob } from "../extensions/types.js";
@@ -138,6 +139,56 @@ describe("retain queue", () => {
         operation_ids: ["op-5"],
       }),
     ).toEqual(["op-2", "op-3", "op-4", "op-5"]);
+  });
+
+  it("parses retain outcome metadata and tolerates old-server responses", () => {
+    expect(parseRetainOutcome(undefined)).toEqual({ operationIds: [] });
+    expect(parseRetainOutcome({ success: true, items_count: 3, async: false })).toEqual({
+      operationIds: [],
+      itemsCount: 3,
+    });
+    expect(
+      parseRetainOutcome({ operation_id: "op-1", items_count: 2, usage: { total_tokens: 120 } }),
+    ).toEqual({ operationIds: ["op-1"], itemsCount: 2, tokens: 120 });
+    expect(parseRetainOutcome({ status: "ok" })).toEqual({ operationIds: [] });
+  });
+
+  it("aggregates retain outcome across delivered jobs", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
+    await enqueueRetainJob(path, job);
+    await enqueueRetainJob(path, { ...job, id: "2", documentId: "doc-2" });
+    let n = 0;
+    const result = await flushRetainQueue(path, {
+      retain: async () => ({
+        operation_id: `op-${++n}`,
+        items_count: 2,
+        usage: { total_tokens: 50 },
+      }),
+      recall: async () => [],
+      reflect: async () => ({}),
+    });
+    expect(result.sent).toBe(2);
+    expect(result.outcome).toEqual({ itemsCount: 4, operations: 2, tokens: 100 });
+    expect(result.delivered).toHaveLength(2);
+    expect(result.delivered?.[0]).toMatchObject({
+      queueJobId: "1",
+      documentId: "doc",
+      outcome: { itemsCount: 2, operations: 1, tokens: 50 },
+    });
+  });
+
+  it("omits outcome aggregates when the server returns no metadata", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
+    await enqueueRetainJob(path, job);
+    const result = await flushRetainQueue(path, {
+      retain: async () => ({ status: "ok" }),
+      recall: async () => [],
+      reflect: async () => ({}),
+    });
+    expect(result.sent).toBe(1);
+    expect(result.outcome).toBeUndefined();
+    expect(result.operationIds).toBeUndefined();
+    expect(result.delivered?.[0]?.outcome).toEqual({});
   });
 
   it("persists and flushes jobs", async () => {

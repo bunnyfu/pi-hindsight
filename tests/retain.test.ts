@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../extensions/config/config.js";
-import { buildRetainJob } from "../extensions/lifecycle/retain.js";
+import { buildRetainJob, recordRetainDeliveries } from "../extensions/lifecycle/retain.js";
+import { listRetainReceipts } from "../extensions/lifecycle/retain-receipts.js";
 import type { AgentEndEvent } from "@earendil-works/pi-coding-agent";
 
 describe("buildRetainJob", () => {
@@ -207,5 +211,47 @@ describe("buildRetainJob", () => {
     const retained = JSON.parse(job?.item.content ?? "[]") as Array<Record<string, unknown>>;
     expect(retained[0]).not.toHaveProperty("model");
     expect(retained[0]).not.toHaveProperty("content");
+  });
+});
+
+describe("recordRetainDeliveries", () => {
+  it("persists queue-source receipts with outcome aggregates", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-deliveries-"));
+    await recordRetainDeliveries(cwd, DEFAULT_CONFIG, {
+      sent: 1,
+      remaining: 0,
+      deadLettered: 0,
+      malformed: 0,
+      delivered: [
+        {
+          queueJobId: "job-1",
+          bankId: "bank",
+          documentId: "pi-session:abc",
+          updateMode: "append",
+          context: "Pi coding session",
+          tags: ["source:pi"],
+          outcome: { itemsCount: 3, operations: 1 },
+        },
+      ],
+    });
+
+    const receipts = await listRetainReceipts(cwd, 10);
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0]).toMatchObject({
+      source: "queue",
+      documentId: "pi-session:abc",
+      outcome: { itemsCount: 3, operations: 1 },
+    });
+  });
+
+  it("writes no receipts when there are no deliveries", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-deliveries-"));
+    await recordRetainDeliveries(cwd, DEFAULT_CONFIG, {
+      sent: 0,
+      remaining: 0,
+      deadLettered: 0,
+      malformed: 0,
+    });
+    expect(await listRetainReceipts(cwd, 10)).toEqual([]);
   });
 });

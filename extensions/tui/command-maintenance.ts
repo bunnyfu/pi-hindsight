@@ -11,6 +11,7 @@ import {
 import {
   flushRetainQueueNotifyLevel,
   formatFlushRetainQueueResult,
+  formatRetainOutcome,
 } from "../queue/flush-presenter.js";
 import { redactError } from "../utils/sanitize.js";
 
@@ -124,8 +125,10 @@ export function maintenanceCommandOperations(operations: Operations): CommandOpe
           const active = result.active.valid;
           const dead = result.deadLetter.valid;
           const malformed = result.active.malformed + result.deadLetter.malformed;
+          const latest = result.recentOutcomes.find((entry) => entry.outcome);
+          const outcomeText = latest ? `; last retain ${formatRetainOutcome(latest.outcome)}` : "";
           ctx.ui.notify(
-            `Hindsight retain queue active=${active}; dead-letter=${dead}; malformed=${malformed}; path=${result.queuePath}`,
+            `Hindsight retain queue active=${active}; dead-letter=${dead}; malformed=${malformed}${outcomeText}; path=${result.queuePath}`,
             dead || malformed ? "warning" : "info",
           );
         },

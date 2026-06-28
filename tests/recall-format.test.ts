@@ -297,6 +297,82 @@ describe("recall formatting", () => {
     expect(rendered).not.toContain("two");
   });
 
+  it("renders source-fact evidence lines under observations, capped per item", () => {
+    const rendered = renderRecallBlocks([
+      {
+        bankId: "b",
+        query: "q",
+        memoryCount: 1,
+        rendered: "",
+        results: [
+          {
+            text: "User prefers tabs",
+            tags: ["source:pi"],
+            sourceFacts: [
+              "said use tabs in #12",
+              "reverted spaces PR",
+              "config sets tabs",
+              "extra",
+            ],
+          },
+        ],
+      },
+    ]);
+    expect(rendered).toContain("1. User prefers tabs");
+    expect(rendered).toContain("   - evidence: said use tabs in #12");
+    expect(rendered).toContain("   - evidence: reverted spaces PR");
+    expect(rendered).toContain("   - evidence: config sets tabs");
+    expect(rendered).not.toContain("extra");
+  });
+
+  it("requests source facts and renders resolved evidence when enabled", async () => {
+    const options: Record<string, unknown>[] = [];
+    const result = await recallForContext({
+      client: {
+        retain: async () => undefined,
+        recall: async (_bankId, _query, opts) => {
+          options.push((opts ?? {}) as Record<string, unknown>);
+          return {
+            results: [{ text: "observation A", source_fact_ids: ["f1", "f2"] }],
+            source_facts: { f1: { text: "evidence one" }, f2: { text: "evidence two" } },
+          };
+        },
+        reflect: async () => ({}),
+      },
+      config: {
+        ...DEFAULT_CONFIG,
+        recall: { ...DEFAULT_CONFIG.recall, includeSourceFacts: true, maxSourceFactsTokens: 256 },
+      },
+      scopes: [{ bankId: "b" }],
+      messages: [{ role: "user", content: "q", timestamp: 1 }] as unknown as AgentMessage[],
+    });
+
+    expect(options[0]).toMatchObject({ includeSourceFacts: true, maxSourceFactsTokens: 256 });
+    expect(result.rendered).toContain("observation A");
+    expect(result.rendered).toContain("   - evidence: evidence one");
+    expect(result.rendered).toContain("   - evidence: evidence two");
+  });
+
+  it("does not request source facts by default", async () => {
+    const options: Record<string, unknown>[] = [];
+    await recallForContext({
+      client: {
+        retain: async () => undefined,
+        recall: async (_bankId, _query, opts) => {
+          options.push((opts ?? {}) as Record<string, unknown>);
+          return { results: [{ text: "x" }] };
+        },
+        reflect: async () => ({}),
+      },
+      config: DEFAULT_CONFIG,
+      scopes: [{ bankId: "b" }],
+      messages: [{ role: "user", content: "q", timestamp: 1 }] as unknown as AgentMessage[],
+    });
+
+    expect(options[0]).not.toHaveProperty("includeSourceFacts");
+    expect(options[0]).not.toHaveProperty("maxSourceFactsTokens");
+  });
+
   it("records slow recall as failed without throwing", async () => {
     const result = await recallForContext({
       client: {

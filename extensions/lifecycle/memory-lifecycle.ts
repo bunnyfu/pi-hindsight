@@ -1,14 +1,14 @@
 import type { AgentEndEvent } from "@earendil-works/pi-coding-agent";
 import { resolveConfig } from "../config/config.js";
-import { consumeLastConfigMigrationResults } from "../config/config-migration.js";
+import { consumeLastConfigMigrationResults } from "../config/config.js";
 import { deriveProjectBankId } from "../banks/banking.js";
 import { createHindsightClient } from "../client/client.js";
 import { ensureGlobalBank, ensureProjectBank } from "../banks/bank-operations.js";
-import { detectAppendCapability } from "../client/capabilities.js";
-import { flushRetainQueue, resolveQueuePath } from "../queue/queue.js";
+import { flushRetainQueue, retainQueuePath } from "../queue/queue.js";
+import { recordRetainDeliveries } from "./retain.js";
 import { formatFlushRetainQueueResult } from "../queue/flush-presenter.js";
 import { bankSelectionMessage } from "../utils/diagnostics.js";
-import type { HindsightCapabilities, HindsightLikeClient, ResolvedConfig } from "../types.js";
+import type { HindsightLikeClient, ResolvedConfig } from "../types.js";
 import { redactError } from "../utils/sanitize.js";
 import {
   notify,
@@ -22,11 +22,21 @@ import {
 import { createRetainTurnPolicy } from "./memory-lifecycle-retain.js";
 import { createRecallTurnPolicy } from "./memory-lifecycle-recall.js";
 
+export interface InitHealthFailure {
+  subsystem: "project-bank" | "user-bank";
+  error: string;
+}
+
+export interface InitHealth {
+  checkedAt: string;
+  failures: InitHealthFailure[];
+}
+
 export interface MemoryLifecycleDeps {
   getClient(): HindsightLikeClient;
   getConfig(): ResolvedConfig;
   getProjectBankId(): string;
-  getCapabilities(): HindsightCapabilities | undefined;
+  getInitHealth(): InitHealth | undefined;
   reloadConfig(cwd: string): void;
 }
 
@@ -45,7 +55,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
   let config: ResolvedConfig = resolveConfig(initialCwd);
   let client: HindsightLikeClient = createHindsightClient(config);
   let projectBankId = deriveProjectBankId(initialCwd, config);
-  let capabilities: HindsightCapabilities | undefined;
+  let initHealth: InitHealth | undefined;
   let periodicFlush: NodeJS.Timeout | undefined;
   let periodicFlushActive = false;
   const stopPeriodicFlush = () => {
@@ -59,13 +69,12 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
     config = resolveConfig(cwd);
     client = createHindsightClient(config);
     projectBankId = deriveProjectBankId(cwd, config);
-    capabilities = undefined;
   };
 
   const startPeriodicFlush = (runtime: RuntimeSnapshot) => {
     stopPeriodicFlush();
     if (!config.enabled || !config.retain.enabled || config.retain.flushIntervalMs <= 0) return;
-    const queuePath = resolveQueuePath(runtime.cwd, config.retain.queuePath);
+    const queuePath = retainQueuePath(runtime.cwd, config);
     periodicFlush = setInterval(() => {
       if (periodicFlushActive) return;
       periodicFlushActive = true;
@@ -74,7 +83,8 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
         maxJobs: config.retain.periodicFlushMaxJobs,
         maxElapsedMs: config.retain.periodicFlushTimeoutMs,
       })
-        .then((result) => {
+        .then(async (result) => {
+          await recordRetainDeliveries(runtime.cwd, config, result);
           if (result.deadLettered || result.remaining) {
             notify(runtime, formatFlushRetainQueueResult(result), "warning");
           }
@@ -108,7 +118,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
     getClient: () => client,
     getConfig: () => config,
     getProjectBankId: () => projectBankId,
-    getCapabilities: () => capabilities,
+    getInitHealth: () => initHealth,
     reloadConfig,
   };
 
@@ -116,7 +126,6 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
     getConfig: () => config,
     getClient: () => client,
     getProjectBankId: () => projectBankId,
-    getCapabilities: () => capabilities,
     setMemoryStatus: (runtime, activity, queueRemaining) =>
       setMemoryStatus(runtime, activity, undefined, queueRemaining),
     notify,
@@ -148,7 +157,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
         );
       }
       if (!config.enabled) return;
-      let ensureFailed = false;
+      const failures: InitHealthFailure[] = [];
       let ensureSucceeded = false;
       if (config.banks.project.enabled) {
         try {
@@ -158,7 +167,7 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
           });
           ensureSucceeded = true;
         } catch (error) {
-          ensureFailed = true;
+          failures.push({ subsystem: "project-bank", error: redactError(error) });
           setMemoryStatus(runtime, "offline");
           notify(runtime, `Hindsight project bank ensure failed: ${redactError(error)}`, "warning");
         }
@@ -171,27 +180,17 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
           });
           ensureSucceeded = true;
         } catch (error) {
-          ensureFailed = true;
+          failures.push({ subsystem: "user-bank", error: redactError(error) });
           setMemoryStatus(runtime, "offline");
           notify(runtime, `Hindsight global bank ensure failed: ${redactError(error)}`, "warning");
         }
       }
-      const capabilityProbeBankId = config.banks.project.enabled
-        ? projectBankId
-        : config.banks.user.enabled
-          ? config.banks.user.bankId
-          : undefined;
-      if (config.retain.enabled && capabilityProbeBankId) {
-        try {
-          capabilities = await detectAppendCapability(client, capabilityProbeBankId);
-        } catch (error) {
-          ensureFailed = true;
-          setMemoryStatus(runtime, "offline");
-          notify(runtime, `Hindsight capability check failed: ${redactError(error)}`, "warning");
-        }
-      }
+      initHealth = { checkedAt: new Date().toISOString(), failures };
       startPeriodicFlush(runtime);
-      setMemoryStatus(runtime, ensureFailed ? "offline" : ensureSucceeded ? "connected" : "idle");
+      setMemoryStatus(
+        runtime,
+        failures.length ? "offline" : ensureSucceeded ? "connected" : "idle",
+      );
       if (config.notifications.startup)
         notify(runtime, bankSelectionMessage(projectBankId, config), "info");
     },
@@ -222,15 +221,12 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       const runtime = snapshotRuntime(ctx);
       if (!runtime) return;
       try {
-        const result = await flushRetainQueue(
-          resolveQueuePath(runtime.cwd, config.retain.queuePath),
-          client,
-          {
-            maxJobs: config.retain.shutdownFlushMaxJobs,
-            maxElapsedMs: config.retain.shutdownFlushTimeoutMs,
-            stopOnFirstFailure: true,
-          },
-        );
+        const result = await flushRetainQueue(retainQueuePath(runtime.cwd, config), client, {
+          maxJobs: config.retain.shutdownFlushMaxJobs,
+          maxElapsedMs: config.retain.shutdownFlushTimeoutMs,
+          stopOnFirstFailure: true,
+        });
+        await recordRetainDeliveries(runtime.cwd, config, result);
         if (result.deadLettered || result.remaining) {
           notify(runtime, formatFlushRetainQueueResult(result), "warning");
         }

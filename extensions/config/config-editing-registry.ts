@@ -7,12 +7,51 @@ import {
   type MemoryProfile,
   type ProjectConfigPatchInput,
 } from "./config-writer.js";
-import type { ConfigEditingField, FieldId } from "./config-editing-types.js";
 import {
   CONFIG_FIELD_PATHS,
   CONFIG_FIELD_RESET_KEYS,
   CONFIG_RESET_PATHS,
+  type ConfigResetKey,
+  type FieldId,
 } from "./config-field-paths.js";
+
+export type { FieldId } from "./config-field-paths.js";
+
+export type TabId = "Status" | "Connection" | "Banks" | "Recall" | "Retain" | "Import" | "UI";
+
+export type ConfigEditingKind = "boolean" | "select" | "text" | "positive-int";
+
+export type ConfigEditingField = {
+  id: FieldId;
+  tab: Exclude<TabId, "Status">;
+  label: string;
+  description: string;
+  value: string;
+  defaultValue: string;
+  projectValue?: string;
+  globalValue?: string;
+  envValue?: string;
+  source: ConfigSource;
+  editableScopes: ConfigScope[];
+  changed: boolean;
+  resetKey: ConfigResetKey;
+  kind: ConfigEditingKind;
+  choices?: string[];
+  advanced?: boolean;
+};
+
+export type ConfigLayers = {
+  project: Record<string, unknown>;
+  global: Record<string, unknown>;
+  env: NodeJS.ProcessEnv;
+};
+
+export type ConfigEditingTab = {
+  id: TabId;
+  fields: ConfigEditingField[];
+  facts?: Array<[string, string]>;
+};
+
 export { CONFIG_FIELD_PATHS, CONFIG_FIELD_RESET_KEYS } from "./config-field-paths.js";
 
 function memoryProfileLabel(config: ResolvedConfig): MemoryProfile {

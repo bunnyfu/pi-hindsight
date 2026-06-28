@@ -1,58 +1,90 @@
-import { HindsightClient } from "@vectorize-io/hindsight-client";
+import {
+  CLIENT_VERSION,
+  HindsightClient,
+  HindsightError,
+  createClient,
+  createConfig,
+  sdk,
+} from "@vectorize-io/hindsight-client";
+import type { Client, ReflectRequest } from "@vectorize-io/hindsight-client";
 import { redactError } from "../utils/sanitize.js";
 import type { HindsightLikeClient, ResolvedConfig } from "../types.js";
 import { PI_HINDSIGHT_USER_AGENT } from "../version.js";
-import {
-  assertHealthResponse,
-  assertReflectResponse,
-  bankConfigPath,
-  bankBackgroundPath,
-  bankProfilePath,
-  bankTemplateExportPath,
-  bankTemplateImportPath,
-  bankTemplateSchemaPath,
-  chunkItemPath,
-  consolidationPath,
-  consolidationRecoverPath,
-  createDirectiveRequestBody,
-  createHindsightRestTransport,
-  withRetry,
-  createMentalModelRequestBody,
-  documentItemPath,
-  documentsCollectionPath,
-  directiveItemPath,
-  directivesCollectionPath,
-  encodeBankPath,
-  entitiesCollectionPath,
-  entityGraphPath,
-  entityItemPath,
-  entityRegeneratePath,
-  graphPath,
-  memoriesCollectionPath,
-  memoryHistoryPath,
-  memoryItemPath,
-  memoryObservationsPath,
-  mentalModelCollectionPath,
-  mentalModelHistoryPath,
-  mentalModelItemPath,
-  mentalModelRefreshPath,
-  operationCancelPath,
-  operationRetryPath,
-  operationsCollectionPath,
-  observationsPath,
-  reflectRequestBody,
-  tagsCollectionPath,
-  updateBankConfigRequestBody,
-  updateBankProfileRequestBody,
-  updateDirectiveRequestBody,
-  updateDocumentRequestBody,
-  updateMentalModelRequestBody,
-} from "./client-rest.js";
+import { withRetry } from "./client-retry.js";
 import { installFetchRequestCompat } from "./fetch-compat.js";
 import { withTimeout } from "./timeout.js";
 
 type ReflectOptions = Parameters<HindsightLikeClient["reflect"]>[2];
 type RetainOptions = Parameters<HindsightLikeClient["retain"]>[2];
+
+function sdkHeaders(config: ResolvedConfig): Record<string, string> {
+  const headers: Record<string, string> = {
+    "User-Agent": PI_HINDSIGHT_USER_AGENT,
+  };
+  if (config.hindsight.apiKey) headers.Authorization = `Bearer ${config.hindsight.apiKey}`;
+  return headers;
+}
+
+function createLowLevelClient(config: ResolvedConfig): Client {
+  return createClient(
+    createConfig({
+      baseUrl: config.hindsight.baseUrl.replace(/\/$/, ""),
+      headers: sdkHeaders(config),
+    }),
+  );
+}
+
+function unwrapSdkResponse<T>(
+  response: { data?: T; error?: unknown; response?: Response },
+  operation: string,
+): T {
+  if (response.data !== undefined) return response.data;
+  const error = response.error as { detail?: unknown; message?: string } | undefined;
+  const statusCode = response.response?.status;
+  const details = error?.detail ?? error?.message ?? error;
+  throw new HindsightError(`${operation} failed: ${JSON.stringify(details)}`, statusCode, details);
+}
+
+function reflectInclude(options: ReflectOptions): ReflectRequest["include"] | undefined {
+  if (options?.includeFacts === undefined && options?.includeToolCalls === undefined) {
+    return undefined;
+  }
+  const include: NonNullable<ReflectRequest["include"]> = {};
+  if (options?.includeFacts !== undefined) {
+    include.facts = options.includeFacts ? {} : null;
+  }
+  if (options?.includeToolCalls !== undefined) {
+    include.tool_calls = options.includeToolCalls
+      ? options.includeToolCallOutput === false
+        ? { output: false }
+        : {}
+      : null;
+  }
+  return include;
+}
+
+function reflectRequestBody(query: string, options: ReflectOptions | undefined): ReflectRequest {
+  const body: ReflectRequest = {
+    query,
+    budget: options?.budget ?? "low",
+  };
+  if (options?.context) body.context = options.context;
+  if (options?.maxTokens !== undefined) body.max_tokens = options.maxTokens;
+  if (options?.responseSchema) body.response_schema = options.responseSchema;
+  if (options?.factTypes) body.fact_types = options.factTypes;
+  if (options?.excludeMentalModels !== undefined) {
+    body.exclude_mental_models = options.excludeMentalModels;
+  }
+  if (options?.excludeMentalModelIds) {
+    body.exclude_mental_model_ids = options.excludeMentalModelIds;
+  }
+  if (options?.tagGroups) body.tag_groups = options.tagGroups;
+  else if (options?.tags) body.tags = options.tags;
+  if (!options?.tagGroups && options?.tagsMatch) body.tags_match = options.tagsMatch;
+  const include = reflectInclude(options);
+  if (include) body.include = include;
+  return body;
+}
 
 function retainBatchItem(content: string, options: RetainOptions) {
   return {
@@ -92,25 +124,24 @@ function retainSingle(
 async function reflect(
   args: {
     raw: HindsightClient;
-    rest: ReturnType<typeof createHindsightRestTransport>;
+    lowLevel: Client;
     bankId: string;
     query: string;
     options: ReflectOptions;
   },
   signal: AbortSignal,
 ): Promise<unknown> {
-  const needsRestShim =
-    args.options?.responseSchema ||
-    args.options?.maxTokens !== undefined ||
-    args.options?.includeFacts !== undefined ||
-    args.options?.includeToolCalls !== undefined;
-  if (!needsRestShim) return args.raw.reflect(args.bankId, args.query, { ...args.options, signal });
-  const response = await args.rest.request(encodeBankPath(args.bankId, "/reflect"), {
-    method: "POST",
-    signal,
-    body: JSON.stringify(reflectRequestBody(args.query, args.options)),
-  });
-  return assertReflectResponse(response);
+  if (args.options?.maxTokens !== undefined) {
+    const response = await sdk.reflect({
+      client: args.lowLevel,
+      path: { bank_id: args.bankId },
+      body: reflectRequestBody(args.query, args.options),
+      signal,
+    });
+    return unwrapSdkResponse(response, "reflect");
+  }
+
+  return args.raw.reflect(args.bankId, args.query, { ...args.options, signal });
 }
 
 export function createHindsightClient(config: ResolvedConfig): HindsightLikeClient {
@@ -121,8 +152,9 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
     ...(config.hindsight.apiKey ? { apiKey: config.hindsight.apiKey } : {}),
     userAgent: PI_HINDSIGHT_USER_AGENT,
   });
-  const rest = withRetry(createHindsightRestTransport(config));
+  const lowLevel = createLowLevelClient(config);
   const timeoutMs = config.hindsight.timeoutMs;
+
   return {
     retain: (bankId, content, options) =>
       withTimeout(
@@ -141,35 +173,12 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
         },
         args[2]?.signal,
       ),
-    retainFiles: (bankId, files, options) =>
-      withTimeout(
-        "hindsight retainFiles",
-        timeoutMs,
-        (signal) =>
-          raw.retainFiles(bankId, files, {
-            ...(options?.context ? { context: options.context } : {}),
-            ...(options?.filesMetadata
-              ? {
-                  filesMetadata: options.filesMetadata.map((metadata) => ({
-                    ...(metadata.context ? { context: metadata.context } : {}),
-                    ...(metadata.documentId ? { document_id: metadata.documentId } : {}),
-                    ...(metadata.tags ? { tags: metadata.tags } : {}),
-                    ...(metadata.metadata ? { metadata: metadata.metadata } : {}),
-                  })),
-                }
-              : {}),
-            signal,
-          }),
-        options?.signal,
-      ),
     recall: (...args) => {
       const [bankId, query, options] = args;
       return withTimeout(
         "hindsight recall",
         timeoutMs,
-        (signal) => {
-          return raw.recall(bankId, query, { ...options, signal });
-        },
+        (signal) => raw.recall(bankId, query, { ...options, signal }),
         options?.signal,
       );
     },
@@ -177,7 +186,7 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
       withTimeout(
         "hindsight reflect",
         timeoutMs,
-        (signal) => reflect({ raw, rest, bankId, query, options }, signal),
+        (signal) => reflect({ raw, lowLevel, bankId, query, options }, signal),
         options?.signal,
       ),
     createBank: (...args) =>
@@ -187,238 +196,29 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
       }),
     getBankProfile: (...args) =>
       withTimeout("hindsight getBankProfile", timeoutMs, (signal) =>
-        raw.getBankProfile(args[0], { signal }),
+        withRetry("getBankProfile", () => raw.getBankProfile(args[0], { signal })),
       ),
     getBankStats: (bankId) =>
       withTimeout("hindsight getBankStats", timeoutMs, (signal) =>
-        rest.request(encodeBankPath(bankId, "/stats"), { signal }),
+        withRetry("getBankStats", async () => {
+          const response = await sdk.getAgentStats({
+            client: lowLevel,
+            path: { bank_id: bankId },
+            signal,
+          });
+          return unwrapSdkResponse(response, "getBankStats");
+        }),
       ),
     getBankConfig: (bankId) =>
       withTimeout("hindsight getBankConfig", timeoutMs, (signal) =>
-        rest.request(bankConfigPath(bankId), { signal }),
-      ),
-    updateBankProfile: (bankId, request) =>
-      withTimeout("hindsight updateBankProfile", timeoutMs, (signal) =>
-        rest.request(encodeBankPath(bankId, ""), {
-          method: "PATCH",
-          signal,
-          body: JSON.stringify(updateBankProfileRequestBody(request)),
-        }),
-      ),
-    updateBankDisposition: (bankId, disposition) =>
-      withTimeout("hindsight updateBankDisposition", timeoutMs, (signal) =>
-        rest.request(bankProfilePath(bankId), {
-          method: "PUT",
-          signal,
-          body: JSON.stringify({ disposition }),
-        }),
-      ),
-    addBankBackground: (bankId, request) =>
-      withTimeout("hindsight addBankBackground", timeoutMs, (signal) =>
-        rest.request(bankBackgroundPath(bankId), {
-          method: "POST",
-          signal,
-          body: JSON.stringify({
-            content: request.content,
-            ...(request.updateDisposition !== undefined
-              ? { update_disposition: request.updateDisposition }
-              : {}),
-          }),
-        }),
-      ),
-    updateBankConfig: (bankId, updates) =>
-      withTimeout("hindsight updateBankConfig", timeoutMs, (signal) =>
-        rest.request(bankConfigPath(bankId), {
-          method: "PATCH",
-          signal,
-          body: JSON.stringify(updateBankConfigRequestBody(updates)),
-        }),
-      ),
-    resetBankConfig: (bankId) =>
-      withTimeout("hindsight resetBankConfig", timeoutMs, (signal) =>
-        rest.request(bankConfigPath(bankId), { method: "DELETE", signal }),
+        withRetry("getBankConfig", () => raw.getBankConfig(bankId, { signal })),
       ),
     health: () =>
-      withTimeout("hindsight health", timeoutMs, async (signal) =>
-        assertHealthResponse(await rest.request("/health", { signal })),
-      ),
-    listDocuments: (bankId, options) =>
-      withTimeout("hindsight listDocuments", timeoutMs, (signal) =>
-        rest.request(documentsCollectionPath(bankId, options), { signal }),
-      ),
-    getDocument: (bankId, documentId) =>
-      withTimeout("hindsight getDocument", timeoutMs, (signal) =>
-        rest.request(documentItemPath(bankId, documentId), { signal }),
-      ),
-    updateDocument: (bankId, documentId, request) =>
-      withTimeout("hindsight updateDocument", timeoutMs, (signal) =>
-        rest.request(documentItemPath(bankId, documentId), {
-          method: "PATCH",
-          signal,
-          body: JSON.stringify(updateDocumentRequestBody(request)),
+      withTimeout("hindsight health", timeoutMs, (signal) =>
+        withRetry("health", async () => {
+          const response = await sdk.healthEndpointHealthGet({ client: lowLevel, signal });
+          return unwrapSdkResponse(response, "health");
         }),
-      ),
-    deleteDocument: (bankId, documentId) =>
-      withTimeout("hindsight deleteDocument", timeoutMs, (signal) =>
-        rest.request(documentItemPath(bankId, documentId), { method: "DELETE", signal }),
-      ),
-    listEntities: (bankId, options) =>
-      withTimeout("hindsight listEntities", timeoutMs, (signal) =>
-        rest.request(entitiesCollectionPath(bankId, options), { signal }),
-      ),
-    getEntity: (bankId, entityId) =>
-      withTimeout("hindsight getEntity", timeoutMs, (signal) =>
-        rest.request(entityItemPath(bankId, entityId), { signal }),
-      ),
-    regenerateEntity: (bankId, entityId) =>
-      withTimeout("hindsight regenerateEntity", timeoutMs, (signal) =>
-        rest.request(entityRegeneratePath(bankId, entityId), { method: "POST", signal }),
-      ),
-    getGraph: (bankId, options) =>
-      withTimeout("hindsight getGraph", timeoutMs, (signal) =>
-        rest.request(graphPath(bankId, options), { signal }),
-      ),
-    getEntityGraph: (bankId, options) =>
-      withTimeout("hindsight getEntityGraph", timeoutMs, (signal) =>
-        rest.request(entityGraphPath(bankId, options), { signal }),
-      ),
-    listTags: (bankId, options) =>
-      withTimeout("hindsight listTags", timeoutMs, (signal) =>
-        rest.request(tagsCollectionPath(bankId, options), { signal }),
-      ),
-    // The installed high-level SDK does not export bank-template helpers. Its generated
-    // import helper also exposes no typed body because the server endpoint accepts raw JSON.
-    // Keep a narrow REST shim for template import/export/schema until the public SDK wraps them.
-    importBankTemplate: (bankId, manifest, options) =>
-      withTimeout("hindsight importBankTemplate", timeoutMs, (signal) =>
-        rest.request(bankTemplateImportPath(bankId, options), {
-          method: "POST",
-          signal,
-          body: JSON.stringify(manifest),
-        }),
-      ),
-    exportBankTemplate: (bankId) =>
-      withTimeout(
-        "hindsight exportBankTemplate",
-        timeoutMs,
-        async (signal) =>
-          (await rest.request(bankTemplateExportPath(bankId), {
-            signal,
-          })) as import("../banks/bank-template-catalog.js").BankTemplateManifest,
-      ),
-    getBankTemplateSchema: () =>
-      withTimeout("hindsight getBankTemplateSchema", timeoutMs, (signal) =>
-        rest.request(bankTemplateSchemaPath(), { signal }),
-      ),
-    // Use direct OpenAPI REST paths for directives so list filters (tags_match, active_only,
-    // limit, offset) and nullable update fields stay aligned with server behavior.
-    listDirectives: (bankId, options) =>
-      withTimeout("hindsight listDirectives", timeoutMs, (signal) =>
-        rest.request(directivesCollectionPath(bankId, options), { signal }),
-      ),
-    getDirective: (bankId, directiveId) =>
-      withTimeout("hindsight getDirective", timeoutMs, (signal) =>
-        rest.request(directiveItemPath(bankId, directiveId), { signal }),
-      ),
-    createDirective: (bankId, request) =>
-      withTimeout("hindsight createDirective", timeoutMs, (signal) =>
-        rest.request(directivesCollectionPath(bankId), {
-          method: "POST",
-          signal,
-          body: JSON.stringify(createDirectiveRequestBody(request)),
-        }),
-      ),
-    updateDirective: (bankId, directiveId, request) =>
-      withTimeout("hindsight updateDirective", timeoutMs, (signal) =>
-        rest.request(directiveItemPath(bankId, directiveId), {
-          method: "PATCH",
-          signal,
-          body: JSON.stringify(updateDirectiveRequestBody(request)),
-        }),
-      ),
-    deleteDirective: (bankId, directiveId) =>
-      withTimeout("hindsight deleteDirective", timeoutMs, (signal) =>
-        rest.request(directiveItemPath(bankId, directiveId), { method: "DELETE", signal }),
-      ),
-    listMentalModels: (bankId, options) =>
-      withTimeout("hindsight listMentalModels", timeoutMs, (signal) =>
-        rest.request(mentalModelCollectionPath(bankId, options), { signal }),
-      ),
-    getMentalModel: (bankId, mentalModelId, options) =>
-      withTimeout("hindsight getMentalModel", timeoutMs, (signal) =>
-        rest.request(mentalModelItemPath(bankId, mentalModelId, options), { signal }),
-      ),
-    createMentalModel: (bankId, request) =>
-      withTimeout("hindsight createMentalModel", timeoutMs, (signal) =>
-        rest.request(mentalModelCollectionPath(bankId), {
-          method: "POST",
-          signal,
-          body: JSON.stringify(createMentalModelRequestBody(request)),
-        }),
-      ),
-    updateMentalModel: (bankId, mentalModelId, request) =>
-      withTimeout("hindsight updateMentalModel", timeoutMs, (signal) =>
-        rest.request(mentalModelItemPath(bankId, mentalModelId), {
-          method: "PATCH",
-          signal,
-          body: JSON.stringify(updateMentalModelRequestBody(request)),
-        }),
-      ),
-    deleteMentalModel: (bankId, mentalModelId) =>
-      withTimeout("hindsight deleteMentalModel", timeoutMs, (signal) =>
-        rest.request(mentalModelItemPath(bankId, mentalModelId), { method: "DELETE", signal }),
-      ),
-    getMentalModelHistory: (bankId, mentalModelId) =>
-      withTimeout("hindsight getMentalModelHistory", timeoutMs, (signal) =>
-        rest.request(mentalModelHistoryPath(bankId, mentalModelId), { signal }),
-      ),
-    refreshMentalModel: (bankId, mentalModelId) =>
-      withTimeout("hindsight refreshMentalModel", timeoutMs, (signal) =>
-        rest.request(mentalModelRefreshPath(bankId, mentalModelId), { method: "POST", signal }),
-      ),
-    triggerConsolidation: (bankId) =>
-      withTimeout("hindsight triggerConsolidation", timeoutMs, (signal) =>
-        rest.request(consolidationPath(bankId), { method: "POST", signal }),
-      ),
-    recoverConsolidation: (bankId) =>
-      withTimeout("hindsight recoverConsolidation", timeoutMs, (signal) =>
-        rest.request(consolidationRecoverPath(bankId), { method: "POST", signal }),
-      ),
-    clearObservations: (bankId) =>
-      withTimeout("hindsight clearObservations", timeoutMs, (signal) =>
-        rest.request(observationsPath(bankId), { method: "DELETE", signal }),
-      ),
-    listOperations: (bankId, options) =>
-      withTimeout("hindsight listOperations", timeoutMs, (signal) =>
-        rest.request(operationsCollectionPath(bankId, options), { signal }),
-      ),
-    cancelOperation: (bankId, operationId) =>
-      withTimeout("hindsight cancelOperation", timeoutMs, (signal) =>
-        rest.request(operationCancelPath(bankId, operationId), { method: "DELETE", signal }),
-      ),
-    retryOperation: (bankId, operationId) =>
-      withTimeout("hindsight retryOperation", timeoutMs, (signal) =>
-        rest.request(operationRetryPath(bankId, operationId), { method: "POST", signal }),
-      ),
-    listMemories: (bankId, options) =>
-      withTimeout("hindsight listMemories", timeoutMs, (signal) =>
-        rest.request(memoriesCollectionPath(bankId, options), { signal }),
-      ),
-    getMemory: (bankId, memoryId) =>
-      withTimeout("hindsight getMemory", timeoutMs, (signal) =>
-        rest.request(memoryItemPath(bankId, memoryId), { signal }),
-      ),
-    getChunk: (chunkId) =>
-      withTimeout("hindsight getChunk", timeoutMs, (signal) =>
-        rest.request(chunkItemPath(chunkId), { signal }),
-      ),
-    getMemoryHistory: (bankId, memoryId) =>
-      withTimeout("hindsight getMemoryHistory", timeoutMs, (signal) =>
-        rest.request(memoryHistoryPath(bankId, memoryId), { signal }),
-      ),
-    deleteMemoryObservations: (bankId, memoryId) =>
-      withTimeout("hindsight deleteMemoryObservations", timeoutMs, (signal) =>
-        rest.request(memoryObservationsPath(bankId, memoryId), { method: "DELETE", signal }),
       ),
   };
 }
@@ -436,3 +236,5 @@ export async function checkHindsight(
     return { ok: false, error: redactError(error) };
   }
 }
+
+export const HINDSIGHT_CLIENT_VERSION = CLIENT_VERSION;

@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { readImportCheckpoint } from "../extensions/imports/import-checkpoint.js";
+import { readImportCheckpoint } from "../extensions/imports/import-plan.js";
 
 describe("import checkpoint", () => {
   it("accepts explicit import quality context allowed values", async () => {

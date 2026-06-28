@@ -1,17 +1,55 @@
 import type { AgentEndEvent } from "@earendil-works/pi-coding-agent";
 import type {
-  HindsightCapabilities,
   HindsightLikeClient,
+  HindsightObservationScopes,
   ResolvedConfig,
   RetainJob,
+  RetainOutcome,
+  UpdateMode,
 } from "../types.js";
 import { baseTags } from "../banks/banking.js";
 import { projectMessages } from "../utils/messages.js";
 import { contextLabel, liveDocumentId, stableSessionId } from "../utils/session.js";
-import { enqueueRetain, flushRetain } from "./retain-queue.js";
+import {
+  enqueueRetain,
+  flushRetain,
+  summarizeRetain,
+  type FlushRetainQueueResult,
+} from "../queue/queue.js";
 import { createMemoryIdentity } from "../operations/memory-identity.js";
 import { expandObservationScopes } from "./observation-scopes.js";
 import { buildRetainJob as buildRetainJobCore } from "./retain-job-builder.js";
+import { appendRetainReceipts } from "./retain-receipts.js";
+
+function hasRetainOutcome(outcome: { itemsCount?: number; operations?: number; tokens?: number }) {
+  return (
+    outcome.itemsCount !== undefined ||
+    outcome.operations !== undefined ||
+    outcome.tokens !== undefined
+  );
+}
+
+export async function recordRetainDeliveries(
+  cwd: string,
+  config: ResolvedConfig,
+  result: FlushRetainQueueResult,
+): Promise<void> {
+  if (!result.delivered?.length) return;
+  await appendRetainReceipts(
+    cwd,
+    result.delivered.map((delivery) => ({
+      queueJobId: delivery.queueJobId,
+      bankId: delivery.bankId,
+      documentId: delivery.documentId,
+      updateMode: delivery.updateMode,
+      source: "queue" as const,
+      context: delivery.context,
+      tags: delivery.tags,
+      ...(hasRetainOutcome(delivery.outcome) ? { outcome: delivery.outcome } : {}),
+    })),
+    { redactSecrets: config.retain.redactSecrets },
+  );
+}
 
 export function buildRetainJob(args: {
   config: ResolvedConfig;
@@ -19,7 +57,6 @@ export function buildRetainJob(args: {
   sessionFile?: string;
   bankId: string;
   messages: AgentEndEvent["messages"];
-  capabilities?: HindsightCapabilities;
   extraTags?: string[];
 }): RetainJob | undefined {
   const projected = projectMessages(args.messages, args.config);
@@ -47,7 +84,6 @@ export function buildRetainJob(args: {
       ...(args.sessionFile ? { pi_session_file: args.sessionFile } : {}),
     },
     ...(observationScopes.length ? { observationScopes } : {}),
-    ...(args.capabilities ? { capabilities: args.capabilities } : {}),
   });
 }
 
@@ -58,7 +94,6 @@ export async function enqueueRetainFromAgentEnd(args: {
   config: ResolvedConfig;
   client: HindsightLikeClient;
   bankId: string;
-  capabilities?: HindsightCapabilities;
   extraTags?: string[];
 }): Promise<{ queued: boolean; sent: number; remaining: number }> {
   if (!args.config.enabled || !args.config.retain.enabled)
@@ -69,12 +104,12 @@ export async function enqueueRetainFromAgentEnd(args: {
     ...(args.sessionFile ? { sessionFile: args.sessionFile } : {}),
     bankId: args.bankId,
     messages: args.event.messages,
-    ...(args.capabilities ? { capabilities: args.capabilities } : {}),
     ...(args.extraTags ? { extraTags: args.extraTags } : {}),
   });
   if (!job) return { queued: false, sent: 0, remaining: 0 };
   await enqueueRetain(args.cwd, args.config, job);
   const result = await flushRetain(args.cwd, args.config, args.client);
+  await recordRetainDeliveries(args.cwd, args.config, result);
   if (args.config.retain.postRetainReflect) {
     try {
       await args.client.reflect(
@@ -87,4 +122,80 @@ export async function enqueueRetainFromAgentEnd(args: {
     }
   }
   return { queued: true, sent: result.sent, remaining: result.remaining };
+}
+
+export type DurableRetainSource = "auto" | "tool" | "command" | "import";
+
+export interface RetainDurablyArgs {
+  cwd: string;
+  config: ResolvedConfig;
+  client: HindsightLikeClient;
+  bankId: string;
+  content: string;
+  context: string;
+  tags: string[];
+  documentId: string;
+  updateMode: UpdateMode;
+  metadata?: Record<string, string>;
+  source: DurableRetainSource;
+  timestamp?: string;
+  observationScopes?: HindsightObservationScopes;
+  documentTags?: string[];
+  entities?: RetainJob["item"]["entities"];
+  async?: boolean;
+}
+
+export interface RetainDurablyResult {
+  enqueued: boolean;
+  sent: number;
+  remaining: number;
+  deadLettered: number;
+  bankId: string;
+  documentId: string;
+  queueJobId: string;
+  updateMode: UpdateMode;
+  operationIds?: string[];
+  outcome?: RetainOutcome;
+}
+
+export function buildDurableRetainJob(args: Omit<RetainDurablyArgs, "client">): RetainJob {
+  return buildRetainJobCore({
+    ...args,
+    metadata: {
+      ...args.metadata,
+      source: "pi-hindsight",
+      retainSource: args.source,
+    },
+  });
+}
+
+export async function retainDurably(args: RetainDurablyArgs): Promise<RetainDurablyResult> {
+  const job = buildDurableRetainJob(args);
+  const receipt = {
+    bankId: job.bankId,
+    documentId: job.documentId,
+    queueJobId: job.id,
+    updateMode: job.updateMode,
+  };
+  const enqueueResult = await enqueueRetain(args.cwd, args.config, job);
+  if (enqueueResult.previousLength > 0) {
+    const summary = await summarizeRetain(args.cwd, args.config);
+    return {
+      ...receipt,
+      enqueued: true,
+      sent: 0,
+      remaining: summary.active.valid + summary.active.malformed,
+      deadLettered: 0,
+    };
+  }
+  const result = await flushRetain(args.cwd, args.config, args.client, { maxJobs: 1 });
+  return {
+    ...receipt,
+    enqueued: true,
+    sent: result.sent,
+    remaining: result.remaining,
+    deadLettered: result.deadLettered,
+    ...(result.operationIds ? { operationIds: result.operationIds } : {}),
+    ...(result.outcome ? { outcome: result.outcome } : {}),
+  };
 }

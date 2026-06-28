@@ -6,7 +6,10 @@ import {
 } from "./queue.js";
 import type { MemoryOperationsDeps } from "../operations/memory-operation-types.js";
 import { redactError } from "../utils/sanitize.js";
+import { listRetainReceipts } from "../lifecycle/retain-receipts.js";
 import type { RetainJob } from "../types.js";
+
+const RECENT_OUTCOME_LIMIT = 5;
 
 function redactJob(job: RetainJob) {
   return {
@@ -40,11 +43,21 @@ export function createQueueOperations(deps: MemoryOperationsDeps) {
             .then((parsed) => parsed.jobs)
             .catch(() => [])
         : [];
+      const recentOutcomes = (await listRetainReceipts(args.cwd, RECENT_OUTCOME_LIMIT)).map(
+        (receipt) => ({
+          documentId: receipt.documentId,
+          bankId: receipt.bankId,
+          source: receipt.source,
+          createdAt: receipt.createdAt,
+          ...(receipt.outcome ? { outcome: receipt.outcome } : {}),
+        }),
+      );
       return {
         queuePath,
         deadLetterPath: `${queuePath}.dead.jsonl`,
         active: summary.active,
         deadLetter: summary.deadLetter,
+        recentOutcomes,
         jobs: args.includeJobs
           ? {
               active: activeJobs.map(redactJob),

@@ -18,15 +18,6 @@ For the concept model, see [Historical Import](/pi-hindsight/concepts/imports/).
 
 Use `--dry-run` before writing memory. Use `--all-leaves` only when you want every fork leaf in an explicit session file.
 
-## Tools
-
-```text
-hindsight_import({ dryRun: true })
-hindsight_import_chat_transcript({ sourceFile: "/path/to/chat.jsonl", dryRun: true })
-```
-
-`hindsight_import` imports Pi session JSONL. `hindsight_import_chat_transcript` imports chat transcript JSONL into the configured User Bank by default.
-
 ## Modes
 
 - `curated`: default filtered structured source chunks.

@@ -4,7 +4,6 @@ import type {
   SetupActionId,
   SetupProfileChoice,
   SetupStep,
-  SetupTemplateChoice,
   SetupUiState,
 } from "./setup-tui-types.js";
 
@@ -13,7 +12,6 @@ export type SetupIntent =
   | { type: "chooseDeployment" }
   | { type: "guidedSetup" }
   | { type: "flushQueue" }
-  | { type: "mentalModels" }
   | { type: "toggleAdvanced" }
   | { type: "moveTab"; delta: number }
   | { type: "moveSelection"; delta: number }
@@ -21,7 +19,6 @@ export type SetupIntent =
   | { type: "editSelectedField" }
   | { type: "startGuidedSetup" }
   | { type: "chooseProfile"; profile: SetupProfileChoice }
-  | { type: "chooseTemplate"; template: SetupTemplateChoice }
   | { type: "back" }
   | { type: "finish" };
 
@@ -53,8 +50,7 @@ function withAction(action: SetupActionId | null, state: SetupUiState): SetupRes
 
 function nextStep(step: SetupStep): SetupStep {
   if (step === "profile") return "banks";
-  if (step === "banks") return "template";
-  if (step === "template") return "review";
+  if (step === "banks") return "review";
   if (step === "review") return "done";
   return step;
 }
@@ -62,8 +58,7 @@ function nextStep(step: SetupStep): SetupStep {
 function previousStep(step: SetupStep): SetupStep {
   if (step === "profile") return "config";
   if (step === "banks") return "profile";
-  if (step === "template") return "banks";
-  if (step === "review") return "template";
+  if (step === "review") return "banks";
   if (step === "done") return "review";
   return step;
 }
@@ -105,7 +100,6 @@ export function setupIntentFromInput(data: string): SetupIntent | undefined {
   if (data === "d") return { type: "chooseDeployment" };
   if (data === "g") return { type: "guidedSetup" };
   if (data === "f") return { type: "flushQueue" };
-  if (data === "m") return { type: "mentalModels" };
   if (matchesKey(data, Key.left) || data === "h" || data === "<") {
     return { type: "moveTab", delta: -1 };
   }
@@ -130,7 +124,6 @@ export function applySetupIntent(
   if (intent.type === "chooseDeployment") return withAction("choose-deployment", normalized);
   if (intent.type === "guidedSetup") return withAction("guided-setup", normalized);
   if (intent.type === "flushQueue") return withAction("flush-queue", normalized);
-  if (intent.type === "mentalModels") return withAction("mental-models", normalized);
   if (intent.type === "toggleAdvanced") return withAction("toggle-advanced", normalized);
   if (intent.type === "finish") return withAction("done", { ...normalized, step: "done" });
   if (intent.type === "startGuidedSetup") return withState({ ...normalized, step: "profile" });
@@ -139,13 +132,6 @@ export function applySetupIntent(
       ...normalized,
       profileChoice: intent.profile,
       step: nextStep("profile"),
-    });
-  }
-  if (intent.type === "chooseTemplate") {
-    return withState({
-      ...normalized,
-      templateChoice: intent.template,
-      step: nextStep("template"),
     });
   }
   if (intent.type === "back") {

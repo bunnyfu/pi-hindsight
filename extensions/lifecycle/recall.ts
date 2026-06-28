@@ -2,24 +2,28 @@ import { basename } from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type {
   HindsightLikeClient,
+  HindsightTagGroup,
   RecallBlock,
   RecallFailure,
   RecallResultItem,
   RecallRole,
   ResolvedConfig,
-  TagsMatch,
 } from "../types.js";
 import { isInjectedHindsightMemory, projectMessageText } from "../utils/messages.js";
 import { createMemoryIdentity } from "../operations/memory-identity.js";
 import { redactError } from "../utils/sanitize.js";
 import { withTimeout } from "../client/timeout.js";
-import { filterRecallQuality } from "./recall-quality-policy.js";
 
 export interface RecallScope {
   kind?: "project" | "global";
   bankId: string;
-  tags?: string[];
-  tagsMatch?: TagsMatch;
+  tagGroups?: HindsightTagGroup[];
+}
+
+function sourceFactText(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const text = (value as { text?: unknown }).text;
+  return typeof text === "string" && text.trim() ? text : undefined;
 }
 
 function textFromRecallResponse(response: unknown): RecallResultItem[] {
@@ -31,7 +35,18 @@ function textFromRecallResponse(response: unknown): RecallResultItem[] {
       : Array.isArray(response)
         ? response
         : [];
-  return raw.map((item) => item as RecallResultItem);
+  const sourceFacts =
+    record.source_facts && typeof record.source_facts === "object"
+      ? (record.source_facts as Record<string, unknown>)
+      : undefined;
+  return raw.map((entry) => {
+    const item = entry as RecallResultItem;
+    if (!sourceFacts || !item.source_fact_ids?.length) return item;
+    const evidence = item.source_fact_ids
+      .map((id) => sourceFactText(sourceFacts[id]))
+      .filter((text): text is string => Boolean(text));
+    return evidence.length ? { ...item, sourceFacts: evidence } : item;
+  });
 }
 
 function itemText(item: RecallResultItem): string {
@@ -106,6 +121,8 @@ export function composeRecallQuery(messages: AgentMessage[], policy: RecallQuery
   );
 }
 
+const RECALL_SOURCE_FACT_LINES = 3;
+
 export function renderRecallBlocks(blocks: RecallBlock[], topK = 12): string {
   const nonEmpty = blocks.filter((block) => block.memoryCount > 0);
   if (nonEmpty.length === 0) return "";
@@ -118,6 +135,9 @@ export function renderRecallBlocks(blocks: RecallBlock[], topK = 12): string {
     block.results.slice(0, topK).forEach((item, index) => {
       const tags = item.tags?.length ? ` [${item.tags.join(", ")}]` : "";
       lines.push(`${index + 1}. ${itemText(item)}${tags}`);
+      for (const fact of (item.sourceFacts ?? []).slice(0, RECALL_SOURCE_FACT_LINES)) {
+        lines.push(`   - evidence: ${fact}`);
+      }
     });
   }
   lines.push("</hindsight-memory>");
@@ -166,11 +186,16 @@ export async function recallForContext(args: {
           budget: args.config.recall.budget,
           maxTokens: args.config.recall.maxTokens,
           types: args.config.recall.types,
+          ...(args.config.recall.includeSourceFacts
+            ? {
+                includeSourceFacts: true,
+                maxSourceFactsTokens: args.config.recall.maxSourceFactsTokens,
+              }
+            : {}),
           ...(args.config.recall.queryTimestamp
             ? { queryTimestamp: args.config.recall.queryTimestamp }
             : {}),
-          ...(scope.tags ? { tags: scope.tags } : {}),
-          ...(scope.tagsMatch ? { tagsMatch: scope.tagsMatch } : {}),
+          ...(scope.tagGroups?.length ? { tagGroups: scope.tagGroups } : {}),
         }),
       );
       const results = filterRecallQuality(textFromRecallResponse(response)).items;
@@ -187,8 +212,7 @@ export async function recallForContext(args: {
         query,
         error: redactError(error),
         ...(scope.kind ? { kind: scope.kind } : {}),
-        ...(scope.tags ? { tags: scope.tags } : {}),
-        ...(scope.tagsMatch ? { tagsMatch: scope.tagsMatch } : {}),
+        ...(scope.tagGroups?.length ? { tagGroups: scope.tagGroups } : {}),
       });
     }
   }
@@ -198,5 +222,58 @@ export async function recallForContext(args: {
     blocks: blocks.map((block) => ({ ...block, rendered })),
     failed: failures.length,
     failures,
+  };
+}
+
+export type RecallQualityDropReason = "blank-memory" | "recall-contamination" | "duplicate-memory";
+
+export interface RecallQualityDecision {
+  item: RecallResultItem;
+  decision: "keep" | "drop";
+  reasons: RecallQualityDropReason[];
+}
+
+function normalizedMemoryText(item: RecallResultItem): string {
+  return itemText(item).replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function isRecallContamination(text: string): boolean {
+  return /<\/?hindsight[-_]memor(?:y|ies)>|customType["']?\s*:\s*["']hindsight-recall|last-recall\.json/.test(
+    text,
+  );
+}
+
+export function classifyRecallQuality(
+  item: RecallResultItem,
+  seen: Set<string>,
+): RecallQualityDecision {
+  const text = normalizedMemoryText(item);
+  const reasons: RecallQualityDropReason[] = [];
+  if (!text) reasons.push("blank-memory");
+  if (isRecallContamination(itemText(item))) reasons.push("recall-contamination");
+  if (text && seen.has(text)) reasons.push("duplicate-memory");
+  if (!reasons.length) seen.add(text);
+  return { item, decision: reasons.length ? "drop" : "keep", reasons };
+}
+
+export function filterRecallQuality(items: RecallResultItem[]): {
+  items: RecallResultItem[];
+  decisions: RecallQualityDecision[];
+  dropped: number;
+  reasonCounts: Partial<Record<RecallQualityDropReason, number>>;
+} {
+  const seen = new Set<string>();
+  const decisions = items.map((item) => classifyRecallQuality(item, seen));
+  const reasonCounts: Partial<Record<RecallQualityDropReason, number>> = {};
+  for (const decision of decisions) {
+    for (const reason of decision.reasons) reasonCounts[reason] = (reasonCounts[reason] ?? 0) + 1;
+  }
+  return {
+    items: decisions
+      .filter((decision) => decision.decision === "keep")
+      .map((decision) => decision.item),
+    decisions,
+    dropped: decisions.filter((decision) => decision.decision === "drop").length,
+    reasonCounts,
   };
 }

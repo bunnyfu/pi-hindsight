@@ -38,7 +38,6 @@ Pi JSON selects banks and local behavior. Hindsight bank config owns bank settin
 - disposition traits
 - mental models
 - directives
-- bank template overrides
 
 Use Pi Hindsight tools and setup flow to inspect or apply bank-owned settings. Do not treat local Pi JSON as the source of truth for missions, mental models, or directives.
 

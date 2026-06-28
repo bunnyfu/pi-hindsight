@@ -41,7 +41,7 @@ describe("setup flow state", () => {
     expect(setupIntentFromInput("d")).toEqual({ type: "chooseDeployment" });
     expect(setupIntentFromInput("g")).toEqual({ type: "guidedSetup" });
     expect(setupIntentFromInput("f")).toEqual({ type: "flushQueue" });
-    expect(setupIntentFromInput("m")).toEqual({ type: "mentalModels" });
+    expect(setupIntentFromInput("m")).toBeUndefined();
     expect(setupIntentFromInput("h")).toEqual({ type: "moveTab", delta: -1 });
     expect(setupIntentFromInput("l")).toEqual({ type: "moveTab", delta: 1 });
     expect(setupIntentFromInput("j")).toEqual({ type: "moveSelection", delta: 1 });
@@ -84,10 +84,6 @@ describe("setup flow state", () => {
       kind: "action",
       action: "flush-queue",
     });
-    expect(applySetupIntent(tabs(), state, { type: "mentalModels" })).toMatchObject({
-      kind: "action",
-      action: "mental-models",
-    });
     expect(applySetupIntent(tabs(), state, { type: "close" })).toMatchObject({
       kind: "action",
       action: null,
@@ -99,7 +95,7 @@ describe("setup flow state", () => {
     });
   });
 
-  it("records guided setup profile and template choices for future onboarding", () => {
+  it("records guided setup profile choices for future onboarding", () => {
     const initial: SetupUiState = { tabIndex: 0, selectedByTab: {} };
 
     const started = applySetupIntent(tabs(), initial, { type: "startGuidedSetup" });
@@ -111,20 +107,11 @@ describe("setup flow state", () => {
     });
     expect(profiled.state).toMatchObject({ step: "banks", profileChoice: "project-user" });
 
-    const templated = applySetupIntent(
-      tabs(),
-      { ...profiled.state, step: "template" },
-      {
-        type: "chooseTemplate",
-        template: "paste-json",
-      },
-    );
-    expect(templated.state).toMatchObject({ step: "review", templateChoice: "paste-json" });
+    const reviewed = { ...profiled.state, step: "review" as const };
+    const backedUp = applySetupIntent(tabs(), reviewed, { type: "back" });
+    expect(backedUp.state.step).toBe("banks");
 
-    const backedUp = applySetupIntent(tabs(), templated.state, { type: "back" });
-    expect(backedUp.state.step).toBe("template");
-
-    expect(applySetupIntent(tabs(), templated.state, { type: "finish" })).toMatchObject({
+    expect(applySetupIntent(tabs(), reviewed, { type: "finish" })).toMatchObject({
       kind: "action",
       action: "done",
       state: { step: "done" },

@@ -84,7 +84,6 @@ export default defineConfig({
             { label: "Hooks", slug: "reference/hooks" },
             { label: "Memory modes", slug: "reference/memory-modes" },
             { label: "Import controls", slug: "reference/import-controls" },
-            { label: "Bank template manifest", slug: "reference/bank-template-manifest" },
             { label: "Hindsight API links", slug: "reference/hindsight-api-links" },
             { label: "Generated surface reference", slug: "reference/surface-reference" },
           ],

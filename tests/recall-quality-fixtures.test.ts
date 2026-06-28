@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { DEFAULT_CONFIG } from "../extensions/config/config.js";
-import { filterRecallQuality } from "../extensions/lifecycle/recall-quality-policy.js";
+import { filterRecallQuality } from "../extensions/lifecycle/recall.js";
 import { recallForContext, renderRecallBlocks } from "../extensions/lifecycle/recall.js";
 import type { HindsightLikeClient } from "../extensions/types.js";
 
@@ -47,7 +47,11 @@ describe("recall quality fixtures", () => {
       client,
       config: DEFAULT_CONFIG,
       scopes: [
-        { kind: "project", bankId: "project-bank", tags: ["repo:abc"], tagsMatch: "any_strict" },
+        {
+          kind: "project",
+          bankId: "project-bank",
+          tagGroups: [{ tags: ["repo:abc"], match: "any_strict" }],
+        },
       ],
       messages: [user("Continue #248 after PR #252.")],
       cwd: process.cwd(),

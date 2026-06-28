@@ -30,7 +30,18 @@ export async function buildSetupTabs(args: {
     args.config,
     args.projectBankId,
     readConfigLayers(args.ctx.cwd),
-    [...statusFacts, ...receiptFacts],
+    [...buildInitHealthFacts(args.deps.getInitHealth?.()), ...statusFacts, ...receiptFacts],
     { showAdvanced: Boolean(args.state.showAdvanced) },
   );
+}
+
+export function buildInitHealthFacts(
+  initHealth: ReturnType<NonNullable<MemoryOperationsDeps["getInitHealth"]>>,
+): Array<[string, string]> {
+  if (!initHealth) return [];
+  if (initHealth.failures.length === 0) return [["Startup", `ok (${initHealth.checkedAt})`]];
+  return initHealth.failures.map((failure) => [
+    `Startup ${failure.subsystem}`,
+    `failed: ${failure.error}`,
+  ]);
 }

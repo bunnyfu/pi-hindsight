@@ -47,7 +47,7 @@ jobs:
             while IFS= read -r path; do
               [ -z "$path" ] && continue
               case "$path" in
-                extensions/client*|extensions/recall*|extensions/retain*|extensions/queue*|extensions/import*|extensions/memory-lifecycle*|extensions/memory-*operations.ts|extensions/bank*|extensions/config*|extensions/smoke-*|scripts/smoke-*|scripts/install-smoke.mjs|scripts/verify-release.mjs|package.json|package-lock.json|.github/workflows/integration-hindsight.yml|.github/workflows/release.yml)
+                extensions/client*|extensions/recall*|extensions/retain*|extensions/queue*|extensions/import*|extensions/memory-lifecycle*|extensions/memory-*operations.ts|extensions/bank*|extensions/config*|extensions/smoke-*|scripts/smoke-*|scripts/bench-*|scripts/install-smoke.mjs|scripts/verify-release.mjs|package.json|package-lock.json|.github/workflows/integration-hindsight.yml|.github/workflows/release.yml)
                   live_smoke=true
                   ;;
               esac
@@ -90,3 +90,16 @@ jobs:
             exit 1
           fi
           npm run smoke:hindsight
+
+      - name: Run memory benchmark when configured
+        env:
+          HINDSIGHT_INTEGRATION_ENABLED: ${{ vars.HINDSIGHT_INTEGRATION_ENABLED || 'false' }}
+          HINDSIGHT_BASE_URL: ${{ secrets.HINDSIGHT_BASE_URL }}
+          HINDSIGHT_API_KEY: ${{ secrets.HINDSIGHT_API_KEY }}
+          HINDSIGHT_SMOKE_ATTEMPTS: ${{ vars.HINDSIGHT_SMOKE_ATTEMPTS || '20' }}
+        run: |
+          if [ "$HINDSIGHT_INTEGRATION_ENABLED" != "true" ]; then
+            echo "HINDSIGHT_INTEGRATION_ENABLED is not true; skipping memory benchmark." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          npm run bench:memory

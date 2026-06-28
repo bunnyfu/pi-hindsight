@@ -32,11 +32,11 @@ Guided setup handles:
 1. Hindsight server URL
 2. memory profile
 3. project and/or user bank target
-4. built-in or custom bank template
-5. optional dry-run-first historical import
-6. optional post-import mental model refresh
+4. optional dry-run-first historical import
 
-Setup also prints docs links for the current area, such as [memory profiles](/pi-hindsight/start/memory-profiles/), [bank templates](/pi-hindsight/reference/bank-template-manifest/), and [imports](/pi-hindsight/guides/importing-sessions/).
+Setup also prints docs links for the current area, such as [memory profiles](/pi-hindsight/start/memory-profiles/) and [imports](/pi-hindsight/guides/importing-sessions/).
+
+Bank templates, mental models, and directives are managed in the Hindsight control-plane web UI, not in Pi setup.
 
 ## Profiles in one line
 
@@ -54,7 +54,6 @@ For details, see [Memory profiles](/pi-hindsight/start/memory-profiles/).
 - `Enter`: edit selected setting
 - `r`: remove selected setting's active override
 - `f`: flush queued Retain Jobs
-- `m`: open read-only mental model list/detail view
 - `a`: toggle advanced fields
 - `d`: deployment setup
 - `g`: rerun guided setup
@@ -75,6 +74,6 @@ For status interpretation, see [Use `/hindsight` status](/pi-hindsight/guides/us
 
 ## Import from the TUI first
 
-Guided setup can offer historical import after config/template setup. That path previews first, shows progress, then asks before writing memory. Prefer it for first-time backfill.
+Guided setup can offer historical import after config setup. That path previews first, shows progress, then asks before writing memory. Prefer it for first-time backfill.
 
 Use command shortcuts later when you already know which session set you want to import. See [Importing sessions](/pi-hindsight/guides/importing-sessions/).

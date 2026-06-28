@@ -20,6 +20,10 @@ Defaults:
 
 Set `recall.types` to include `world` or `experience`, or to an empty list, only when you explicitly want lower-level memory types.
 
+Each recall scope is enforced with a strict Hindsight `tag_groups` filter (`any_strict`), so project and user memory stay isolated. The `hindsight_recall` and `hindsight_reflect` tools accept an optional `tagGroups` filter that is AND-ed with the automatic scope.
+
+Set `recall.includeSourceFacts: true` (bounded by `recall.maxSourceFactsTokens`) to attach supporting evidence lines to recalled observations. It is off by default to keep recall conservative.
+
 `recall.queryTimestamp` should normally be omitted. Set it only when recall should be anchored to a specific point in time.
 
 ## Last-recall snapshots
@@ -47,7 +51,7 @@ A unique backup is written next to the session file before pruning.
 
 Automatic retain runs in Pi's `agent_end` hook. It stores a structured JSON projection of new messages, not a summary.
 
-Live sessions use stable `documentId` values and `updateMode: "append"`. A persisted retain cursor under `.pi/hindsight/retain-cursors.json` prevents duplicate appends when Pi provides overlapping transcripts, including after extension restart.
+Live sessions use stable `documentId` values and `updateMode: "append"`. A versioned retain cursor under `.pi/hindsight/retain-cursors.json` tracks the last retained transcript index plus hash chains and a bounded tail window (200 messages) so overlapping `agent_end` transcripts dedupe for append-only sessions, including after extension restart. Legacy fingerprint-only cursor files migrate on read without a duplicate-retain burst.
 
 The retain projection is controlled by:
 
@@ -80,6 +84,8 @@ Flush routes:
 Retain also flushes on new retain attempts and shutdown. Set `retain.flushIntervalMs` to a positive interval to flush periodically while Pi is running. Periodic background flushes are bounded separately by `retain.periodicFlushMaxJobs` and `retain.periodicFlushTimeoutMs`.
 
 Shutdown flushing is bounded by `retain.shutdownFlushMaxJobs` and `retain.shutdownFlushTimeoutMs`. If jobs remain after shutdown, they stay on disk and are visible through `/hindsight`.
+
+When Hindsight 0.8+ returns retain outcome metadata, flush reporting, `/hindsight:queue`, and the `/hindsight` status tab surface lightweight aggregates (items extracted, async operations, token usage), and the latest per-document outcome is kept in `retain-receipts.json`. Only aggregates are persisted — never raw retained payloads. Older servers that omit this metadata degrade gracefully with no outcome shown.
 
 ## Banks and missions
 
@@ -126,4 +132,4 @@ Per-session governance is stored outside provider-visible messages under `.pi/hi
 
 `hindsight_retain_global` is the preferred tool for durable global user identity, preferences, and cross-project workflows.
 
-`hindsight_route_memory` is a dry-run classifier for `project`, `global`, `both`, or `skip`. In `explicit-only` mode, routing suggestions do not write global memory automatically. ADR 002 documents the explicit routing strategy seam and safety policy for future richer bank topologies.
+The internal memory router classifies retain candidates as `project`, `global`, `both`, or `skip` when `globalRetain.mode` is `router`. In the default `explicit-only` mode, routing never writes global memory automatically. ADR 002 documents the explicit routing strategy seam and safety policy for future richer bank topologies.

@@ -275,7 +275,6 @@ describe("durable explicit retain", () => {
       getClient: () => client(async () => undefined),
       getConfig: () => config,
       getProjectBankId: () => "project-bank",
-      getCapabilities: () => ({ appendUpdateMode: false, checkedAt: "now" }),
     });
 
     const result = await operations.retainExplicit({

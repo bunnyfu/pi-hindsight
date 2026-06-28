@@ -7,8 +7,8 @@ import { readRetainQueue, resolveQueuePath } from "../extensions/queue/queue.js"
 import {
   importChatTranscript,
   parseChatTranscriptJsonl,
-} from "../extensions/imports/import-chat-transcript.js";
-import { importMemoryChatTranscript } from "../extensions/imports/import-operations.js";
+} from "../extensions/imports/import-sessions.js";
+import { importMemoryChatTranscript } from "../extensions/imports/import-sessions.js";
 
 describe("chat transcript import", () => {
   it("parses high-signal chat transcript events and drops stream noise", () => {

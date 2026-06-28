@@ -1,10 +1,10 @@
 import type { MemoryOperationsDeps } from "./memory-operation-types.js";
-import { flushRetain } from "../lifecycle/retain-queue.js";
+import { flushRetain } from "../queue/queue.js";
 import { resolveOperationBank } from "../banks/bank-selection.js";
 import { explicitMemoryDocumentId } from "../utils/session.js";
 import { createMemoryIdentity, explicitRetainTags } from "./memory-identity.js";
 import { expandObservationScopes } from "../lifecycle/observation-scopes.js";
-import { retainDurably } from "../lifecycle/retain-durable.js";
+import { retainDurably } from "../lifecycle/retain.js";
 import { appendRetainReceipt, listRetainReceipts } from "../lifecycle/retain-receipts.js";
 import {
   getEffectiveSessionMemoryMode,
@@ -60,7 +60,6 @@ export function createRetainOperations(deps: MemoryOperationsDeps) {
         ...(args.tags ?? []),
         ...meta.tags,
       ]);
-      const capabilities = deps.getCapabilities?.();
       const identity = createMemoryIdentity(args.cwd, config, args.sessionFile);
       const defaultObservationScopes = config.observations.enabled
         ? expandObservationScopes(config.observations.scopes, {
@@ -98,7 +97,6 @@ export function createRetainOperations(deps: MemoryOperationsDeps) {
         ...(args.documentTags?.length ? { documentTags: args.documentTags } : {}),
         ...(args.entities?.length ? { entities: args.entities } : {}),
         ...(args.async !== undefined ? { async: args.async } : {}),
-        ...(capabilities ? { capabilities } : {}),
       });
       const response = { ...result, tags, queued: result.enqueued };
       await appendRetainReceipt(
@@ -111,6 +109,7 @@ export function createRetainOperations(deps: MemoryOperationsDeps) {
           source: "tool",
           context: args.context,
           tags,
+          ...(result.outcome ? { outcome: result.outcome } : {}),
         },
         { redactSecrets: config.retain.redactSecrets },
       );

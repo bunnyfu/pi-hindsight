@@ -14,7 +14,7 @@ These notes record deepening work completed after the mission/global-memory pass
 
 ## Document deletion UX
 
-- Recent explicit retain receipts are persisted, available through `hindsight_retain_receipts`, and surfaced in `/hindsight` status facts so users can find exact document IDs for deletion.
+- Recent explicit retain receipts are persisted and surfaced in `/hindsight` status facts so users can find exact document IDs for deletion in the Hindsight web UI.
 
 ## Historical import queue seam
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   flushRetainQueueNotifyLevel,
   formatFlushRetainQueueResult,
+  formatRetainOutcome,
 } from "../extensions/queue/flush-presenter.js";
 import type { FlushRetainQueueResult } from "../extensions/queue/queue.js";
 
@@ -14,6 +15,18 @@ describe("flush presenter", () => {
     expect(formatFlushRetainQueueResult(result({ sent: 2, deadLettered: 1, remaining: 3 }))).toBe(
       "Hindsight flushed 2; dead-lettered 1; remaining 3",
     );
+  });
+
+  it("appends retain outcome aggregates when present", () => {
+    expect(
+      formatFlushRetainQueueResult(
+        result({ sent: 2, outcome: { itemsCount: 5, operations: 2, tokens: 300 } }),
+      ),
+    ).toBe(
+      "Hindsight flushed 2; dead-lettered 0; remaining 0; retained 5 items, 2 operations, 300 tokens",
+    );
+    expect(formatRetainOutcome(undefined)).toBe("");
+    expect(formatRetainOutcome({ operations: 1 })).toBe("1 operations");
   });
 
   it("warns when a flush leaves queued or dead-lettered jobs", () => {
