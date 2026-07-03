@@ -207,7 +207,7 @@ describe("resolveConfig", () => {
           global: { enabled: true, bankId: "old-global" },
         },
         userRetain: { mode: "explicit-only" },
-        globalRetain: { mode: "router" },
+        globalRetain: { mode: "explicit-only" },
         recall: {
           userQueryPreamble: "Preferred preamble",
           globalQueryPreamble: "Legacy preamble",
@@ -250,7 +250,7 @@ describe("resolveConfig", () => {
           global: { enabled: false, bankId: "legacy-bank", retainMission: "Legacy retain" },
         },
         userRetain: {},
-        globalRetain: { mode: "router" },
+        globalRetain: { mode: "explicit-only" },
       }),
     );
 
@@ -262,9 +262,36 @@ describe("resolveConfig", () => {
       bankId: "legacy-bank",
       retainMission: "Legacy retain",
     });
-    expect(config.userRetain.mode).toBe("router");
+    expect(config.userRetain.mode).toBe("explicit-only");
     expect(migrated).not.toHaveProperty("banks.global");
     expect(migrated).not.toHaveProperty("globalRetain");
+  });
+
+  it("normalizes a removed legacy router retain mode to explicit-only without throwing", () => {
+    const userRetainCwd = tmp();
+    mkdirSync(join(userRetainCwd, ".pi"));
+    writeFileSync(
+      join(userRetainCwd, ".pi", "hindsight.json"),
+      JSON.stringify({ userRetain: { mode: "router" } }),
+    );
+    let userRetainConfig: ReturnType<typeof resolveConfig> | undefined;
+    expect(() => {
+      userRetainConfig = resolveConfig(userRetainCwd);
+    }).not.toThrow();
+    expect(userRetainConfig?.userRetain.mode).toBe("explicit-only");
+
+    const globalRetainCwd = tmp();
+    mkdirSync(join(globalRetainCwd, ".pi"));
+    writeFileSync(
+      join(globalRetainCwd, ".pi", "hindsight.json"),
+      JSON.stringify({ globalRetain: { mode: "router" } }),
+    );
+    let globalRetainConfig: ReturnType<typeof resolveConfig> | undefined;
+    expect(() => {
+      globalRetainConfig = resolveConfig(globalRetainCwd);
+    }).not.toThrow();
+    expect(globalRetainConfig?.userRetain.mode).toBe("explicit-only");
+    expect(globalRetainConfig?.globalRetain.mode).toBe("explicit-only");
   });
 
   it("accepts recall query builder overrides", () => {
