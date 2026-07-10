@@ -1,10 +1,21 @@
 import type { ResolvedConfig } from "../types.js";
-import { baseTags, deriveProjectBankId, recallScopeTags, repoKey } from "../banks/banking.js";
+import {
+  baseTags,
+  deriveProjectBankId,
+  recallScopeTags,
+  resolveProjectIdentity,
+  type ProjectIdBasis,
+} from "../banks/banking.js";
 import { importDocumentId, liveDocumentId, stableSessionId } from "../utils/session.js";
 
 export interface MemoryIdentity {
   cwd: string;
   sessionFile?: string;
+  /** Stable project id (pin / remote / basename). */
+  projectId: string;
+  projectIdBasis: ProjectIdBasis;
+  projectIdSource: string;
+  /** Legacy path-hash key; still dual-tagged during migration. */
   repoKey: string;
   sessionId: string;
   projectBankId: string;
@@ -28,15 +39,19 @@ export function createMemoryIdentity(
   sessionFile?: string,
 ): MemoryIdentity {
   const sessionId = stableSessionId(sessionFile, cwd);
+  const project = resolveProjectIdentity(cwd, config);
   return {
     cwd,
     ...(sessionFile ? { sessionFile } : {}),
-    repoKey: repoKey(cwd),
+    projectId: project.projectId,
+    projectIdBasis: project.basis,
+    projectIdSource: project.source,
+    repoKey: project.legacyRepoKey,
     sessionId,
     projectBankId: deriveProjectBankId(cwd, config),
     liveDocumentId: liveDocumentId(sessionFile, cwd),
-    baseTags: baseTags(cwd, sessionId),
-    projectRecallTags: recallScopeTags(cwd),
+    baseTags: baseTags(cwd, sessionId, config),
+    projectRecallTags: recallScopeTags(cwd, config),
     globalRecallTags: ["source:pi"],
   };
 }
@@ -45,8 +60,9 @@ export function explicitRetainTags(
   cwd: string,
   sessionFile: string | undefined,
   extraTags: string[] | undefined,
+  config?: ResolvedConfig,
 ): string[] {
-  return mergeBaseAndExtraTags(baseTags(cwd, stableSessionId(sessionFile, cwd)), extraTags);
+  return mergeBaseAndExtraTags(baseTags(cwd, stableSessionId(sessionFile, cwd), config), extraTags);
 }
 
 export { importDocumentId, liveDocumentId, stableSessionId };

@@ -113,12 +113,23 @@ describe("diagnostics", () => {
     expect(retain.toolFilter.toolResult.exclude).toContain("hindsight_recall");
     expect(report.observations).toEqual({
       enabled: true,
-      scopes: [["harness:pi"], [expect.stringMatching(/^repo:/)]],
+      scopes: [["harness:pi"], [expect.stringMatching(/^project:/)]],
       error: null,
       action: null,
     });
+    expect(report.projectScope).toMatchObject({
+      basis: expect.stringMatching(/^(pin|remote|basename)$/),
+      tag: expect.stringMatching(/^project:/),
+      legacyRepoTag: expect.stringMatching(/^repo:/),
+    });
     expect(report.overrideProjectBankId).toContain("PI_HINDSIGHT_PROJECT_BANK_ID");
-    expect(report.tags).toEqual(expect.arrayContaining(["source:pi"]));
+    expect(report.tags).toEqual(
+      expect.arrayContaining([
+        "source:pi",
+        expect.stringMatching(/^project:/),
+        expect.stringMatching(/^repo:/),
+      ]),
+    );
   });
 
   it("formats global-only memory routes", () => {

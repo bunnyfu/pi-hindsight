@@ -193,12 +193,23 @@ export function normalizeConfig(
   const defaultUserBankConfig = DEFAULT_CONFIG.banks.user;
   const globalBankId = optionalString(userBankConfig?.bankId, defaultUserBankConfig.bankId);
   const minScores = scoreFloors(config.recall?.minScores);
+  const scopeRaw = (config as { scope?: { projectId?: unknown; projectIdStrategy?: unknown } })
+    .scope;
+  const projectIdPin = optionalString(scopeRaw?.projectId, DEFAULT_CONFIG.scope.projectId);
   return {
     enabled: bool(config.enabled, DEFAULT_CONFIG.enabled),
     setupComplete: bool(
       (config as { setupComplete?: unknown }).setupComplete,
       DEFAULT_CONFIG.setupComplete,
     ),
+    scope: {
+      ...(projectIdPin ? { projectId: projectIdPin } : {}),
+      projectIdStrategy: enumValue(
+        scopeRaw?.projectIdStrategy,
+        ["remote", "basename"] as const,
+        DEFAULT_CONFIG.scope.projectIdStrategy,
+      ),
+    },
     hindsight: {
       baseUrl: stringValue(config.hindsight?.baseUrl, DEFAULT_CONFIG.hindsight.baseUrl),
       ...(apiKey ? { apiKey } : {}),

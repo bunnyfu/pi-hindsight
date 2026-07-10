@@ -456,7 +456,7 @@ describe("resolveConfig", () => {
     expect(config.recall.maxTokens).toBe(800);
     expect(config.recall.types).toEqual(["observation"]);
     expect(config.observations.enabled).toBe(true);
-    expect(config.observations.scopes).toEqual([["harness:pi"], ["repo:{repoKey}"]]);
+    expect(config.observations.scopes).toEqual([["harness:pi"], ["project:{projectId}"]]);
     expect(config.recall.contextTurns).toBe(2);
     expect(config.recall.roles).toEqual(["user", "assistant"]);
     expect(config.recall.maxQueryChars).toBe(800);

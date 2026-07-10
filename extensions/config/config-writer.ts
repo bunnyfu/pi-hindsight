@@ -87,6 +87,8 @@ export function deepMergeConfig(
 export interface ProjectConfigPatchInput {
   enabled?: boolean;
   setupComplete?: boolean;
+  projectId?: string;
+  projectIdStrategy?: "remote" | "basename";
   baseUrl?: string;
   timeoutMs?: number;
   apiKeyEnvVar?: string;
@@ -143,6 +145,14 @@ export function buildProjectConfigPatch(input: ProjectConfigPatchInput): Record<
   const patch: Record<string, unknown> = {};
   if (input.enabled !== undefined) patch.enabled = input.enabled;
   if (input.setupComplete !== undefined) patch.setupComplete = input.setupComplete;
+  if (input.projectId !== undefined || input.projectIdStrategy !== undefined) {
+    patch.scope = {
+      ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
+      ...(input.projectIdStrategy !== undefined
+        ? { projectIdStrategy: input.projectIdStrategy }
+        : {}),
+    };
+  }
   if (input.apiKeyEnvVar && !validEnvVarName(input.apiKeyEnvVar)) {
     throw new Error("apiKeyEnvVar must be an environment variable name");
   }

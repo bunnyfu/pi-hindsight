@@ -186,7 +186,10 @@ describe("memory operations", () => {
       includeToolCalls: true,
       includeToolCallOutput: false,
       tagGroups: [
-        { tags: [expect.stringMatching(/^repo:/)], match: "any_strict" },
+        {
+          tags: [expect.stringMatching(/^project:/), expect.stringMatching(/^repo:/)],
+          match: "any_strict",
+        },
         { tags: ["topic:hindsight"], match: "all_strict" },
         { tags: ["kind:decision"], match: "any_strict" },
       ],

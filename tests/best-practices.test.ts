@@ -126,6 +126,7 @@ describe("Hindsight best-practice invariants", () => {
 
     expect(scopeTagsForBank(cwd, config, "pi-global")).toEqual(["source:pi"]);
     expect(scopeTagsForBank(cwd, config, scopes[0]!.bankId)).toEqual([
+      expect.stringMatching(/^project:/),
       expect.stringMatching(/^repo:/),
     ]);
 
@@ -155,7 +156,12 @@ describe("Hindsight best-practice invariants", () => {
       expect.objectContaining({
         kind: "project",
         bankId: expect.stringMatching(/^pi-project-/),
-        tagGroups: [{ tags: [expect.stringMatching(/^repo:/)], match: "any_strict" }],
+        tagGroups: [
+          {
+            tags: [expect.stringMatching(/^project:/), expect.stringMatching(/^repo:/)],
+            match: "any_strict",
+          },
+        ],
       }),
       expect.objectContaining({
         kind: "global",

@@ -48,6 +48,7 @@ export default defineConfig({
           label: "Concepts",
           items: [
             { label: "Memory Banks", slug: "concepts/memory-banks" },
+            { label: "Project identity and scope tags", slug: "concepts/project-identity" },
             { label: "Retain, Recall, and Reflect", slug: "concepts/retain-recall-reflect" },
             {
               label: "Document IDs and update modes",

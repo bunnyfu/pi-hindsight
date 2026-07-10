@@ -754,7 +754,12 @@ describe("extension hooks", () => {
     expect(mocked.client.recall.mock.calls[0]?.[2]).toMatchObject({
       maxTokens: DEFAULT_CONFIG.recall.maxTokens,
       types: ["observation"],
-      tagGroups: [{ tags: [expect.stringMatching(/^repo:/)], match: "any_strict" }],
+      tagGroups: [
+        {
+          tags: [expect.stringMatching(/^project:/), expect.stringMatching(/^repo:/)],
+          match: "any_strict",
+        },
+      ],
     });
     expect(mocked.client.recall.mock.calls[1]?.[0]).toBe("global-bank");
     expect(mocked.client.recall.mock.calls[1]?.[1]).toContain(
@@ -1518,13 +1523,14 @@ describe("extension hooks", () => {
           imported: "false",
           pi_session_file: expect.stringContaining("session-api_key=[REDACTED]"),
         },
-        observationScopes: [["harness:pi"], [expect.stringMatching(/^repo:/)]],
+        observationScopes: [["harness:pi"], [expect.stringMatching(/^project:/)]],
       },
     });
     expect(queued[0]?.item.tags).toEqual(
       expect.arrayContaining([
         "source:pi",
         `session:${stableSessionId(sessionFile, cwd)}`,
+        expect.stringMatching(/^project:/),
         expect.stringMatching(/^repo:/),
       ]),
     );
