@@ -15,7 +15,7 @@ function config(patch: Partial<ResolvedConfig> = {}): ResolvedConfig {
   return {
     ...DEFAULT_CONFIG,
     ...patch,
-    scope: { ...DEFAULT_CONFIG.scope, ...(patch.scope ?? {}) },
+    scope: { ...DEFAULT_CONFIG.scope, ...patch.scope },
   };
 }
 
