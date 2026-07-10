@@ -13,7 +13,7 @@ Defaults:
 - `recall.types: ["observation"]`
 - `recall.budget: "mid"`
 - `recall.injectionPosition: "append"`
-- project recall is scoped by the current repo tag
+- project recall is scoped by stable `project:<id>` tags (plus dual-tag legacy `repo:<path-hash>`; see [project identity](project-identity.md))
 - global recall uses explicit non-repo `source:pi` scope
 
 Set `recall.types` to include `world` or `experience`, or to an empty list, only when you explicitly want lower-level memory types.

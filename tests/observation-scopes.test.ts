@@ -7,6 +7,7 @@ import {
 const identity = {
   cwd: "/repo/project",
   repoKey: "abc123",
+  projectId: "github-com-luxus-demo",
   sessionId: "session-1",
   projectBankId: "pi-project-abc123",
 };
@@ -17,6 +18,7 @@ describe("observation scopes", () => {
       expandObservationScopes(
         [
           ["harness:pi"],
+          ["project:{projectId}"],
           ["repo:{repoKey}"],
           ["bank:{projectBankId}", "target:{bankId}", "session:{sessionId}", "cwd:{cwdHash}"],
         ],
@@ -24,6 +26,7 @@ describe("observation scopes", () => {
       ),
     ).toEqual([
       ["harness:pi"],
+      ["project:github-com-luxus-demo"],
       ["repo:abc123"],
       [
         "bank:pi-project-abc123",

@@ -863,7 +863,7 @@ function buildImportBranch(args: Omit<ImportRetainArgs, "client">): ImportBranch
     const content = args.config.retain.redactSecrets ? redactSecrets(contentRaw) : contentRaw;
     const contentHash = hashImportContent(content);
     const tags = [
-      ...baseTags(args.cwd, args.sessionId, leafId),
+      ...baseTags(args.cwd, args.sessionId, leafId, args.config),
       "import:historical",
       "imported:true",
       `document:${documentId}`,

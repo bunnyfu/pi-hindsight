@@ -11,7 +11,7 @@ export interface MemoryRecallScope {
 export function scopeTagsForBank(cwd: string, config: ResolvedConfig, bankId: string): string[] {
   return config.banks.user.enabled && bankId === config.banks.user.bankId
     ? ["source:pi"]
-    : recallScopeTags(cwd);
+    : recallScopeTags(cwd, config);
 }
 
 export interface ScopedTagFilterInput {

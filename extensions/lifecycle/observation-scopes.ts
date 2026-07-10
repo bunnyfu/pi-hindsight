@@ -5,7 +5,7 @@ const PLACEHOLDER_PATTERN = /\{([a-zA-Z0-9_]+)\}/g;
 
 export type ObservationScopeIdentity = Pick<
   MemoryIdentity,
-  "cwd" | "repoKey" | "sessionId" | "projectBankId"
+  "cwd" | "repoKey" | "sessionId" | "projectBankId" | "projectId"
 >;
 
 function cwdHash(cwd: string): string {
@@ -19,6 +19,7 @@ export function observationScopePlaceholders(
     cwdHash: cwdHash(identity.cwd),
     bankId: identity.projectBankId,
     projectBankId: identity.projectBankId,
+    projectId: identity.projectId,
     repoKey: identity.repoKey,
     sessionId: identity.sessionId,
   };

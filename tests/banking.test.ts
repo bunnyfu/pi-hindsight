@@ -149,7 +149,17 @@ describe("banking/session identity", () => {
       liveDocumentId("/tmp/session.jsonl", "/repo"),
     );
     expect(baseTags("/repo", "s1")).toContain("session:s1");
-    expect(recallScopeTags("/repo")).toEqual([expect.stringMatching(/^repo:/)]);
+    expect(baseTags("/repo", "s1")).toEqual(
+      expect.arrayContaining([
+        "source:pi",
+        expect.stringMatching(/^project:/),
+        expect.stringMatching(/^repo:/),
+        "session:s1",
+      ]),
+    );
+    expect(recallScopeTags("/repo")).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^project:/), expect.stringMatching(/^repo:/)]),
+    );
   });
 
   it("separates missing-session-file identities from cwd-only repo identity", () => {

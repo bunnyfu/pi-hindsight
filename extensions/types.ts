@@ -57,6 +57,16 @@ export interface HindsightEntityInput {
   type?: string;
 }
 
+export interface ScopeConfig {
+  /** Explicit project id pin (wins over remote/basename). Written as tag project:<slug>. */
+  projectId?: string;
+  /**
+   * How to derive project id when pin is unset.
+   * remote = git origin URL (default); basename = git root folder name.
+   */
+  projectIdStrategy: "remote" | "basename";
+}
+
 export interface ResolvedConfig {
   enabled: boolean;
   /**
@@ -64,6 +74,7 @@ export interface ResolvedConfig {
    * Also treated as complete when bank ids, project config files, or legacy runtime state exist (ADR-005).
    */
   setupComplete: boolean;
+  scope: ScopeConfig;
   hindsight: { baseUrl: string; apiKey?: string; apiKeyRef?: string; timeoutMs: number };
   /** Selects default mental-model sets (coding vs conversation/real-life). */
   agentUse: AgentUseProfile;

@@ -8,7 +8,12 @@ import {
   PI_HINDSIGHT_USER_AGENT,
   PI_HINDSIGHT_VERSION,
 } from "../version.js";
-import { baseTags, findRepoRoot } from "../banks/banking.js";
+import {
+  baseTags,
+  findRepoRoot,
+  formatProjectIdentityForStatus,
+  resolveProjectIdentity,
+} from "../banks/banking.js";
 import { stableSessionId } from "./session.js";
 import { createMemoryIdentity } from "../operations/memory-identity.js";
 import { expandObservationScopes } from "../lifecycle/observation-scopes.js";
@@ -105,7 +110,8 @@ export function observationScopeDiagnostics(args: {
 
 export function formatDebugReport(args: DebugReportArgs): string {
   const sessionId = stableSessionId(args.sessionFile, args.cwd);
-  const tags = baseTags(args.cwd, sessionId);
+  const projectIdentity = resolveProjectIdentity(args.cwd, args.config);
+  const tags = baseTags(args.cwd, sessionId, args.config);
   const observationScopes = observationScopeDiagnostics(args);
   const health = args.health
     ? args.health.ok
@@ -136,6 +142,16 @@ export function formatDebugReport(args: DebugReportArgs): string {
       repoRoot: findRepoRoot(args.cwd),
       sessionFile: args.sessionFile ?? null,
       sessionId,
+      projectScope: {
+        projectId: projectIdentity.projectId,
+        basis: projectIdentity.basis,
+        source: projectIdentity.source,
+        tag: `project:${projectIdentity.projectId}`,
+        legacyRepoTag: `repo:${projectIdentity.legacyRepoKey}`,
+        summary: formatProjectIdentityForStatus(projectIdentity),
+        dualTagWindow:
+          "Retain and recall dual-tag project:<id> and legacy repo:<path-hash> so path moves and older banks stay recoverable.",
+      },
       memoryProfile: memoryProfile(args.config),
       projectBankId: args.projectBankId,
       projectBankSelection: args.config.banks.project.bankId

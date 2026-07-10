@@ -193,12 +193,13 @@ describe("operation catalog", () => {
         source: "pi-hindsight",
         retainSource: "tool",
       },
-      observationScopes: [["harness:pi"], [expect.stringMatching(/^repo:/)]],
+      observationScopes: [["harness:pi"], [expect.stringMatching(/^project:/)]],
     });
     expect(options.documentId).toEqual(expect.stringMatching(/^pi-explicit:/));
     expect(options.tags).toEqual(
       expect.arrayContaining([
         "source:pi",
+        expect.stringMatching(/^project:/),
         expect.stringMatching(/^repo:/),
         expect.stringMatching(/^session:/),
       ]),

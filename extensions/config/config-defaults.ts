@@ -3,6 +3,9 @@ import type { ResolvedConfig } from "../types.js";
 export const DEFAULT_CONFIG: ResolvedConfig = {
   enabled: true,
   setupComplete: false,
+  scope: {
+    projectIdStrategy: "remote",
+  },
   hindsight: { baseUrl: "http://localhost:8888", timeoutMs: 30_000 },
   agentUse: "coding",
   mentalModels: {
@@ -48,7 +51,8 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   },
   observations: {
     enabled: true,
-    scopes: [["harness:pi"], ["repo:{repoKey}"]],
+    // Project-stable scope; {repoKey} remains a supported placeholder for legacy configs.
+    scopes: [["harness:pi"], ["project:{projectId}"]],
   },
   globalRetain: {
     mode: "explicit-only",
