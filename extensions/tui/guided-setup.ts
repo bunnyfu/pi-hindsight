@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { ensureGlobalBank, ensureProjectBank } from "../banks/bank-operations.js";
 import {
   createMemoryOperations,
   type MemoryOperations,
@@ -10,7 +11,7 @@ import { importDocumentSummary } from "../imports/import-presentation.js";
 import type { ImportProgressEvent } from "../imports/import-sessions.js";
 import type { MemoryProfile, ProjectConfigPatchInput } from "../config/config-writer.js";
 import type { SetupProfileChoice } from "./setup-tui-types.js";
-import type { AgentUseProfile, ResolvedConfig } from "../types.js";
+import type { AgentUseProfile, HindsightLikeClient, ResolvedConfig } from "../types.js";
 import { defaultTemplateIdFor } from "../banks/bank-templates.js";
 import {
   renderBankTemplateApplyResult,
@@ -97,6 +98,118 @@ async function askBankId(args: {
   return value.trim() || args.fallback;
 }
 
+export type BankExistence =
+  | { status: "exists" }
+  | { status: "missing" }
+  | { status: "unknown"; error?: string };
+
+/** Check whether a bank ID already exists in Hindsight (typo protection for setup). */
+export async function probeBankExistence(
+  client: HindsightLikeClient,
+  bankId: string,
+): Promise<BankExistence> {
+  const id = bankId.trim();
+  if (!id) return { status: "unknown", error: "missing bank id" };
+  if (!client.getBankProfile) {
+    return { status: "unknown", error: "getBankProfile unavailable" };
+  }
+  try {
+    await client.getBankProfile(id);
+    return { status: "exists" };
+  } catch (error) {
+    if (isNotFoundError(error)) return { status: "missing" };
+    return {
+      status: "unknown",
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Collect a bank ID, verify it against Hindsight, and confirm create when missing
+ * so typos do not silently mint a new bank.
+ * Returns undefined when the user cancels input.
+ */
+export async function resolveSetupBankId(args: {
+  ctx: ExtensionCommandContext;
+  client: HindsightLikeClient;
+  config: ResolvedConfig;
+  kind: "project" | "user";
+  title: string;
+  fallback: string;
+}): Promise<string | undefined> {
+  while (true) {
+    const bankId = await askBankId({
+      ctx: args.ctx,
+      title: args.title,
+      fallback: args.fallback,
+    });
+    if (bankId === undefined) return undefined;
+    const trimmed = bankId.trim();
+    if (!trimmed) {
+      if (args.kind === "user") {
+        args.ctx.ui.notify("User bank ID is required.", "warning");
+        continue;
+      }
+      return trimmed;
+    }
+
+    const existence = await probeBankExistence(args.client, trimmed);
+    if (existence.status === "exists") {
+      args.ctx.ui.notify(`Using existing ${args.kind} bank ${trimmed}.`, "info");
+      return trimmed;
+    }
+
+    if (existence.status === "missing") {
+      const create = await args.ctx.ui.confirm(
+        `Create ${args.kind} bank "${trimmed}"?`,
+        `No bank with this ID was found in Hindsight. Confirm create, or cancel to re-enter the ID (typo protection).`,
+      );
+      if (!create) {
+        args.ctx.ui.notify("Bank ID not created. Re-enter the correct bank ID.", "info");
+        continue;
+      }
+      if (!args.client.createBank) {
+        args.ctx.ui.notify(
+          "Hindsight client cannot create banks. Re-enter an existing bank ID or fix client support.",
+          "error",
+        );
+        continue;
+      }
+      try {
+        if (args.kind === "project") {
+          await ensureProjectBank(args.client, trimmed, {
+            ...args.config.banks.project,
+            enableObservations: args.config.observations.enabled,
+          });
+        } else {
+          await ensureGlobalBank(args.client, trimmed, {
+            ...args.config.banks.user,
+            enableObservations: args.config.observations.enabled,
+          });
+        }
+        args.ctx.ui.notify(`Created ${args.kind} bank ${trimmed}.`, "info");
+        return trimmed;
+      } catch (error) {
+        args.ctx.ui.notify(
+          `Failed to create ${args.kind} bank ${trimmed}: ${error instanceof Error ? error.message : String(error)}`,
+          "error",
+        );
+        continue;
+      }
+    }
+
+    // Profile API missing: cannot verify; keep prior behavior.
+    if (existence.error === "getBankProfile unavailable") return trimmed;
+
+    const proceed = await args.ctx.ui.confirm(
+      `Could not verify ${args.kind} bank "${trimmed}"`,
+      `${existence.error ?? "Unknown error"}. Continue with this ID anyway, or cancel to re-enter?`,
+    );
+    if (proceed) return trimmed;
+  }
+}
+
 export function importChoicesForSetup(args: {
   setupProfile: SetupProfileChoice;
   projectBankId?: string;
@@ -122,25 +235,214 @@ function setupImportProgressMessage(event: ImportProgressEvent): string {
   return `Hindsight import progress: ${event.message}`;
 }
 
+function isNotFoundError(error: unknown): boolean {
+  if (typeof error !== "object" || !error) return false;
+  const fields = error as {
+    status?: unknown;
+    statusCode?: unknown;
+    code?: unknown;
+    message?: unknown;
+  };
+  return (
+    fields.status === 404 ||
+    fields.statusCode === 404 ||
+    fields.code === 404 ||
+    fields.code === "404" ||
+    (typeof fields.message === "string" && /\b404\b|not found/i.test(fields.message))
+  );
+}
+
+/** Setup-time snapshot of a bank's mental-model catalog from the API. */
+export interface SetupBankMentalModelProbe {
+  target: "project" | "user";
+  bankId: string;
+  /** False when getBankProfile reports not found (or no profile API). */
+  bankExists: boolean;
+  modelNames: string[];
+  error?: string;
+}
+
+/** Extract mental-model names from a listMentalModels response body. */
+export function extractMentalModelNames(response: unknown): string[] {
+  if (!response || typeof response !== "object") return [];
+  const body = response as { items?: unknown; mental_models?: unknown };
+  const rows = Array.isArray(body.items)
+    ? body.items
+    : Array.isArray(body.mental_models)
+      ? body.mental_models
+      : [];
+  const names: string[] = [];
+  for (const entry of rows) {
+    if (!entry || typeof entry !== "object") continue;
+    const row = entry as { name?: unknown; id?: unknown };
+    if (typeof row.name === "string" && row.name.trim()) names.push(row.name.trim());
+    else if (typeof row.id === "string" && row.id.trim()) names.push(row.id.trim());
+  }
+  return names;
+}
+
+/**
+ * Decide which setup targets should be offered starter mental models.
+ * Existing banks that already have models are not offered by default.
+ * Probe failures are not auto-offered (hub remains the intentional path).
+ */
+export function selectMentalModelTargetsToOffer(probes: SetupBankMentalModelProbe[]): {
+  toOffer: SetupBankMentalModelProbe[];
+  alreadyProvisioned: SetupBankMentalModelProbe[];
+  unknown: SetupBankMentalModelProbe[];
+} {
+  const toOffer: SetupBankMentalModelProbe[] = [];
+  const alreadyProvisioned: SetupBankMentalModelProbe[] = [];
+  const unknown: SetupBankMentalModelProbe[] = [];
+  for (const probe of probes) {
+    if (probe.error) {
+      unknown.push(probe);
+      continue;
+    }
+    if (probe.bankExists && probe.modelNames.length > 0) {
+      alreadyProvisioned.push(probe);
+      continue;
+    }
+    // New bank or existing empty catalog → offer starter provision.
+    toOffer.push(probe);
+  }
+  return { toOffer, alreadyProvisioned, unknown };
+}
+
+export async function probeBankMentalModels(args: {
+  client: HindsightLikeClient;
+  target: "project" | "user";
+  bankId: string;
+}): Promise<SetupBankMentalModelProbe> {
+  const bankId = args.bankId.trim();
+  if (!bankId) {
+    return {
+      target: args.target,
+      bankId: "",
+      bankExists: false,
+      modelNames: [],
+      error: "missing bank id",
+    };
+  }
+
+  let bankExists = false;
+  if (args.client.getBankProfile) {
+    try {
+      await args.client.getBankProfile(bankId);
+      bankExists = true;
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return { target: args.target, bankId, bankExists: false, modelNames: [] };
+      }
+      return {
+        target: args.target,
+        bankId,
+        bankExists: false,
+        modelNames: [],
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  } else {
+    // Without profile API, assume the bank may exist and still list models.
+    bankExists = true;
+  }
+
+  if (!args.client.listMentalModels) {
+    return {
+      target: args.target,
+      bankId,
+      bankExists,
+      modelNames: [],
+      ...(bankExists ? { error: "listMentalModels unavailable" } : {}),
+    };
+  }
+
+  try {
+    const response = await args.client.listMentalModels(bankId);
+    return {
+      target: args.target,
+      bankId,
+      bankExists,
+      modelNames: extractMentalModelNames(response),
+    };
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      return { target: args.target, bankId, bankExists: false, modelNames: [] };
+    }
+    return {
+      target: args.target,
+      bankId,
+      bankExists,
+      modelNames: [],
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function formatExistingMentalModelsSummary(probe: SetupBankMentalModelProbe): string {
+  const preview = probe.modelNames.slice(0, 6).join(", ");
+  const more = probe.modelNames.length > 6 ? ` (+${probe.modelNames.length - 6} more)` : "";
+  return `${probe.target} bank ${probe.bankId}: ${probe.modelNames.length} mental model(s) already present (${preview}${more}). Skipping starter provision; use hub (t) to re-apply intentionally.`;
+}
+
 async function maybeOfferMentalModelsForSetup(args: {
   ctx: ExtensionCommandContext;
   operations: MemoryOperations;
+  client: HindsightLikeClient;
   agentUse: AgentUseProfile;
   setupProfile: SetupProfileChoice;
+  projectBankId?: string;
+  globalBankId?: string;
 }): Promise<void> {
-  const targets: Array<"project" | "user"> = [];
-  if (profileUsesProject(args.setupProfile)) targets.push("project");
-  if (profileUsesUser(args.setupProfile)) targets.push("user");
+  const targets: Array<{ target: "project" | "user"; bankId: string }> = [];
+  if (profileUsesProject(args.setupProfile) && args.projectBankId?.trim()) {
+    targets.push({ target: "project", bankId: args.projectBankId.trim() });
+  }
+  if (profileUsesUser(args.setupProfile) && args.globalBankId?.trim()) {
+    targets.push({ target: "user", bankId: args.globalBankId.trim() });
+  }
   if (targets.length === 0) return;
 
+  const probes: SetupBankMentalModelProbe[] = [];
+  for (const entry of targets) {
+    probes.push(
+      await probeBankMentalModels({
+        client: args.client,
+        target: entry.target,
+        bankId: entry.bankId,
+      }),
+    );
+  }
+
+  const { toOffer, alreadyProvisioned, unknown } = selectMentalModelTargetsToOffer(probes);
+
+  for (const probe of alreadyProvisioned) {
+    args.ctx.ui.notify(formatExistingMentalModelsSummary(probe), "info");
+  }
+  for (const probe of unknown) {
+    args.ctx.ui.notify(
+      `Could not inspect ${probe.target} bank ${probe.bankId || "(missing id)"} for mental models: ${probe.error}. Skipping automatic starter provision; use hub (t) if needed.`,
+      "warning",
+    );
+  }
+
+  if (toOffer.length === 0) return;
+
+  const bankSummary = toOffer
+    .map((probe) =>
+      probe.bankExists
+        ? `${probe.target}=${probe.bankId} (exists, empty catalog)`
+        : `${probe.target}=${probe.bankId} (new or missing)`,
+    )
+    .join("; ");
   const proceed = await args.ctx.ui.confirm(
     "Provision starter mental models?",
-    `Agent use: ${args.agentUse}. Dry-run preview first; nothing is written without confirmation. Mental models become part of automatic context when present.`,
+    `Agent use: ${args.agentUse}. Targets: ${bankSummary}. Dry-run preview first; nothing is written without confirmation. Mental models become part of automatic context when present.`,
   );
   if (!proceed) return;
 
-  for (const target of targets) {
-    const templateId = defaultTemplateIdFor(target, args.agentUse);
+  for (const probe of toOffer) {
+    const templateId = defaultTemplateIdFor(probe.target, args.agentUse);
     try {
       const dryRun = await args.operations.applyBankTemplate({ templateId, dryRun: true });
       const details = renderBankTemplateMentalModelDetails(dryRun.template);
@@ -298,9 +600,13 @@ export async function runGuidedSetup(args: {
     : ("coding" as const);
 
   const config = args.deps.getConfig();
+  const client = args.deps.getClient();
   const projectBankId = profileUsesProject(setupProfile)
-    ? await askBankId({
+    ? await resolveSetupBankId({
         ctx: args.ctx,
+        client,
+        config,
+        kind: "project",
         title:
           setupProfile === "isolated-only"
             ? "Isolated project bank ID (optional; leave default for path-derived)"
@@ -313,8 +619,11 @@ export async function runGuidedSetup(args: {
   if (profileUsesProject(setupProfile) && projectBankId === undefined) return false;
 
   const globalBankId = profileUsesUser(setupProfile)
-    ? await askBankId({
+    ? await resolveSetupBankId({
         ctx: args.ctx,
+        client,
+        config,
+        kind: "user",
         title: "User bank ID",
         fallback: config.banks.user.bankId ?? "",
       })
@@ -361,8 +670,11 @@ export async function runGuidedSetup(args: {
   await maybeOfferMentalModelsForSetup({
     ctx: args.ctx,
     operations,
+    client,
     agentUse,
     setupProfile,
+    ...(projectBankId !== undefined ? { projectBankId } : {}),
+    ...(globalBankId !== undefined ? { globalBankId } : {}),
   });
 
   await maybeOfferHistoricalImportForSetup({
