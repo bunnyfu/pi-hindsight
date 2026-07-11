@@ -11,6 +11,7 @@ import {
 } from "../queue/flush-presenter.js";
 import { defaultTemplateIdFor, listBankTemplatesForAgentUse } from "../banks/bank-templates.js";
 import {
+  buildIgnoreRepoPatch,
   hasProjectHindsightConfig,
   maybeOfferHistoricalImportForSetup,
   runGuidedSetup,
@@ -172,6 +173,28 @@ async function handleInitConfig(
   );
 }
 
+async function handleIgnoreRepo(
+  ctx: ExtensionCommandContext,
+  deps: MemoryOperationsDeps,
+): Promise<boolean> {
+  const confirmed = await ctx.ui.confirm(
+    "Ignore Hindsight in this repo?",
+    "Writes project config with enabled=false, setupComplete=true, and status.style=off. Automatic memory, status bar, and tool calls stay off; /hindsight remains available to re-enable.",
+  );
+  if (!confirmed) return false;
+  const result = await createMemoryOperations(deps).configure(ctx.cwd, buildIgnoreRepoPatch());
+  try {
+    ctx.ui.setStatus?.("hindsight", undefined);
+  } catch {
+    // Best effort; some hosts may not expose setStatus on command UI.
+  }
+  ctx.ui.notify(
+    `Wrote ${result.path}: Hindsight disabled for this repo (enabled=false, status.style=off). Tools refuse calls until re-enabled via /hindsight.`,
+    "info",
+  );
+  return true;
+}
+
 export async function runHindsightSetupTui(
   ctx: ExtensionCommandContext,
   deps: MemoryOperationsDeps,
@@ -181,10 +204,14 @@ export async function runHindsightSetupTui(
     const choice = await ctx.ui.select("No project Hindsight config found", [
       "Guided setup",
       "Open hub",
-      "Skip",
+      "Ignore this repo",
+      "Skip for now",
     ]);
     if (choice === "Guided setup") await runGuidedSetup({ ctx, deps, cwd: ctx.cwd });
-    if (choice === "Skip" || !choice) return;
+    else if (choice === "Ignore this repo") {
+      await handleIgnoreRepo(ctx, deps);
+      return;
+    } else if (choice === "Skip for now" || !choice) return;
   }
   while (true) {
     const config = deps.getConfig();

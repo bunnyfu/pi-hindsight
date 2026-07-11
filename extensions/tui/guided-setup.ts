@@ -77,6 +77,15 @@ export function buildGuidedSetupGlobalPatch(args: {
   };
 }
 
+/**
+ * Durable per-repo opt-out: automatic memory stays off, setup gate is satisfied
+ * so `/hindsight` stops re-prompting, status bar is cleared (style off), and tools
+ * refuse execution until re-enabled. Hub commands remain available to re-enable.
+ */
+export function buildIgnoreRepoPatch(): ProjectConfigPatchInput {
+  return { enabled: false, setupComplete: true, statusStyle: "off" };
+}
+
 async function askBankId(args: {
   ctx: ExtensionCommandContext;
   title: string;
