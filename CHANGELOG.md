@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.9.0](https://github.com/luxus/pi-hindsight/compare/v0.8.0...v0.9.0) (2026-07-12)
+
+
+### Features
+
+* agent allowlisted hindsight_config get/patch tool ([#508](https://github.com/luxus/pi-hindsight/issues/508)) ([cc9c4b5](https://github.com/luxus/pi-hindsight/commit/cc9c4b597bba6df37c1e56a18bb950dc040c4e26))
+* agent control-plane tools for status, bank, mental models ([#502](https://github.com/luxus/pi-hindsight/issues/502)) ([813d26c](https://github.com/luxus/pi-hindsight/commit/813d26c6a6406a4a8764241100a30dbf01018497))
+* domain-tagged scope mode and coding bank profiles ([#499](https://github.com/luxus/pi-hindsight/issues/499)) ([3bc8789](https://github.com/luxus/pi-hindsight/commit/3bc87895cf924f9b09eb9a4fbb9e8a7a828451a4))
+* filter mental-model inject by project tags ([#501](https://github.com/luxus/pi-hindsight/issues/501)) ([cc32c06](https://github.com/luxus/pi-hindsight/commit/cc32c062aa7f507b20bc913c5ca86db09acc1b46))
+* opt-in shared/untagged observation recall ([#492](https://github.com/luxus/pi-hindsight/issues/492)) ([#503](https://github.com/luxus/pi-hindsight/issues/503)) ([726fa18](https://github.com/luxus/pi-hindsight/commit/726fa182ebbe0619ebcc142bf6e2fe5292410957))
+* **recall:** add optional score-floor gate for auto-inject ([2d1d536](https://github.com/luxus/pi-hindsight/commit/2d1d536b9d8c68fc2bd9b9805805f5a49060327a))
+* **recall:** add optional score-floor gate for auto-inject ([ec13b45](https://github.com/luxus/pi-hindsight/commit/ec13b45c30883403f4c975ab57645ba7fbe5d5f0)), closes [#473](https://github.com/luxus/pi-hindsight/issues/473)
+* scope migrate dry-run for dual-tag / legacy repo tags ([#505](https://github.com/luxus/pi-hindsight/issues/505)) ([4030380](https://github.com/luxus/pi-hindsight/commit/40303809b587449335a1bc6303e41d6783aedc86))
+* setup gate pauses memory until bank is configured ([#497](https://github.com/luxus/pi-hindsight/issues/497)) ([b3dba34](https://github.com/luxus/pi-hindsight/commit/b3dba34be7d822e3380b6b10669336ad221bd7b5))
+* stable projectId tags with dual-tag migration window ([#498](https://github.com/luxus/pi-hindsight/issues/498)) ([ff6cf51](https://github.com/luxus/pi-hindsight/commit/ff6cf51c2fe2c87887cfd7f9a8b5a3cfd7a1fb9a))
+* status fields with non-default tone signaling ([#500](https://github.com/luxus/pi-hindsight/issues/500)) ([1176a2b](https://github.com/luxus/pi-hindsight/commit/1176a2bdca40bcf43bf8f1ba82a15ac39f7e246e))
+* **tui:** durable ignore-this-repo option when no config ([#516](https://github.com/luxus/pi-hindsight/issues/516)) ([b664246](https://github.com/luxus/pi-hindsight/commit/b664246f73ded54e335152a6960eaa780f851c16))
+* **tui:** hub-first surface with use-profile mental models ([0b12d4b](https://github.com/luxus/pi-hindsight/commit/0b12d4bd8b19140f79d573369f7ac40f4c412994))
+* **tui:** hub-first surface with use-profile mental models ([42968a9](https://github.com/luxus/pi-hindsight/commit/42968a9f88832c9a6f93e03379512e7eea37fb37)), closes [#477](https://github.com/luxus/pi-hindsight/issues/477)
+* **tui:** probe Hindsight server health in guided setup ([#518](https://github.com/luxus/pi-hindsight/issues/518)) ([23e34e7](https://github.com/luxus/pi-hindsight/commit/23e34e7504184718c105d025afd43e65b405938b))
+
+
+### Bug Fixes
+
+* control-plane review follow-ups for dry-run, gate, migrate ([#510](https://github.com/luxus/pi-hindsight/issues/510)) ([d46640b](https://github.com/luxus/pi-hindsight/commit/d46640bd4c14e952beae05bcadbd2eefeccfe4a5))
+* **memory:** tighten mental-model inject detection and multi-bank budget ([8920835](https://github.com/luxus/pi-hindsight/commit/8920835cd63e7abe1c621f979a5778c834d5a034))
+* **test:** make scope-migrate receipt path assertion Windows-safe ([#522](https://github.com/luxus/pi-hindsight/issues/522)) ([da74616](https://github.com/luxus/pi-hindsight/commit/da74616b8f46798b5ab87e09477ba048436a9348))
+* **tui:** polish guided setup offline path and bank status ([#520](https://github.com/luxus/pi-hindsight/issues/520)) ([3d527f7](https://github.com/luxus/pi-hindsight/commit/3d527f71de409e82b194219b680ef96816b0218d))
+* **tui:** restore next-opt-out and land review follow-ups ([9374b77](https://github.com/luxus/pi-hindsight/commit/9374b77aff4e1d68dd987e1822177c5ff0ac688f))
+* **tui:** skip guided mental-model offer for existing banks ([#514](https://github.com/luxus/pi-hindsight/issues/514)) ([50981d5](https://github.com/luxus/pi-hindsight/commit/50981d5b15a55bcaeb327b0dca47938300b181dd))
+
 ## [0.8.0](https://github.com/luxus/pi-hindsight/compare/v0.7.0...v0.8.0) (2026-07-06)
 
 
