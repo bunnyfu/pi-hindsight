@@ -5,6 +5,7 @@ import {
 } from "../extensions/banks/bank-operations.js";
 import {
   BUILT_IN_BANK_TEMPLATES,
+  expectedStarterMentalModelIds,
   getBuiltInBankTemplate,
   listBuiltInBankTemplates,
   resolveBankTemplateManifest,
@@ -54,6 +55,20 @@ describe("bank templates", () => {
     });
   });
 
+  it("uses life bank missions for the conversation user template", async () => {
+    const { defaultLifeBankMissions } = await import("../extensions/banks/bank-operations.js");
+    const template = getBuiltInBankTemplate("pi-conversation-user");
+    const defaults = defaultLifeBankMissions();
+
+    expect(template?.target).toBe("user");
+    expect(template?.agentUse).toBe("conversation");
+    expect(template?.manifest.bank).toMatchObject({
+      reflect_mission: defaults.reflectMission,
+      retain_mission: defaults.retainMission,
+      observations_mission: defaults.observationsMission,
+    });
+  });
+
   it("includes a conversation project template distinct from coding", () => {
     const coding = getBuiltInBankTemplate("pi-coding-project");
     const conversation = getBuiltInBankTemplate("pi-conversation-project");
@@ -63,10 +78,33 @@ describe("bank templates", () => {
     );
   });
 
-  it("does not set an auto-refresh trigger on bundled mental models", () => {
+  it("uses delta refresh defaults on bundled mental models", () => {
+    const prefsFactTypes = ["world", "experience", "observation"];
+    const projectFactTypes = ["observation"];
     for (const template of BUILT_IN_BANK_TEMPLATES) {
       for (const model of template.manifest.mental_models ?? []) {
-        expect(model.trigger).toBeUndefined();
+        expect(model.trigger).toMatchObject({
+          mode: "delta",
+          refresh_after_consolidation: true,
+          exclude_mental_models: true,
+        });
+        const ft = model.trigger?.fact_types ?? [];
+        const isPrefs =
+          /prefer|habit|operating|communication|collaboration|priority|goals|people|decision/i.test(
+            model.id ?? "",
+          ) || model.max_tokens === 600;
+        if (isPrefs && !model.id?.startsWith("project-")) {
+          expect(ft).toEqual(prefsFactTypes);
+        } else if (
+          model.id?.startsWith("project-architecture") ||
+          model.id?.startsWith("project-conventions") ||
+          model.id?.startsWith("project-decisions")
+        ) {
+          expect(ft).toEqual(projectFactTypes);
+        } else {
+          expect([prefsFactTypes, projectFactTypes]).toContainEqual(ft);
+        }
+        expect(model.max_tokens).toBeLessThanOrEqual(800);
       }
     }
   });
@@ -104,6 +142,46 @@ describe("bank templates", () => {
     const manifest = resolveBankTemplateManifest(template, { retainMission: "Custom retain" });
 
     expect(manifest.mental_models).toBe(template.manifest.mental_models);
+  });
+
+  it("stamps project models and merges bank-global starters for coding project resolve", () => {
+    const template = getBuiltInBankTemplate("pi-coding-project")!;
+    const manifest = resolveBankTemplateManifest(
+      template,
+      {},
+      {
+        projectId: "github-com-luxus-pi-hindsight",
+      },
+    );
+    const ids = manifest.mental_models?.map((model) => model.id) ?? [];
+    expect(ids).toContain("coding-assistant-operating-preferences");
+    expect(ids).toContain("project-architecture-and-seams--github-com-luxus-pi-hindsight");
+    expect(ids).toContain("project-conventions--github-com-luxus-pi-hindsight");
+    expect(ids).toContain("project-decisions--github-com-luxus-pi-hindsight");
+    const global = manifest.mental_models?.find(
+      (model) => model.id === "coding-assistant-operating-preferences",
+    );
+    expect(global?.tags).toEqual(["source:pi"]);
+    const project = manifest.mental_models?.find(
+      (model) => model.id === "project-decisions--github-com-luxus-pi-hindsight",
+    );
+    expect(project?.tags).toEqual(
+      expect.arrayContaining(["source:pi", "project:github-com-luxus-pi-hindsight"]),
+    );
+  });
+
+  it("lists expected starter ids for setup ensure checks", () => {
+    const ids = expectedStarterMentalModelIds({
+      target: "project",
+      agentUse: "coding",
+      projectId: "github-com-luxus-pi-hindsight",
+    });
+    expect(ids).toEqual([
+      "coding-assistant-operating-preferences",
+      "project-architecture-and-seams--github-com-luxus-pi-hindsight",
+      "project-conventions--github-com-luxus-pi-hindsight",
+      "project-decisions--github-com-luxus-pi-hindsight",
+    ]);
   });
 
   it("lists all built-in templates", () => {

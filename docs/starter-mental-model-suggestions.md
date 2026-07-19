@@ -6,6 +6,8 @@ Mental models are a **core** Hindsight feature. Pi Hindsight provisions them thr
 
 Starter suggestions live here and in `extensions/banks/bank-templates.ts` (keep in sync). Applying a bundled template creates these models via Hindsight's bank-template import endpoint — dry-run gated, confirm before write. Arbitrary mental-model authoring remains in the Hindsight control-plane web UI.
 
+For quality criteria and when agents should **propose** create/update/refresh (never silent), see [Mission and mental-model quality](mission-and-mental-model-quality.md).
+
 ## Product rules
 
 - Suggestions are explicit opt-in (setup/TUI), never silent bank mutation on every boot.
@@ -13,6 +15,14 @@ Starter suggestions live here and in `extensions/banks/bank-templates.ts` (keep 
 - **Agent use** selects which seed set applies: `coding` vs `conversation` (real-life / chat agents).
 - Tags on seeds must be a subset of retain tags (`source:pi`) so refresh is not empty.
 - When models have content, automatic context injects them ephemerally under `<hindsight-mental-models>`; retain strips that injection like recall blocks.
+- Seed `max_tokens` stays lean (600 prefs / 800 project) so inject does not dominate every turn (see [coding-memory-evaluation.md](coding-memory-evaluation.md)).
+- Template triggers use `mode: delta`, `refresh_after_consolidation: true`, observation-first refresh, and `exclude_mental_models` (oh-my-pi / Claude Code pattern).
+
+## Coding bank-global (shared coding bank)
+
+| Name                                   | Source query (summary)                                                             | Why              |
+| -------------------------------------- | ---------------------------------------------------------------------------------- | ---------------- |
+| Coding assistant operating preferences | Durable plan/verify/commit/tool + clarification style; exclude probe harness rules | Cross-repo prefs |
 
 ## Coding project bank
 

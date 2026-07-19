@@ -53,8 +53,8 @@ describe("bank operations", () => {
     expect(createBank).toHaveBeenCalledWith(
       "project-bank",
       expect.objectContaining({
-        reflectMission: expect.stringContaining("project-specific architecture"),
-        retainMission: expect.stringContaining("durable project memory"),
+        reflectMission: expect.stringContaining("senior developer"),
+        retainMission: expect.stringContaining("technical decisions"),
         observationsMission: expect.stringContaining("durable project patterns"),
       }),
     );
@@ -126,8 +126,8 @@ describe("bank operations", () => {
     expect(createBank).toHaveBeenCalledWith(
       "project-bank",
       expect.objectContaining({
-        reflectMission: expect.stringContaining("project-specific architecture"),
-        retainMission: expect.stringContaining("durable project memory"),
+        reflectMission: expect.stringContaining("senior developer"),
+        retainMission: expect.stringContaining("technical decisions"),
         observationsMission: expect.stringContaining("durable project patterns"),
       }),
     );
@@ -140,11 +140,25 @@ describe("bank operations", () => {
     expect(createBank).toHaveBeenCalledWith(
       "global-bank",
       expect.objectContaining({
-        reflectMission: expect.stringContaining("cross-project user preferences"),
-        retainMission: expect.stringContaining("Do not retain repo-specific code facts"),
-        observationsMission: expect.stringContaining("cross-project user preferences"),
+        reflectMission: expect.stringContaining("cross-project context"),
+        retainMission: expect.stringContaining("repo-specific code facts"),
+        observationsMission: expect.stringContaining("cross-project preferences"),
         retainExtractionMode: "concise",
         enableObservations: true,
+      }),
+    );
+  });
+
+  it("uses life missions when ensuring a conversation user bank", async () => {
+    const createBank = vi.fn(async () => undefined);
+    await ensureGlobalBank(client({ createBank }), "life-bank", { agentUse: "conversation" });
+
+    expect(createBank).toHaveBeenCalledWith(
+      "life-bank",
+      expect.objectContaining({
+        reflectMission: expect.stringContaining("personal assistant"),
+        retainMission: expect.stringContaining("life-task memory"),
+        observationsMission: expect.stringContaining("life and task patterns"),
       }),
     );
   });
