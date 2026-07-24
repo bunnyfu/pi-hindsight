@@ -13,8 +13,11 @@ import { redactError } from "../utils/sanitize.js";
 import { contextLabel, liveDocumentId, stableSessionId } from "../utils/session.js";
 import {
   enqueueRetain,
+  enqueueRetainCoalesced,
   flushRetain,
   summarizeRetain,
+  summarizeRetainQueue,
+  retainQueuePath,
   type FlushRetainQueueResult,
 } from "../queue/queue.js";
 import { createMemoryIdentity } from "../operations/memory-identity.js";
@@ -108,6 +111,17 @@ export async function enqueueRetainFromAgentEnd(args: {
     ...(args.extraTags ? { extraTags: args.extraTags } : {}),
   });
   if (!job) return { queued: false, sent: 0, remaining: 0 };
+
+  // Coalesced delivery: merge this delta into any compatible pending job and defer the
+  // remote flush to the session boundary (shutdown) / periodic flush. This collapses the
+  // per-agent_end write storm into a few larger operations. Durability is unchanged: the
+  // job is persisted to the on-disk queue before we return.
+  if (args.config.retain.delivery === "coalesced") {
+    await enqueueRetainCoalesced(args.cwd, args.config, job);
+    const summary = await summarizeRetainQueue(retainQueuePath(args.cwd, args.config));
+    return { queued: true, sent: 0, remaining: summary.active.valid + summary.active.malformed };
+  }
+
   await enqueueRetain(args.cwd, args.config, job);
   const result = await flushRetain(args.cwd, args.config, args.client);
   await recordRetainDeliveries(args.cwd, args.config, result);

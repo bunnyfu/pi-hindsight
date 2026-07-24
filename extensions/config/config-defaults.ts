@@ -65,6 +65,7 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   retain: {
     enabled: true,
     async: true,
+    delivery: "immediate",
     updateMode: "append",
     content: {
       user: ["text"],

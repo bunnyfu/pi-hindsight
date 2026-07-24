@@ -3,8 +3,14 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../extensions/config/config.js";
-import { buildRetainJob, recordRetainDeliveries } from "../extensions/lifecycle/retain.js";
+import {
+  buildRetainJob,
+  enqueueRetainFromAgentEnd,
+  recordRetainDeliveries,
+} from "../extensions/lifecycle/retain.js";
 import { listRetainReceipts } from "../extensions/lifecycle/retain-receipts.js";
+import { readQueuedRetains } from "../extensions/queue/queue.js";
+import type { HindsightLikeClient, ResolvedConfig } from "../extensions/types.js";
 import type { AgentEndEvent } from "@earendil-works/pi-coding-agent";
 
 describe("buildRetainJob", () => {
@@ -253,5 +259,73 @@ describe("recordRetainDeliveries", () => {
       malformed: 0,
     });
     expect(await listRetainReceipts(cwd, 10)).toEqual([]);
+  });
+});
+
+describe("enqueueRetainFromAgentEnd delivery modes", () => {
+  const messages = [
+    { role: "user", content: "remember this", timestamp: Date.now() },
+  ] as unknown as AgentEndEvent["messages"];
+
+  function trackingClient(): { client: HindsightLikeClient; retainCalls: number } {
+    const state = { retainCalls: 0 };
+    const client: HindsightLikeClient = {
+      retain: async () => {
+        state.retainCalls += 1;
+        return { status: "ok" };
+      },
+      recall: async () => [],
+      reflect: async () => ({}),
+    };
+    return {
+      client,
+      get retainCalls() {
+        return state.retainCalls;
+      },
+    };
+  }
+
+  it("immediate delivery flushes to the client on every agent_end", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-delivery-"));
+    const tracked = trackingClient();
+    const config: ResolvedConfig = {
+      ...DEFAULT_CONFIG,
+      retain: { ...DEFAULT_CONFIG.retain, delivery: "immediate" },
+    };
+    const result = await enqueueRetainFromAgentEnd({
+      event: { messages } as AgentEndEvent,
+      cwd,
+      config,
+      client: tracked.client,
+      bankId: "bank",
+    });
+    expect(result.queued).toBe(true);
+    expect(result.sent).toBe(1);
+    expect(tracked.retainCalls).toBe(1);
+    expect(await readQueuedRetains(cwd, config)).toHaveLength(0);
+  });
+
+  it("coalesced delivery enqueues without contacting the client and merges runs", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-delivery-"));
+    const tracked = trackingClient();
+    const config: ResolvedConfig = {
+      ...DEFAULT_CONFIG,
+      retain: { ...DEFAULT_CONFIG.retain, delivery: "coalesced" },
+    };
+    const args = {
+      event: { messages } as AgentEndEvent,
+      cwd,
+      config,
+      client: tracked.client,
+      bankId: "bank",
+    };
+    const first = await enqueueRetainFromAgentEnd(args);
+    const second = await enqueueRetainFromAgentEnd(args);
+    expect(tracked.retainCalls).toBe(0);
+    expect(first.queued).toBe(true);
+    expect(first.sent).toBe(0);
+    // Two agent_end runs collapse into a single pending queue entry.
+    expect(second.remaining).toBe(1);
+    expect(await readQueuedRetains(cwd, config)).toHaveLength(1);
   });
 });

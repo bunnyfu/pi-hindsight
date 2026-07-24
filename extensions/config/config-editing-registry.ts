@@ -436,6 +436,18 @@ export function buildBaseConfigEditingFields(
       resetKey: "retain.async",
       advanced: true,
     }),
+    selectField({
+      id: "retainDelivery",
+      tab: "Retain",
+      label: "Retain delivery",
+      description:
+        "immediate flushes after every turn (default); coalesced merges compatible deltas and defers delivery to session end to cut database write amplification.",
+      value: config.retain.delivery,
+      defaultValue: defaults.retain.delivery,
+      resetKey: "retain.delivery",
+      choices: ["immediate", "coalesced"],
+      advanced: true,
+    }),
     textField({
       id: "queuePath",
       tab: "Retain",

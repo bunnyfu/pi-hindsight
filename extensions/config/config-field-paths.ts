@@ -27,6 +27,7 @@ export type FieldId =
   | "recallPreferObservations"
   | "retainEnabled"
   | "retainAsync"
+  | "retainDelivery"
   | "queuePath"
   | "importMode"
   | "importQualityProfile"
@@ -74,6 +75,7 @@ export const CONFIG_FIELD_PATHS: Record<FieldId, string[]> = {
   recallPreferObservations: ["recall", "preferObservations"],
   retainEnabled: ["retain", "enabled"],
   retainAsync: ["retain", "async"],
+  retainDelivery: ["retain", "delivery"],
   queuePath: ["retain", "queuePath"],
   importMode: ["import", "mode"],
   importQualityProfile: ["import", "qualityProfile"],
@@ -168,6 +170,7 @@ export const CONFIG_RESET_PATHS = {
   "recall.preferObservations": [["recall", "preferObservations"]],
   "retain.enabled": [["retain", "enabled"]],
   "retain.async": [["retain", "async"]],
+  "retain.delivery": [["retain", "delivery"]],
   "retain.queuePath": [["retain", "queuePath"]],
   "import.mode": [["import", "mode"]],
   "import.qualityProfile": [["import", "qualityProfile"]],
@@ -219,6 +222,7 @@ export const CONFIG_FIELD_RESET_KEYS: Record<FieldId, ConfigResetKey> = {
   recallPreferObservations: "recall.preferObservations",
   retainEnabled: "retain.enabled",
   retainAsync: "retain.async",
+  retainDelivery: "retain.delivery",
   queuePath: "retain.queuePath",
   importMode: "import.mode",
   importQualityProfile: "import.qualityProfile",

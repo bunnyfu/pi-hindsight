@@ -50,6 +50,72 @@ export async function enqueueRetainJob(path: string, job: RetainJob): Promise<vo
   await enqueueRetainJobWithStats(path, job);
 }
 
+// Two automatic-retain jobs can be merged into one remote operation when they target the
+// same bank + document with append semantics and carry no delivery failures yet. Merging
+// concatenates their (cursor-filtered) deltas so a single delivery covers both, which is
+// what cuts server extraction/consolidation and Postgres write amplification.
+export function canCoalesceRetainJobs(existing: RetainJob, incoming: RetainJob): boolean {
+  return (
+    existing.bankId === incoming.bankId &&
+    existing.documentId === incoming.documentId &&
+    existing.updateMode === "append" &&
+    incoming.updateMode === "append" &&
+    existing.retries === 0 &&
+    existing.deadLetteredAt === undefined
+  );
+}
+
+function mergeRetainContent(existing: string, incoming: string): string {
+  // Automatic-retain content is a JSON array of projected messages. When both sides parse
+  // as arrays, concatenate the elements so the merged job is indistinguishable from having
+  // enqueued the deltas sequentially. Fall back to newline concatenation otherwise.
+  try {
+    const a = JSON.parse(existing);
+    const b = JSON.parse(incoming);
+    if (Array.isArray(a) && Array.isArray(b)) return JSON.stringify([...a, ...b], null, 2);
+  } catch {
+    // fall through to string concatenation
+  }
+  return `${existing}\n${incoming}`;
+}
+
+export function coalesceRetainJob(existing: RetainJob, incoming: RetainJob): RetainJob {
+  const tags = [...new Set([...(existing.item.tags ?? []), ...(incoming.item.tags ?? [])])];
+  return {
+    ...existing,
+    item: {
+      ...existing.item,
+      ...incoming.item,
+      content: mergeRetainContent(existing.item.content, incoming.item.content),
+      ...(tags.length ? { tags } : {}),
+    },
+  };
+}
+
+// Append the job to the queue, coalescing it into the most recent compatible pending job
+// when one exists. Returns whether a merge happened plus the resulting queue length.
+export async function enqueueRetainJobCoalesced(
+  path: string,
+  job: RetainJob,
+): Promise<{ coalesced: boolean; currentLength: number }> {
+  return withQueueLock(path, async () => {
+    const store = retainQueueStore(path);
+    const parsed = await store.readTolerant();
+    const jobs = parsed.jobs;
+    for (let i = jobs.length - 1; i >= 0; i -= 1) {
+      const existing = jobs[i];
+      if (existing && canCoalesceRetainJobs(existing, job)) {
+        jobs[i] = coalesceRetainJob(existing, job);
+        await appendMalformedQueueLines(path, parsed.malformedLines);
+        await store.replace(jobs);
+        return { coalesced: true, currentLength: jobs.length };
+      }
+    }
+    await store.append([job]);
+    return { coalesced: false, currentLength: jobs.length + 1 };
+  });
+}
+
 export async function readRetainQueue(path: string): Promise<RetainJob[]> {
   return retainQueueStore(path).readStrict();
 }
@@ -289,6 +355,14 @@ export async function enqueueRetain(
   job: RetainJob,
 ): Promise<EnqueueRetainJobResult> {
   return enqueueRetainJobWithStats(retainQueuePath(cwd, config), job);
+}
+
+export async function enqueueRetainCoalesced(
+  cwd: string,
+  config: ResolvedConfig,
+  job: RetainJob,
+): Promise<{ coalesced: boolean; currentLength: number }> {
+  return enqueueRetainJobCoalesced(retainQueuePath(cwd, config), job);
 }
 
 export async function flushRetain(
