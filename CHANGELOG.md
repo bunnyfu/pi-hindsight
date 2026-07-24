@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.0](https://github.com/luxus/pi-hindsight/compare/v0.9.0...v0.10.0) (2026-07-24)
+
+
+### Features
+
+* **memory:** ensure project MMs, delta refresh, lean budgets, eval docs ([#533](https://github.com/luxus/pi-hindsight/issues/533)) ([010dfd9](https://github.com/luxus/pi-hindsight/commit/010dfd930b2dc87539a95638a5dcdacf5df94516))
+
+
+### Bug Fixes
+
+* **setup:** save shared coding bank globally and prefill with replace-on-type ([#538](https://github.com/luxus/pi-hindsight/issues/538)) ([14a227b](https://github.com/luxus/pi-hindsight/commit/14a227bed3e1ccd1f215378b3325a4ab95084e52))
+
 ## [0.9.0](https://github.com/luxus/pi-hindsight/compare/v0.8.0...v0.9.0) (2026-07-12)
 
 
