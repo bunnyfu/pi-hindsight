@@ -15,7 +15,7 @@ The hub shows status first (profile, agent use, banks, queue, receipts). Press `
 - first setup and profile selection
 - agent use (coding vs conversation / real-life) for mental-model sets
 - server/base URL checks
-- Project Bank and User Bank confirmation
+- Coding bank and optional Life / User bank confirmation
 - provision starter mental models (`t`)
 - Retain Queue flushes (`f`)
 - historical import (`i`)
@@ -38,7 +38,7 @@ Guided setup handles:
 1. **server health check** — probe configured URL (fallback `http://localhost:8888`); if unreachable and no API key, offer `HINDSIGHT_API_KEY` env setup (restart required if the env is not in this process); if a key is set, offer an alternate Cloud/self-hosted base URL; docs links shown on this screen. Offline continue skips mental models and import.
 2. memory profile
 3. **agent use** (coding vs conversation)
-4. project and/or user bank target (existing vs create; one-line `Server: … · Bank: …` status)
+4. project and/or user bank target (existing vs create; one-line `Server: … · Bank: …` status). **Shared coding bank** IDs are saved to **user/global** config and prefilled next time (first keystroke replaces the prefill). **Isolated** bank IDs stay project-local.
 5. optional starter mental models (dry-run + confirm; skipped offline / when **all expected** bank-global + this-project starters are already present — other projects' models on a shared coding bank do not skip)
 6. optional dry-run-first historical import (skipped offline)
 
@@ -46,12 +46,13 @@ Setup also prints docs links for the current area, such as [memory profiles](/pi
 
 ## Profiles in one line
 
-- **Project + User**: repo facts in Project memory; durable preferences in User memory.
-- **Project Only**: strict repo isolation.
-- **User Only**: cross-project/user memory without project memory.
-- **Recall Only**: recall on, automatic retain off.
+- **Coding** (recommended): shared coding bank; repos separated by tags.
+- **Coding + Life**: coding bank plus optional personal/life bank.
+- **Isolated project**: hard-wall bank for this repo only.
+- **Life only**: personal bank only; no coding bank.
+- **Recall only**: inject memory; automatic retain off.
 
-For details, see [Memory profiles](/pi-hindsight/start/memory-profiles/).
+For details, see [Memory profiles](/pi-hindsight/start/memory-profiles/) and [Memory banks](/pi-hindsight/concepts/memory-banks/).
 
 ## Keyboard controls
 
@@ -79,8 +80,8 @@ After setup, confirm:
 
 - server is reachable
 - expected profile and agent use are active
-- Project Bank appears only when project memory is intended
-- User Bank appears only when user memory is intended
+- Coding bank appears when project/coding memory is intended
+- Life / User bank appears only when life memory is intended
 - mental models inject is on if you want them in context
 - Retain Queue path is visible and writable
 

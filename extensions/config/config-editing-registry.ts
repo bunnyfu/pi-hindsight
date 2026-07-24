@@ -289,7 +289,7 @@ export function buildBaseConfigEditingFields(
       tab: "Banks",
       label: "Memory scope",
       description:
-        "Choose Project Only for strict isolation, Project + User for personal coding, User Only for cross-repo preference memory, or Recall Only to disable automatic retain.",
+        "Coding (project-only) is recommended: shared coding bank. Coding+Life (project+global) adds a personal bank. Isolated is a hard-wall escape hatch. Life-only / recall-only are special cases.",
       value: profile,
       defaultValue: defaultProfile,
       resetKey: "banks.profile",
@@ -319,8 +319,9 @@ export function buildBaseConfigEditingFields(
     textField({
       id: "projectBankId",
       tab: "Banks",
-      label: "Project bank ID",
-      description: "Bank used for this repository. Default derives a stable ID from repo identity.",
+      label: "Coding bank ID",
+      description:
+        "Shared coding bank for domain-tagged mode (prefer user/global config). Isolated mode may pin a per-repo bank.",
       value: projectBankId,
       defaultValue: "auto-derived",
       changed: Boolean(config.banks.project.bankId),
@@ -619,7 +620,7 @@ export function buildBaseConfigEditingFields(
   ];
 }
 export const PROJECT_ONLY_FIELD_IDS = new Set<FieldId>([
-  "projectBankId",
+  // projectBankId is intentionally global+project: shared coding bank lives in user config.
   "memoryProfile",
   "agentUse",
   "mentalModelsInject",

@@ -18,6 +18,7 @@ import {
   renderBankTemplateApplyResult,
   renderBankTemplateMentalModelDetails,
 } from "./bank-template-presentation.js";
+import { inputWithPrefill } from "./prefill-input.js";
 import { ensureServerConnectionForSetup } from "./setup-server-probe.js";
 
 export function hasProjectHindsightConfig(cwd: string): boolean {
@@ -34,6 +35,23 @@ export function setupProfileChoiceToMemoryProfile(choice: SetupProfileChoice): M
   return choice;
 }
 
+/** Guided-setup profile menu (first entry is the recommended default). */
+export const GUIDED_SETUP_PROFILE_LABELS = {
+  coding: "Coding — recommended (shared bank; repos separated by tags)",
+  codingLife: "Coding + Life (coding bank + personal/life bank)",
+  isolated: "Isolated project (hard wall bank for this repo only)",
+  lifeOnly: "Life only (personal bank; no coding bank)",
+  recallOnly: "Recall only (inject memory; do not auto-save)",
+} as const;
+
+const SETUP_PROFILE_BY_LABEL: Record<string, SetupProfileChoice> = {
+  [GUIDED_SETUP_PROFILE_LABELS.coding]: "project-only",
+  [GUIDED_SETUP_PROFILE_LABELS.codingLife]: "project-user",
+  [GUIDED_SETUP_PROFILE_LABELS.isolated]: "isolated-only",
+  [GUIDED_SETUP_PROFILE_LABELS.lifeOnly]: "user-only",
+  [GUIDED_SETUP_PROFILE_LABELS.recallOnly]: "recall-only",
+};
+
 function profileUsesProject(profile: SetupProfileChoice): boolean {
   return (
     profile === "project-user" ||
@@ -47,6 +65,11 @@ function profileUsesUser(profile: SetupProfileChoice): boolean {
   return profile === "project-user" || profile === "user-only";
 }
 
+/** Shared coding bank (domain-tagged) — not isolated hard-wall. */
+function usesSharedCodingBank(profile: SetupProfileChoice): boolean {
+  return profileUsesProject(profile) && profile !== "isolated-only";
+}
+
 export function buildGuidedSetupPatch(args: {
   profile: SetupProfileChoice;
   projectBankId?: string;
@@ -54,14 +77,17 @@ export function buildGuidedSetupPatch(args: {
   config: ResolvedConfig;
 }): ProjectConfigPatchInput {
   const memoryProfile = setupProfileChoiceToMemoryProfile(args.profile);
+  // Isolated bank is per-repo; shared coding bank is written to global config.
+  const isolatedBankId =
+    args.profile === "isolated-only" && args.projectBankId?.trim()
+      ? args.projectBankId.trim()
+      : undefined;
   return {
     memoryProfile,
     setupComplete: true,
     // Domain-tagged shares one coding bank + project tags; isolated keeps a hard wall.
     scopeMode: args.profile === "isolated-only" ? "isolated-bank" : "domain-tagged",
-    ...(profileUsesProject(args.profile) && args.projectBankId?.trim()
-      ? { projectBankId: args.projectBankId.trim() }
-      : {}),
+    ...(isolatedBankId ? { projectBankId: isolatedBankId } : {}),
     ...(profileUsesUser(args.profile) ? { resetDefaults: ["banks.global.bankId" as const] } : {}),
   };
 }
@@ -69,14 +95,21 @@ export function buildGuidedSetupPatch(args: {
 export function buildGuidedSetupGlobalPatch(args: {
   profile: SetupProfileChoice;
   globalBankId?: string;
+  projectBankId?: string;
   config: ResolvedConfig;
 }): ProjectConfigPatchInput | undefined {
-  if (!profileUsesUser(args.profile)) return undefined;
+  const wantsUser = profileUsesUser(args.profile);
+  const sharedCodingBankId =
+    usesSharedCodingBank(args.profile) && args.projectBankId?.trim()
+      ? args.projectBankId.trim()
+      : undefined;
+  if (!wantsUser && !sharedCodingBankId) return undefined;
   const globalBankId = args.globalBankId?.trim() || args.config.banks.user.bankId;
   return {
     scope: "global",
-    enableGlobalBank: true,
-    ...(globalBankId ? { globalBankId } : {}),
+    ...(wantsUser ? { enableGlobalBank: true } : {}),
+    ...(wantsUser && globalBankId ? { globalBankId } : {}),
+    ...(sharedCodingBankId ? { projectBankId: sharedCodingBankId } : {}),
   };
 }
 
@@ -94,7 +127,7 @@ async function askBankId(args: {
   title: string;
   fallback: string;
 }): Promise<string | undefined> {
-  const value = await args.ctx.ui.input(args.title, args.fallback);
+  const value = await inputWithPrefill(args.ctx.ui, args.title, args.fallback);
   if (value === undefined) return undefined;
   return value.trim() || args.fallback;
 }
@@ -673,21 +706,16 @@ export async function runGuidedSetup(args: {
   const offline = connection.offline;
 
   const profile = await args.ctx.ui.select("Choose memory profile", [
-    "Coding (shared coding bank + project tags)",
-    "Coding + Life (coding bank + user bank)",
-    "Isolated project (hard wall bank per repo)",
-    "Life only (user bank)",
-    "Recall only",
+    GUIDED_SETUP_PROFILE_LABELS.coding,
+    GUIDED_SETUP_PROFILE_LABELS.codingLife,
+    GUIDED_SETUP_PROFILE_LABELS.isolated,
+    GUIDED_SETUP_PROFILE_LABELS.lifeOnly,
+    GUIDED_SETUP_PROFILE_LABELS.recallOnly,
   ]);
   if (!profile) return false;
 
-  const setupProfile = {
-    "Coding (shared coding bank + project tags)": "project-only",
-    "Coding + Life (coding bank + user bank)": "project-user",
-    "Isolated project (hard wall bank per repo)": "isolated-only",
-    "Life only (user bank)": "user-only",
-    "Recall only": "recall-only",
-  }[profile] as SetupProfileChoice;
+  const setupProfile = SETUP_PROFILE_BY_LABEL[profile];
+  if (!setupProfile) return false;
 
   const agentUseLabel = await args.ctx.ui.select("How do you use this Pi agent?", [
     "Coding (architecture, conventions, decisions)",
@@ -715,7 +743,7 @@ export async function runGuidedSetup(args: {
         title:
           setupProfile === "isolated-only"
             ? "Isolated project bank ID (optional; leave default for path-derived)"
-            : "Coding bank ID (shared across repos with project tags)",
+            : "Coding bank ID (recommended shared bank; saved globally for new repos)",
         fallback:
           config.banks.project.bankId ??
           (setupProfile === "isolated-only" ? args.deps.getProjectBankId() : "pi-coding"),
@@ -769,13 +797,20 @@ export async function runGuidedSetup(args: {
   const globalPatch = buildGuidedSetupGlobalPatch({
     profile: setupProfile,
     ...(globalBankId !== undefined ? { globalBankId } : {}),
+    ...(projectBankId !== undefined ? { projectBankId } : {}),
     config,
   });
   const summary = [
     `Profile: ${setupProfileChoiceToMemoryProfile(setupProfile)}`,
     `Agent use: ${agentUse}`,
     `Server: ${connection.serverReachable ? "reachable" : "offline"}`,
-    ...(projectBankId ? [`Project config: project bank ${projectBankId}`] : []),
+    ...(projectBankId
+      ? [
+          setupProfile === "isolated-only"
+            ? `Project config: isolated bank ${projectBankId}`
+            : `Global config: coding bank ${projectBankId}`,
+        ]
+      : []),
     ...(globalBankId ? [`Global config: user bank ${globalBankId}`] : []),
     ...(setupProfile === "recall-only"
       ? ["Automatic retain: disabled; automatic recall: enabled"]
