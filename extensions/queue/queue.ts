@@ -92,8 +92,8 @@ export function coalesceRetainJob(existing: RetainJob, incoming: RetainJob): Ret
   };
 }
 
-// Append the job to the queue, coalescing it into the most recent compatible pending job
-// when one exists. Returns whether a merge happened plus the resulting queue length.
+// Append the job, or merge into the last queue entry only when compatible.
+// Only the tail is considered so append order never jumps past a failed/non-mergeable job.
 export async function enqueueRetainJobCoalesced(
   path: string,
   job: RetainJob,
@@ -102,14 +102,12 @@ export async function enqueueRetainJobCoalesced(
     const store = retainQueueStore(path);
     const parsed = await store.readTolerant();
     const jobs = parsed.jobs;
-    for (let i = jobs.length - 1; i >= 0; i -= 1) {
-      const existing = jobs[i];
-      if (existing && canCoalesceRetainJobs(existing, job)) {
-        jobs[i] = coalesceRetainJob(existing, job);
-        await appendMalformedQueueLines(path, parsed.malformedLines);
-        await store.replace(jobs);
-        return { coalesced: true, currentLength: jobs.length };
-      }
+    const last = jobs[jobs.length - 1];
+    if (last && canCoalesceRetainJobs(last, job)) {
+      jobs[jobs.length - 1] = coalesceRetainJob(last, job);
+      await appendMalformedQueueLines(path, parsed.malformedLines);
+      await store.replace(jobs);
+      return { coalesced: true, currentLength: jobs.length };
     }
     await store.append([job]);
     return { coalesced: false, currentLength: jobs.length + 1 };

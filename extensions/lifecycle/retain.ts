@@ -119,7 +119,7 @@ export async function enqueueRetainFromAgentEnd(args: {
   if (args.config.retain.delivery === "coalesced") {
     await enqueueRetainCoalesced(args.cwd, args.config, job);
     const summary = await summarizeRetainQueue(retainQueuePath(args.cwd, args.config));
-    return { queued: true, sent: 0, remaining: summary.active.valid + summary.active.malformed };
+    return { queued: true, sent: 0, remaining: summary.active.valid };
   }
 
   await enqueueRetain(args.cwd, args.config, job);

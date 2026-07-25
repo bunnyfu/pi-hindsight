@@ -91,6 +91,7 @@ describe("config writer", () => {
         recallStoreFailures: true,
         recallPreferObservations: false,
         retainAsync: false,
+        retainDelivery: "coalesced",
         importMode: "raw",
         importQualityProfile: "strict",
         importIncludeBranches: "all-leaves",
@@ -115,7 +116,7 @@ describe("config writer", () => {
         storeLastRecallFailures: true,
         preferObservations: false,
       },
-      retain: { async: false },
+      retain: { async: false, delivery: "coalesced" },
       import: {
         mode: "raw",
         qualityProfile: "strict",

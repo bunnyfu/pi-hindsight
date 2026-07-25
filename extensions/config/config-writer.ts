@@ -118,6 +118,7 @@ export interface ProjectConfigPatchInput {
   recallPreferObservations?: boolean;
   retainEnabled?: boolean;
   retainAsync?: boolean;
+  retainDelivery?: "immediate" | "coalesced";
   retainUpdateMode?: "append" | "replace";
   queuePath?: string;
   importMode?: "curated" | "raw" | "forensic";
@@ -281,11 +282,13 @@ export function buildProjectConfigPatch(input: ProjectConfigPatchInput): Record<
     input.queuePath ||
     input.retainEnabled !== undefined ||
     input.retainAsync !== undefined ||
+    input.retainDelivery ||
     input.retainUpdateMode
   ) {
     patch.retain = {
       ...(input.retainEnabled !== undefined ? { enabled: input.retainEnabled } : {}),
       ...(input.retainAsync !== undefined ? { async: input.retainAsync } : {}),
+      ...(input.retainDelivery ? { delivery: input.retainDelivery } : {}),
       ...(input.retainUpdateMode ? { updateMode: input.retainUpdateMode } : {}),
       ...(input.queuePath ? { queuePath: input.queuePath } : {}),
     };

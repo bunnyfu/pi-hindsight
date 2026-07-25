@@ -243,6 +243,33 @@ describe("retain queue", () => {
     expect(merged.id).toBe("1");
   });
 
+  it("does not coalesce past a non-mergeable tail job (preserves append order)", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
+    const older: RetainJob = {
+      ...job,
+      id: "1",
+      item: { ...job.item, content: JSON.stringify([{ m: 1 }]) },
+    };
+    const failedTail: RetainJob = {
+      ...job,
+      id: "2",
+      retries: 1,
+      item: { ...job.item, content: JSON.stringify([{ m: 2 }]) },
+    };
+    const incoming: RetainJob = {
+      ...job,
+      id: "3",
+      item: { ...job.item, content: JSON.stringify([{ m: 3 }]) },
+    };
+    await enqueueRetainJob(path, older);
+    await enqueueRetainJob(path, failedTail);
+    const result = await enqueueRetainJobCoalesced(path, incoming);
+    expect(result).toEqual({ coalesced: false, currentLength: 3 });
+    const queued = await readRetainQueue(path);
+    expect(queued.map((entry) => entry.id)).toEqual(["1", "2", "3"]);
+    expect(JSON.parse(queued[0]?.item.content ?? "[]")).toEqual([{ m: 1 }]);
+  });
+
   it("persists and flushes jobs", async () => {
     const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
     await enqueueRetainJob(path, job);
