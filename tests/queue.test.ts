@@ -249,19 +249,8 @@ describe("retain queue", () => {
     expect(nonArray.item.content).toBe('{"m":1}\n{"m":2}');
     // One array + one non-array still falls back; empty tags omit the tags field.
     const mixed = coalesceRetainJob(
-      {
-        ...job,
-        item: {
-          content: JSON.stringify([{ m: 1 }]),
-          context: "ctx",
-          timestamp: job.item.timestamp,
-        },
-      },
-      {
-        ...job,
-        id: "2",
-        item: { content: '{"m":2}', context: "ctx", timestamp: job.item.timestamp },
-      },
+      { ...job, item: { content: JSON.stringify([{ m: 1 }]), context: "ctx" } },
+      { ...job, id: "2", item: { content: '{"m":2}', context: "ctx" } },
     );
     expect(mixed.item.content).toBe(`${JSON.stringify([{ m: 1 }])}\n{"m":2}`);
     expect(mixed.item.tags).toBeUndefined();
