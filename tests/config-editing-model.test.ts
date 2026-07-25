@@ -199,6 +199,9 @@ describe("config editing model", () => {
     expect(
       patchForConfigEditingField("recallPreferObservations", "Disable", DEFAULT_CONFIG),
     ).toEqual({ recallPreferObservations: false });
+    expect(patchForConfigEditingField("retainDelivery", "coalesced", DEFAULT_CONFIG)).toEqual({
+      retainDelivery: "coalesced",
+    });
     expect(patchForConfigEditingField("importToolResults", "summary", DEFAULT_CONFIG)).toEqual({
       importToolResults: "summary",
     });

@@ -12,7 +12,10 @@ import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { isQueueLockRaceError } from "../extensions/queue/queue-lock.js";
 import {
+  canCoalesceRetainJobs,
+  coalesceRetainJob,
   enqueueRetainJob,
+  enqueueRetainJobCoalesced,
   flushRetainQueue,
   isQueueLockOwnerStale,
   readDeadLetterQueue,
@@ -189,6 +192,95 @@ describe("retain queue", () => {
     expect(result.outcome).toBeUndefined();
     expect(result.operationIds).toBeUndefined();
     expect(result.delivered?.[0]?.outcome).toEqual({});
+  });
+
+  it("coalesces a compatible append job by merging JSON-array deltas into one queue entry", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
+    const first: RetainJob = { ...job, item: { ...job.item, content: JSON.stringify([{ m: 1 }]) } };
+    const second: RetainJob = {
+      ...job,
+      id: "2",
+      item: { ...job.item, content: JSON.stringify([{ m: 2 }]), tags: ["source:pi", "extra"] },
+    };
+    const r1 = await enqueueRetainJobCoalesced(path, first);
+    expect(r1).toEqual({ coalesced: false, currentLength: 1 });
+    const r2 = await enqueueRetainJobCoalesced(path, second);
+    expect(r2).toEqual({ coalesced: true, currentLength: 1 });
+    const queued = await readRetainQueue(path);
+    expect(queued).toHaveLength(1);
+    expect(queued[0]?.id).toBe("1");
+    expect(JSON.parse(queued[0]?.item.content ?? "[]")).toEqual([{ m: 1 }, { m: 2 }]);
+    expect(queued[0]?.item.tags).toEqual(["source:pi", "extra"]);
+  });
+
+  it("does not coalesce jobs targeting a different document or non-append mode", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
+    await enqueueRetainJobCoalesced(path, job);
+    const otherDoc = await enqueueRetainJobCoalesced(path, {
+      ...job,
+      id: "2",
+      documentId: "doc-2",
+    });
+    expect(otherDoc.coalesced).toBe(false);
+    const replaceJob = await enqueueRetainJobCoalesced(path, {
+      ...job,
+      id: "3",
+      updateMode: "replace",
+    });
+    expect(replaceJob.coalesced).toBe(false);
+    expect(await readRetainQueue(path)).toHaveLength(3);
+  });
+
+  it("refuses to coalesce into a job that has already failed delivery", async () => {
+    const failed: RetainJob = { ...job, retries: 1 };
+    expect(canCoalesceRetainJobs(failed, { ...job, id: "2" })).toBe(false);
+    // Content merge falls back to newline concatenation for non-JSON payloads.
+    const merged = coalesceRetainJob(
+      { ...job, item: { ...job.item, content: "a" } },
+      { ...job, id: "2", item: { ...job.item, content: "b" } },
+    );
+    expect(merged.item.content).toBe("a\nb");
+    expect(merged.id).toBe("1");
+    // Valid JSON that is not an array also falls back to newline concatenation.
+    const nonArray = coalesceRetainJob(
+      { ...job, item: { ...job.item, content: '{"m":1}' } },
+      { ...job, id: "2", item: { ...job.item, content: '{"m":2}' } },
+    );
+    expect(nonArray.item.content).toBe('{"m":1}\n{"m":2}');
+    // One array + one non-array still falls back; empty tags omit the tags field.
+    const mixed = coalesceRetainJob(
+      { ...job, item: { content: JSON.stringify([{ m: 1 }]), context: "ctx" } },
+      { ...job, id: "2", item: { content: '{"m":2}', context: "ctx" } },
+    );
+    expect(mixed.item.content).toBe(`${JSON.stringify([{ m: 1 }])}\n{"m":2}`);
+    expect(mixed.item.tags).toBeUndefined();
+  });
+
+  it("does not coalesce past a non-mergeable tail job (preserves append order)", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "pi-hindsight-q-")), "q.jsonl");
+    const older: RetainJob = {
+      ...job,
+      id: "1",
+      item: { ...job.item, content: JSON.stringify([{ m: 1 }]) },
+    };
+    const failedTail: RetainJob = {
+      ...job,
+      id: "2",
+      retries: 1,
+      item: { ...job.item, content: JSON.stringify([{ m: 2 }]) },
+    };
+    const incoming: RetainJob = {
+      ...job,
+      id: "3",
+      item: { ...job.item, content: JSON.stringify([{ m: 3 }]) },
+    };
+    await enqueueRetainJob(path, older);
+    await enqueueRetainJob(path, failedTail);
+    const result = await enqueueRetainJobCoalesced(path, incoming);
+    expect(result).toEqual({ coalesced: false, currentLength: 3 });
+    const queued = await readRetainQueue(path);
+    expect(queued.map((entry) => entry.id)).toEqual(["1", "2", "3"]);
+    expect(JSON.parse(queued[0]?.item.content ?? "[]")).toEqual([{ m: 1 }]);
   });
 
   it("persists and flushes jobs", async () => {

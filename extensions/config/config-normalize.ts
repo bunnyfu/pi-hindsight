@@ -408,6 +408,11 @@ export function normalizeConfig(
     retain: {
       enabled: bool(config.retain?.enabled, DEFAULT_CONFIG.retain.enabled),
       async: bool(config.retain?.async, DEFAULT_CONFIG.retain.async),
+      delivery: enumValue(
+        config.retain?.delivery,
+        ["immediate", "coalesced"],
+        DEFAULT_CONFIG.retain.delivery,
+      ),
       updateMode: enumValue(
         config.retain?.updateMode,
         ["append", "replace"],

@@ -9,6 +9,14 @@ import type {
 
 export type Budget = "low" | "mid" | "high";
 export type UpdateMode = "append" | "replace";
+
+// Automatic-retain delivery cadence.
+// - immediate: flush the queue after every agent_end (legacy, backward-compatible default).
+// - coalesced: enqueue and merge compatible deltas for the same bank/document, deferring
+//   remote delivery to the session boundary (shutdown) and any configured periodic flush.
+//   This collapses many small per-run retain operations into few larger ones, cutting
+//   Hindsight extraction/consolidation and Postgres WAL/write amplification.
+export type RetainDelivery = "immediate" | "coalesced";
 export type RetainUserContent = "text";
 export type RetainAssistantContent = "text" | "toolCall" | "thinking";
 export type RetainToolResultContent = "error" | "summary" | "content";
@@ -152,6 +160,7 @@ export interface ResolvedConfig {
   retain: {
     enabled: boolean;
     async: boolean;
+    delivery: RetainDelivery;
     updateMode: UpdateMode;
     content: {
       user: RetainUserContent[];
