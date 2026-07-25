@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.11.0](https://github.com/luxus/pi-hindsight/compare/v0.10.0...v0.11.0) (2026-07-25)
+
+
+### Features
+
+* **retain:** add coalesced automatic-retain delivery ([#541](https://github.com/luxus/pi-hindsight/issues/541)) ([0e76a4f](https://github.com/luxus/pi-hindsight/commit/0e76a4f38e0e927bb4671dc2464bf4bd936bae2f))
+* **retain:** add coalesced automatic-retain delivery to cut DB write amplification ([13da9bf](https://github.com/luxus/pi-hindsight/commit/13da9bfb29fb92aa8220e750c24139dd7ed7f384))
+
+
+### Bug Fixes
+
+* **retain:** harden coalesced delivery from PR [#541](https://github.com/luxus/pi-hindsight/issues/541) ([9bc7a09](https://github.com/luxus/pi-hindsight/commit/9bc7a0993e858fdc0c7b8eac567fb5986618c4fe))
+* **test:** drop optional timestamp in coalesce coverage case ([1f39b82](https://github.com/luxus/pi-hindsight/commit/1f39b8281850e85023da7bfa6876716ddeba4135))
+
 ## [0.10.0](https://github.com/luxus/pi-hindsight/compare/v0.9.0...v0.10.0) (2026-07-24)
 
 
