@@ -241,6 +241,30 @@ describe("retain queue", () => {
     );
     expect(merged.item.content).toBe("a\nb");
     expect(merged.id).toBe("1");
+    // Valid JSON that is not an array also falls back to newline concatenation.
+    const nonArray = coalesceRetainJob(
+      { ...job, item: { ...job.item, content: '{"m":1}' } },
+      { ...job, id: "2", item: { ...job.item, content: '{"m":2}' } },
+    );
+    expect(nonArray.item.content).toBe('{"m":1}\n{"m":2}');
+    // One array + one non-array still falls back; empty tags omit the tags field.
+    const mixed = coalesceRetainJob(
+      {
+        ...job,
+        item: {
+          content: JSON.stringify([{ m: 1 }]),
+          context: "ctx",
+          timestamp: job.item.timestamp,
+        },
+      },
+      {
+        ...job,
+        id: "2",
+        item: { content: '{"m":2}', context: "ctx", timestamp: job.item.timestamp },
+      },
+    );
+    expect(mixed.item.content).toBe(`${JSON.stringify([{ m: 1 }])}\n{"m":2}`);
+    expect(mixed.item.tags).toBeUndefined();
   });
 
   it("does not coalesce past a non-mergeable tail job (preserves append order)", async () => {
