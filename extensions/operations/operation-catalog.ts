@@ -43,7 +43,7 @@ const tagGroupJsonSchema = {
   required: ["tags"],
   properties: {
     tags: { type: "array", items: { type: "string" } },
-    match: { enum: ["any", "all", "any_strict", "all_strict"] },
+    match: { type: "string", enum: ["any", "all", "any_strict", "all_strict"] },
   },
   additionalProperties: false,
 };
