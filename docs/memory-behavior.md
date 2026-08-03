@@ -132,6 +132,8 @@ Defaults keep user/assistant text, assistant tool calls, tool result errors, and
 
 Live session retains set the named bank strategy `conversation` (coding project templates define multi-strategy maps: `git`, `gitlog`, `conversation`, `document`, `survey`, plus knowledge `entity_labels` for page routing). Default bank mission text prefers final-state-wins extraction when a conversation amends itself.
 
+Applying the `pi-coding-project` bank template (or `hindsight_knowledge` action `seed_taxonomy`) idempotently seeds a fixed five-page knowledge taxonomy tagged `knowledge:component|concept|convention|decision|feature-work`. When the client/server lacks knowledge-base APIs, seeding returns `knowledge_pages_unavailable` and does not fail template apply.
+
 Explicit retain tool tags are merged with base `source:pi`, repo, and session tags so manually retained memories remain visible to default project recall.
 
 ## Queue-first durability

@@ -712,13 +712,14 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
       name: "hindsight_knowledge",
       label: "Hindsight Knowledge Pages",
       description:
-        "Agent control plane for knowledge pages (living docs over bank observations). Actions: tree|search|get|export|create_page|create_folder|update|delete. Prefer search then get for routine Q&A (pages are not auto-injected). Use export only for a portable full-bank markdown bundle (backup/commit/share) — not for answering questions. Project-tier create_page defaults tags to source:pi + project:<activeId>. Mutating actions default dryRun=true. Requires Hindsight client/server knowledge-base support.",
+        "Agent control plane for knowledge pages (living docs over bank observations). Actions: tree|search|get|export|seed_taxonomy|create_page|create_folder|update|delete. Prefer search then get for routine Q&A (pages are not auto-injected). seed_taxonomy creates the fixed five-page coding taxonomy (idempotent; degrades when pages unavailable). Use export only for a portable full-bank markdown bundle. Project-tier create_page defaults tags to source:pi + project:<activeId>. Mutating actions default dryRun=true. Requires Hindsight client/server knowledge-base support.",
       parameters: Type.Object({
         action: Type.Union([
           Type.Literal("tree"),
           Type.Literal("search"),
           Type.Literal("get"),
           Type.Literal("export"),
+          Type.Literal("seed_taxonomy"),
           Type.Literal("create_page"),
           Type.Literal("create_folder"),
           Type.Literal("update"),
@@ -748,7 +749,7 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
         dryRun: Type.Optional(
           Type.Boolean({
             description:
-              "Mutating actions (create_page|create_folder|update|delete) default true (preview). Set false to apply.",
+              "Mutating actions (seed_taxonomy|create_page|create_folder|update|delete) default true (preview). Set false to apply.",
           }),
         ),
       }),
@@ -759,7 +760,8 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
           params.action === "create_page" ||
           params.action === "create_folder" ||
           params.action === "update" ||
-          params.action === "delete";
+          params.action === "delete" ||
+          params.action === "seed_taxonomy";
         const result = await operations.knowledge({
           action: params.action,
           cwd: ctx.cwd,

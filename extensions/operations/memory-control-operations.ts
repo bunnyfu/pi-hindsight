@@ -4,6 +4,7 @@ import { buildStatusFields } from "../utils/status-fields.js";
 import type { MemoryOperationsDeps } from "./memory-operation-types.js";
 import { isMemorySetupComplete, setupRequiredMessage } from "../config/setup-gate.js";
 import { configureMemory, type ProjectConfigPatchInput } from "../config/config-writer.js";
+import { seedKnowledgePages } from "../banks/knowledge-page-seed.js";
 import type { HindsightLikeClient, ResolvedConfig, TagsMatch } from "../types.js";
 
 /** Keys agents may read/patch via hindsight_config (no raw secrets). */
@@ -365,6 +366,7 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
         | "search"
         | "get"
         | "export"
+        | "seed_taxonomy"
         | "create_page"
         | "create_folder"
         | "update"
@@ -399,6 +401,19 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
         case "tree": {
           const tree = clientMethod(deps, "getKnowledgeBaseTree");
           return { bankId, result: await tree(bankId) };
+        }
+        case "seed_taxonomy": {
+          // Idempotent five-page coding taxonomy; degrades when pages are unavailable.
+          const baseTags = isUserBank
+            ? ["source:pi"]
+            : ["source:pi", `project:${project.projectId}`];
+          const seed = await seedKnowledgePages({
+            client: deps.getClient(),
+            bankId,
+            baseTags,
+            dryRun: args.dryRun ?? true,
+          });
+          return { bankId, seed };
         }
         case "search": {
           if (!args.query?.trim()) throw new Error("query is required for search");
