@@ -274,6 +274,8 @@ export interface RetainJob {
     observationScopes?: HindsightObservationScopes;
     documentTags?: string[];
     entities?: HindsightEntityInput[];
+    /** Named bank retain strategy (conversation, git, gitlog, document, survey). */
+    strategy?: string;
   };
   retries: number;
   lastError?: string;
@@ -305,6 +307,8 @@ export interface HindsightLikeClient {
       tags?: string[];
       updateMode?: UpdateMode;
       observationScopes?: HindsightObservationScopes;
+      /** Named bank retain strategy override for this item. */
+      strategy?: string;
       signal?: AbortSignal;
     },
   ): Promise<unknown>;
@@ -320,6 +324,7 @@ export interface HindsightLikeClient {
       tags?: string[];
       observation_scopes?: HindsightObservationScopes;
       update_mode?: UpdateMode;
+      strategy?: string;
     }>,
     options?: {
       documentId?: string;

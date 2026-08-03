@@ -99,6 +99,7 @@ function retainBatchItem(content: string, options: RetainOptions) {
       ? { observation_scopes: options.observationScopes }
       : {}),
     ...(options?.updateMode ? { update_mode: options.updateMode } : {}),
+    ...(options?.strategy ? { strategy: options.strategy } : {}),
   };
 }
 

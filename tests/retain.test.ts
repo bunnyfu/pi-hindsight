@@ -30,6 +30,7 @@ describe("buildRetainJob", () => {
     expect(job?.documentId).toMatch(/^pi-session:/);
     expect(job?.item.context).toContain("Pi coding session");
     expect(job?.item.async).toBe(true);
+    expect(job?.item.strategy).toBe("conversation");
     expect(job?.item.content).not.toContain("API_KEY=secret");
     const retained = JSON.parse(job?.item.content ?? "[]") as Array<Record<string, unknown>>;
     expect(retained[0]?.role).toBe("user");

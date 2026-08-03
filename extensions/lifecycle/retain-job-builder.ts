@@ -21,6 +21,8 @@ export interface RetainJobBuildArgs {
   documentTags?: string[];
   entities?: RetainJob["item"]["entities"];
   async?: boolean;
+  /** Named bank retain strategy (e.g. conversation, gitlog). Overrides bank default for this item. */
+  strategy?: string;
 }
 
 function sanitizedMetadata(
@@ -57,6 +59,7 @@ export function buildRetainJob(args: RetainJobBuildArgs): RetainJob {
       ...(metadata ? { metadata } : {}),
       ...(args.observationScopes?.length ? { observationScopes: args.observationScopes } : {}),
       ...(args.documentTags?.length ? { documentTags: args.documentTags } : {}),
+      ...(args.strategy ? { strategy: args.strategy } : {}),
     },
     retries: 0,
   };

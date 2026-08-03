@@ -130,6 +130,8 @@ The retain projection is controlled by:
 
 Defaults keep user/assistant text, assistant tool calls, tool result errors, and per-message timestamps while excluding recursive Hindsight tool output and noisy read/search results.
 
+Live session retains set the named bank strategy `conversation` (coding project templates define multi-strategy maps: `git`, `gitlog`, `conversation`, `document`, `survey`, plus knowledge `entity_labels` for page routing). Default bank mission text prefers final-state-wins extraction when a conversation amends itself.
+
 Explicit retain tool tags are merged with base `source:pi`, repo, and session tags so manually retained memories remain visible to default project recall.
 
 ## Queue-first durability

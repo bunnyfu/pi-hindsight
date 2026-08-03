@@ -4,7 +4,9 @@ const DEFAULT_PROJECT_REFLECT_MISSION =
   "You are a senior developer helping a Pi coding agent. Prefer past technical decisions, architecture trade-offs, conventions, and constraints. Be direct and opinionated when memory supports it; do not invent facts not grounded in memory.";
 
 const DEFAULT_PROJECT_RETAIN_MISSION =
-  "Always extract technical decisions, API/architecture trade-offs, blockers, error resolutions, repo conventions, and durable project-local preferences. Ignore greetings, small talk, scheduling logistics, secrets, probe/bait harness instructions (e.g. temporary 'do not ask questions' test rules), and resurfaced recalled memory unless it adds a new correction or decision.";
+  "Always extract technical decisions, API/architecture trade-offs, blockers, error resolutions, repo conventions, and durable project-local preferences. " +
+  "CRITICAL for conversations: record ONLY the FINAL settled state as what is in effect — when the same rule is amended, keep only the LAST choice; superseded proposals appear only as rejected alternatives, never as active decisions. " +
+  "Ignore greetings, small talk, scheduling logistics, secrets, probe/bait harness instructions (e.g. temporary 'do not ask questions' test rules), and resurfaced recalled memory unless it adds a new correction or decision.";
 
 const DEFAULT_PROJECT_OBSERVATIONS_MISSION =
   "Identify evolving durable project patterns, recurring constraints, architectural preferences, and contradictions with prior knowledge. Focus on stable repo-relevant knowledge — not transient task state, one-off plans, or test-harness noise.";

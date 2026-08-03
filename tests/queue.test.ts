@@ -115,6 +115,7 @@ describe("retain queue", () => {
           entities: [{ text: "entity", type: "thing" }],
           observationScopes: [["repo:abc"]],
           documentTags: ["doc:test"],
+          strategy: "conversation",
         },
       }),
     ).toMatchObject({
@@ -127,6 +128,7 @@ describe("retain queue", () => {
       tags: ["source:pi"],
       observationScopes: [["repo:abc"]],
       documentTags: ["doc:test"],
+      strategy: "conversation",
       documentId: "doc",
       updateMode: "append",
     });

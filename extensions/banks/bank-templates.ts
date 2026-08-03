@@ -10,6 +10,7 @@ import {
   resolveBankMissions,
 } from "./bank-operations.js";
 import type { BankMissionDefaults } from "./bank-operations.js";
+import { KNOWLEDGE_ENTITY_LABELS, PI_RETAIN_STRATEGIES } from "./retain-strategies.js";
 import type { AgentUseProfile, BankMissionSettings } from "../types.js";
 
 export type BankTemplateProfileId =
@@ -32,12 +33,26 @@ export interface BuiltInBankTemplate {
   manifest: BankTemplateManifest;
 }
 
-function bankConfigFromMissions(missions: BankMissionDefaults): BankTemplateConfig {
-  return {
+function bankConfigFromMissions(
+  missions: BankMissionDefaults,
+  options?: { codingStrategies?: boolean },
+): BankTemplateConfig {
+  const base: BankTemplateConfig = {
     reflect_mission: missions.reflectMission,
     retain_mission: missions.retainMission,
     enable_observations: true,
     observations_mission: missions.observationsMission,
+  };
+  if (!options?.codingStrategies) return base;
+  // Coding-agents-aligned multi-strategy retain + knowledge entity labels for page routing.
+  // Default strategy is conversation (live Pi sessions); git/gitlog used by opt-in seed paths.
+  return {
+    ...base,
+    retain_extraction_mode: "verbose",
+    retain_default_strategy: "conversation",
+    retain_strategies: { ...PI_RETAIN_STRATEGIES },
+    entity_labels: [KNOWLEDGE_ENTITY_LABELS],
+    entities_allow_free_form: true,
   };
 }
 
@@ -215,7 +230,7 @@ export const BUILT_IN_BANK_TEMPLATES: readonly BuiltInBankTemplate[] = [
     description: "Repo-focused mental models for architecture, conventions, and durable decisions.",
     manifest: {
       version: "1",
-      bank: bankConfigFromMissions(defaultProjectBankMissions()),
+      bank: bankConfigFromMissions(defaultProjectBankMissions(), { codingStrategies: true }),
       mental_models: CODING_PROJECT_MENTAL_MODELS,
     },
   },
@@ -342,10 +357,11 @@ export function resolveBankTemplateManifest(
     const bankGlobal = bankGlobalMentalModelsForTemplate(template.id);
     mental_models = bankGlobal.length > 0 ? [...bankGlobal, ...stamped] : stamped;
   }
+  const codingStrategies = template.id === "pi-coding-project";
   return {
     ...template.manifest,
     ...(mental_models ? { mental_models } : {}),
-    bank: bankConfigFromMissions(missions),
+    bank: bankConfigFromMissions(missions, { codingStrategies }),
   };
 }
 

@@ -49,6 +49,7 @@ export function retainOptionsForJob(job: RetainJob) {
     ...(job.item.tags ? { tags: job.item.tags } : {}),
     ...(job.item.observationScopes ? { observationScopes: job.item.observationScopes } : {}),
     ...(job.item.documentTags ? { documentTags: job.item.documentTags } : {}),
+    ...(job.item.strategy ? { strategy: job.item.strategy } : {}),
     documentId: job.documentId,
     updateMode: job.updateMode,
   };
