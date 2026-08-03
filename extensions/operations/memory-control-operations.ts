@@ -4,7 +4,7 @@ import { buildStatusFields } from "../utils/status-fields.js";
 import type { MemoryOperationsDeps } from "./memory-operation-types.js";
 import { isMemorySetupComplete, setupRequiredMessage } from "../config/setup-gate.js";
 import { configureMemory, type ProjectConfigPatchInput } from "../config/config-writer.js";
-import type { HindsightLikeClient, ResolvedConfig } from "../types.js";
+import type { HindsightLikeClient, ResolvedConfig, TagsMatch } from "../types.js";
 
 /** Keys agents may read/patch via hindsight_config (no raw secrets). */
 export const AGENT_CONFIG_ALLOWLIST = [
@@ -256,6 +256,8 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
       sourceQuery?: string;
       tags?: string[];
       maxTokens?: number;
+      /** How model tags filter source memories on refresh (create/update trigger). */
+      tagsMatch?: TagsMatch;
       dryRun?: boolean;
       cwd: string;
     }) {
@@ -288,11 +290,20 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
           const tags =
             args.tags ??
             (isUserBank ? ["source:pi"] : ["source:pi", `project:${project.projectId}`]);
+          const trigger = {
+            refreshAfterConsolidation: true as const,
+            ...(args.tagsMatch ? { tagsMatch: args.tagsMatch } : {}),
+          };
           if (args.dryRun ?? true) {
             return {
               dryRun: true,
               bankId,
-              wouldCreate: { name: args.name, sourceQuery: args.sourceQuery, tags },
+              wouldCreate: {
+                name: args.name,
+                sourceQuery: args.sourceQuery,
+                tags,
+                trigger,
+              },
             };
           }
           const create = clientMethod(deps, "createMentalModel");
@@ -300,8 +311,7 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
             ...(args.id ? { id: args.id } : {}),
             tags,
             ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}),
-            // Client maps only refreshAfterConsolidation; template import carries full delta trigger.
-            trigger: { refreshAfterConsolidation: true },
+            trigger,
           });
           return { bankId, result };
         }
@@ -312,9 +322,14 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
             ...(args.sourceQuery !== undefined ? { sourceQuery: args.sourceQuery } : {}),
             ...(args.tags !== undefined ? { tags: args.tags } : {}),
             ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}),
+            ...(args.tagsMatch
+              ? { trigger: { refreshAfterConsolidation: true, tagsMatch: args.tagsMatch } }
+              : {}),
           };
           if (Object.keys(options).length === 0) {
-            throw new Error("Provide name, sourceQuery, tags, and/or maxTokens for update");
+            throw new Error(
+              "Provide name, sourceQuery, tags, maxTokens, and/or tagsMatch for update",
+            );
           }
           if (args.dryRun ?? true)
             return { dryRun: true, bankId, id: args.id, wouldUpdate: options };
@@ -345,7 +360,15 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
      * Requires a Hindsight client/server that exposes knowledge-base methods.
      */
     async knowledge(args: {
-      action: "tree" | "search" | "get" | "create_page" | "create_folder" | "update" | "delete";
+      action:
+        | "tree"
+        | "search"
+        | "get"
+        | "export"
+        | "create_page"
+        | "create_folder"
+        | "update"
+        | "delete";
       bank?: string;
       id?: string;
       query?: string;
@@ -355,6 +378,8 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
       parentId?: string | null;
       tags?: string[];
       maxTokens?: number;
+      /** Page create only — when set, restates server page defaults + tagsMatch (trigger replace). */
+      tagsMatch?: TagsMatch;
       dryRun?: boolean;
       cwd: string;
     }) {
@@ -392,6 +417,11 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
           const get = clientMethod(deps, "getKnowledgePage");
           return { bankId, result: await get(bankId, args.id) };
         }
+        case "export": {
+          // Portable markdown bundle of the whole knowledge base (not for routine Q&A).
+          const exp = clientMethod(deps, "exportKnowledgeBase");
+          return { bankId, result: await exp(bankId) };
+        }
         case "create_page": {
           if (!args.name?.trim() || !args.sourceQuery?.trim()) {
             throw new Error("name and sourceQuery are required for create_page");
@@ -399,12 +429,24 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
           const tags =
             args.tags ??
             (isUserBank ? ["source:pi"] : ["source:pi", `project:${project.projectId}`]);
+          // Omit trigger to keep server page defaults; only restate them when tagsMatch is set
+          // (a supplied trigger replaces defaults rather than merging).
+          const trigger = args.tagsMatch
+            ? {
+                mode: "delta" as const,
+                factTypes: ["observation" as const],
+                excludeMentalModels: true,
+                refreshAfterConsolidation: true,
+                tagsMatch: args.tagsMatch,
+              }
+            : undefined;
           const wouldCreate = {
             name: args.name.trim(),
             sourceQuery: args.sourceQuery.trim(),
             tags,
             ...(args.parentId !== undefined ? { parentId: args.parentId } : {}),
             ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}),
+            ...(trigger ? { trigger } : {}),
           };
           if (args.dryRun ?? true) return { dryRun: true, bankId, wouldCreate };
           const create = clientMethod(deps, "createKnowledgePage");
@@ -412,6 +454,7 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
             tags,
             ...(args.parentId !== undefined ? { parentId: args.parentId } : {}),
             ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}),
+            ...(trigger ? { trigger } : {}),
           });
           return { bankId, result };
         }

@@ -652,7 +652,7 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
       name: "hindsight_mental_model",
       label: "Hindsight Mental Model",
       description:
-        "Agent control plane for mental models on the selected bank. Actions: list|get|create|update|refresh|delete. Project-tier create defaults tags to source:pi + project:<activeId>. Mutating actions (create/update/refresh/delete) default dryRun=true; set dryRun=false to apply.",
+        "Agent control plane for mental models on the selected bank. Actions: list|get|create|update|refresh|delete. Project-tier create defaults tags to source:pi + project:<activeId>. Optional tagsMatch sets refresh tag matching on create/update trigger. Mutating actions default dryRun=true; set dryRun=false to apply.",
       parameters: Type.Object({
         action: Type.Union([
           Type.Literal("list"),
@@ -670,6 +670,7 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
         sourceQuery: Type.Optional(Type.String()),
         tags: Type.Optional(Type.Array(Type.String())),
         maxTokens: Type.Optional(Type.Integer({ minimum: 1 })),
+        tagsMatch: Type.Optional(tagMatchSchema),
         dryRun: Type.Optional(
           Type.Boolean({
             description: "Mutating actions default true (preview). Set false to apply.",
@@ -693,6 +694,7 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
           ...(params.sourceQuery ? { sourceQuery: params.sourceQuery } : {}),
           ...(params.tags ? { tags: params.tags } : {}),
           ...(params.maxTokens !== undefined ? { maxTokens: params.maxTokens } : {}),
+          ...(params.tagsMatch ? { tagsMatch: params.tagsMatch } : {}),
           ...(mutating
             ? { dryRun: params.dryRun ?? true }
             : params.dryRun !== undefined
@@ -710,12 +712,13 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
       name: "hindsight_knowledge",
       label: "Hindsight Knowledge Pages",
       description:
-        "Agent control plane for knowledge pages (living docs over bank observations). Actions: tree|search|get|create_page|create_folder|update|delete. Prefer search then get for read path; pages are not auto-injected. Project-tier create_page defaults tags to source:pi + project:<activeId>. Mutating actions default dryRun=true. Requires Hindsight client/server knowledge-base support.",
+        "Agent control plane for knowledge pages (living docs over bank observations). Actions: tree|search|get|export|create_page|create_folder|update|delete. Prefer search then get for routine Q&A (pages are not auto-injected). Use export only for a portable full-bank markdown bundle (backup/commit/share) — not for answering questions. Project-tier create_page defaults tags to source:pi + project:<activeId>. Mutating actions default dryRun=true. Requires Hindsight client/server knowledge-base support.",
       parameters: Type.Object({
         action: Type.Union([
           Type.Literal("tree"),
           Type.Literal("search"),
           Type.Literal("get"),
+          Type.Literal("export"),
           Type.Literal("create_page"),
           Type.Literal("create_folder"),
           Type.Literal("update"),
@@ -741,6 +744,7 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
         ),
         tags: Type.Optional(Type.Array(Type.String())),
         maxTokens: Type.Optional(Type.Integer({ minimum: 1 })),
+        tagsMatch: Type.Optional(tagMatchSchema),
         dryRun: Type.Optional(
           Type.Boolean({
             description:
@@ -768,6 +772,7 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
           ...(params.parentId !== undefined ? { parentId: params.parentId } : {}),
           ...(params.tags ? { tags: params.tags } : {}),
           ...(params.maxTokens !== undefined ? { maxTokens: params.maxTokens } : {}),
+          ...(params.tagsMatch ? { tagsMatch: params.tagsMatch } : {}),
           ...(mutating
             ? { dryRun: params.dryRun ?? true }
             : params.dryRun !== undefined

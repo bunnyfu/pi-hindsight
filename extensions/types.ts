@@ -299,6 +299,8 @@ export interface HindsightLikeClient {
       documentId?: string;
       documentTags?: string[];
       async?: boolean;
+      /** Caller-supplied UUID for idempotent async retain retries. */
+      operationId?: string;
       entities?: HindsightEntityInput[];
       tags?: string[];
       updateMode?: UpdateMode;
@@ -323,6 +325,7 @@ export interface HindsightLikeClient {
       documentId?: string;
       documentTags?: string[];
       async?: boolean;
+      operationId?: string;
       signal?: AbortSignal;
     },
   ): Promise<unknown>;
@@ -406,7 +409,10 @@ export interface HindsightLikeClient {
       id?: string;
       tags?: string[];
       maxTokens?: number;
-      trigger?: { refreshAfterConsolidation?: boolean };
+      trigger?: {
+        refreshAfterConsolidation?: boolean;
+        tagsMatch?: TagsMatch;
+      };
       signal?: AbortSignal;
     },
   ): Promise<unknown>;
@@ -418,7 +424,10 @@ export interface HindsightLikeClient {
       sourceQuery?: string;
       tags?: string[];
       maxTokens?: number;
-      trigger?: { refreshAfterConsolidation?: boolean };
+      trigger?: {
+        refreshAfterConsolidation?: boolean;
+        tagsMatch?: TagsMatch;
+      };
       signal?: AbortSignal;
     },
   ): Promise<unknown>;
@@ -447,6 +456,14 @@ export interface HindsightLikeClient {
       parentId?: string | null;
       tags?: string[];
       maxTokens?: number;
+      /** When set, must restate page defaults (server replaces, does not merge). */
+      trigger?: {
+        mode?: "full" | "delta";
+        refreshAfterConsolidation?: boolean;
+        factTypes?: Array<"world" | "experience" | "observation">;
+        excludeMentalModels?: boolean;
+        tagsMatch?: TagsMatch;
+      };
       signal?: AbortSignal;
     },
   ): Promise<unknown>;
@@ -477,6 +494,7 @@ export interface HindsightLikeClient {
     nodeId: string,
     options?: { signal?: AbortSignal },
   ): Promise<unknown>;
+  exportKnowledgeBase?(bankId: string, options?: { signal?: AbortSignal }): Promise<unknown>;
   updateBankConfig?(
     bankId: string,
     options: {

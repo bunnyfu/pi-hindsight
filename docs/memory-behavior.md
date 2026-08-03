@@ -15,6 +15,7 @@ Defaults:
 - `recall.injectionPosition: "append"`
 - project recall is scoped by stable `project:<id>` tags (plus dual-tag legacy `repo:<path-hash>`; see [project identity](project-identity.md))
 - global recall uses explicit non-repo `source:pi` scope
+- automatic retain tags include `source:pi` and `harness:pi` (coding-agents-style host provenance; observation scopes already default to `harness:pi`)
 
 Set `recall.types` to include `world` or `experience`, or to an empty list, only when you explicitly want lower-level memory types.
 

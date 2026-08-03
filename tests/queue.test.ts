@@ -122,6 +122,7 @@ describe("retain queue", () => {
       timestamp: "2026-01-01T00:00:00.000Z",
       metadata: { source: "test" },
       async: true,
+      operationId: job.id,
       entities: [{ text: "entity", type: "thing" }],
       tags: ["source:pi"],
       observationScopes: [["repo:abc"]],

@@ -37,11 +37,14 @@ export function redactQueueError(error: unknown): string {
 }
 
 export function retainOptionsForJob(job: RetainJob) {
+  const async = job.item.async;
   return {
     context: job.item.context,
     ...(job.item.timestamp ? { timestamp: job.item.timestamp } : {}),
     ...(job.item.metadata ? { metadata: job.item.metadata } : {}),
-    ...(job.item.async !== undefined ? { async: job.item.async } : {}),
+    ...(async !== undefined ? { async } : {}),
+    // Stable per queue job so async retain retries are idempotent (Hindsight operation_id).
+    ...(async === true ? { operationId: job.id } : {}),
     ...(job.item.entities?.length ? { entities: job.item.entities } : {}),
     ...(job.item.tags ? { tags: job.item.tags } : {}),
     ...(job.item.observationScopes ? { observationScopes: job.item.observationScopes } : {}),

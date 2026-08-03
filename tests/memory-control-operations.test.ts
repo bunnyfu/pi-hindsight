@@ -263,9 +263,68 @@ describe("memory control operations", () => {
     await ops.knowledge({ action: "tree", cwd });
     expect(getKnowledgeBaseTree).toHaveBeenCalledWith("coding");
 
+    const exportKnowledgeBase = vi.fn(async () => ({ files: [] }));
+    const opsWithExport = createControlOperations({
+      getClient: () => ({
+        retain: async () => undefined,
+        recall: async () => [],
+        reflect: async () => ({}),
+        exportKnowledgeBase,
+      }),
+      getConfig: () => ({
+        ...DEFAULT_CONFIG,
+        setupComplete: true,
+        banks: {
+          ...DEFAULT_CONFIG.banks,
+          project: { enabled: true, bankId: "coding", derive: "manual" as const },
+        },
+      }),
+      getProjectBankId: () => "coding",
+    });
+    await opsWithExport.knowledge({ action: "export", cwd });
+    expect(exportKnowledgeBase).toHaveBeenCalledWith("coding");
+
     const delDry = await ops.knowledge({ action: "delete", cwd, id: "kp1" });
     expect(delDry).toMatchObject({ dryRun: true, wouldDelete: true });
     expect(deleteKnowledgeNode).not.toHaveBeenCalled();
+  });
+
+  it("mental model create passes tagsMatch on trigger", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-ctrl-mm-tm-"));
+    const createMentalModel = vi.fn(async () => ({ mental_model_id: "mm1" }));
+    const ops = createControlOperations({
+      getClient: () => ({
+        retain: async () => undefined,
+        recall: async () => [],
+        reflect: async () => ({}),
+        createMentalModel,
+      }),
+      getConfig: () => ({
+        ...DEFAULT_CONFIG,
+        setupComplete: true,
+        banks: {
+          ...DEFAULT_CONFIG.banks,
+          project: { enabled: true, bankId: "coding", derive: "manual" as const },
+        },
+      }),
+      getProjectBankId: () => "coding",
+    });
+    await ops.mentalModel({
+      action: "create",
+      cwd,
+      name: "Arch",
+      sourceQuery: "architecture?",
+      tagsMatch: "any",
+      dryRun: false,
+    });
+    expect(createMentalModel).toHaveBeenCalledWith(
+      "coding",
+      "Arch",
+      "architecture?",
+      expect.objectContaining({
+        trigger: { refreshAfterConsolidation: true, tagsMatch: "any" },
+      }),
+    );
   });
 
   it("knowledge fails clearly when client lacks knowledge-base methods", async () => {

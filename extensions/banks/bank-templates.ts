@@ -41,7 +41,7 @@ function bankConfigFromMissions(missions: BankMissionDefaults): BankTemplateConf
   };
 }
 
-// Tags must be a subset of tags written at retain time (source:pi, project:*, session:*, repo:*).
+// Tags must be a subset of tags written at retain time (source:pi, harness:pi, project:*, session:*, repo:*).
 // Project-tier models get project:<id> stamped at apply time (resolveBankTemplateManifest).
 const RETAIN_COMPAT_TAGS = ["source:pi"] as const;
 

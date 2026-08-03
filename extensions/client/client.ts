@@ -112,6 +112,9 @@ function retainSingle(
   if (options?.documentTags?.length) {
     return raw.retainBatch(bankId, [retainBatchItem(content, options)], {
       ...(options.async !== undefined ? { async: options.async } : {}),
+      ...(options.async === true && options.operationId != null
+        ? { operationId: options.operationId }
+        : {}),
       documentTags: options.documentTags,
       signal,
     });

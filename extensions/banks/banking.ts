@@ -210,6 +210,8 @@ export function baseTags(
   const identity = resolveProjectIdentity(cwd, config);
   const tags = [
     "source:pi",
+    // Provenance host tag (coding-agents uses harness:<name> + source:chat).
+    "harness:pi",
     projectScopeTag(identity.projectId),
     // Dual-tag window: keep legacy path-hash tag so older memories still match any_strict.
     legacyRepoScopeTag(identity.legacyRepoKey),

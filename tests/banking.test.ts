@@ -152,6 +152,7 @@ describe("banking/session identity", () => {
     expect(baseTags("/repo", "s1")).toEqual(
       expect.arrayContaining([
         "source:pi",
+        "harness:pi",
         expect.stringMatching(/^project:/),
         expect.stringMatching(/^repo:/),
         "session:s1",
