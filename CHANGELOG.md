@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.1](https://github.com/luxus/pi-hindsight/compare/v0.11.0...v0.11.1) (2026-08-03)
+
+
+### Bug Fixes
+
+* **operations:** declare type on tagGroups.match enum for MFJS compatibility ([3862650](https://github.com/luxus/pi-hindsight/commit/3862650b853d2b60e70cc83e8417d2638d72b152))
+* **operations:** declare type on tagGroups.match enum for MFJS compatibility ([ea00ebf](https://github.com/luxus/pi-hindsight/commit/ea00ebf823d52ba64e3d96dc275b12884d6886e7))
+
 ## [0.11.0](https://github.com/luxus/pi-hindsight/compare/v0.10.0...v0.11.0) (2026-07-25)
 
 
