@@ -17,6 +17,7 @@ Pi Hindsight 1.0 supports a stable Pi-first Hindsight integration. Core and Pi w
 | `hindsight_retain_global` | core 1.0             |
 | `hindsight_reflect`       | core 1.0             |
 | `hindsight_status`        | supported 1.0        |
+| `hindsight_seed_git`      | supported 1.0        |
 | `hindsight_scope`         | supported 1.0        |
 | `hindsight_config`        | supported 1.0        |
 | `hindsight_bank`          | supported 1.0        |
@@ -122,10 +123,20 @@ Ask Hindsight to synthesize an answer from memory. Use explicitly, not for defau
 
 ### `hindsight_status`
 
-Inspect Pi Hindsight status: setup gate, coding/life banks, project scope tags (basis), recall/retain flags, queue. Use before changing memory config. Read-only.
+Inspect Pi Hindsight status: setup gate, coding/life banks, project scope tags (basis), recall/retain flags, queue, and sync readiness (queue depth, git seed receipt, knowledge-page capability). Use before changing memory config. Read-only.
 
 | Parameter | Type | Required | Description |
 | --------- | ---- | -------- | ----------- |
+
+### `hindsight_seed_git`
+
+Opt-in cold-repo seed: retain recent git commit messages (strategy gitlog) into the project bank. Not automatic — conversation retain remains primary. dryRun defaults true; set dryRun=false to enqueue (and flush by default).
+
+| Parameter | Type    | Required | Description                                                      |
+| --------- | ------- | -------- | ---------------------------------------------------------------- |
+| `limit`   | integer | no       | Max commits to include (default 300).                            |
+| `dryRun`  | boolean | no       | Default true (preview). Set false to enqueue retain.             |
+| `flush`   | boolean | no       | When dryRun=false, flush the queue after enqueue (default true). |
 
 ### `hindsight_scope`
 

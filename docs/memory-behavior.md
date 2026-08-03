@@ -134,6 +134,8 @@ Live session retains set the named bank strategy `conversation` (coding project 
 
 Applying the `pi-coding-project` bank template (or `hindsight_knowledge` action `seed_taxonomy`) idempotently seeds a fixed five-page knowledge taxonomy tagged `knowledge:component|concept|convention|decision|feature-work`. When the client/server lacks knowledge-base APIs, seeding returns `knowledge_pages_unavailable` and does not fail template apply.
 
+Opt-in cold-repo git seed: `hindsight_seed_git` retains recent commit messages (strategy `gitlog`, stable `pi-gitlog:<head>` document ids) without replacing live session retain. It is never automatic on session start. `hindsight_status` and doctor include a `sync` readiness block (queue depth, git seed receipt, knowledge-page capability).
+
 Explicit retain tool tags are merged with base `source:pi`, repo, and session tags so manually retained memories remain visible to default project recall.
 
 ## Queue-first durability

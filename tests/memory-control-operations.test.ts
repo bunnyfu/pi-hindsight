@@ -6,7 +6,7 @@ import { DEFAULT_CONFIG } from "../extensions/config/config.js";
 import { createControlOperations } from "../extensions/operations/memory-control-operations.js";
 
 describe("memory control operations", () => {
-  it("status reports setup required on fresh cwd", () => {
+  it("status reports setup required on fresh cwd", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-ctrl-"));
     const ops = createControlOperations({
       getClient: () => ({
@@ -17,9 +17,13 @@ describe("memory control operations", () => {
       getConfig: () => DEFAULT_CONFIG,
       getProjectBankId: () => "pi-project-x",
     });
-    const status = ops.status(cwd);
+    const status = await ops.status(cwd);
     expect(status.setupComplete).toBe(false);
     expect(status.fields.some((f) => f.key === "setup" && f.tone === "warn")).toBe(true);
+    expect(status.sync).toMatchObject({
+      queue: expect.objectContaining({ active: expect.any(Number) }),
+      knowledgePages: expect.any(String),
+    });
   });
 
   it("mental model create defaults project tags and supports dry-run", async () => {

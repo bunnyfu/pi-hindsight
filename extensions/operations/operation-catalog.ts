@@ -493,12 +493,52 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
       name: "hindsight_status",
       label: "Hindsight Status",
       description:
-        "Inspect Pi Hindsight status: setup gate, coding/life banks, project scope tags (basis), recall/retain flags, queue. Use before changing memory config. Read-only.",
+        "Inspect Pi Hindsight status: setup gate, coding/life banks, project scope tags (basis), recall/retain flags, queue, and sync readiness (queue depth, git seed receipt, knowledge-page capability). Use before changing memory config. Read-only.",
       parameters: Type.Object({}),
       async execute(_id, _params, signal, _onUpdate, ctx) {
         useCwd(ctx.cwd);
         if (signal?.aborted) throw new Error("Aborted");
-        const result = operations.status(ctx.cwd);
+        const result = await operations.status(ctx.cwd);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          details: result,
+        };
+      },
+      renderResult: renderMemoryToolTextResult,
+    }),
+    defineCatalogTool({
+      name: "hindsight_seed_git",
+      label: "Hindsight Seed Git",
+      description:
+        "Opt-in cold-repo seed: retain recent git commit messages (strategy gitlog) into the project bank. Not automatic — conversation retain remains primary. dryRun defaults true; set dryRun=false to enqueue (and flush by default).",
+      parameters: Type.Object({
+        limit: Type.Optional(
+          Type.Integer({
+            minimum: 1,
+            maximum: 2000,
+            description: "Max commits to include (default 300).",
+          }),
+        ),
+        dryRun: Type.Optional(
+          Type.Boolean({
+            description: "Default true (preview). Set false to enqueue retain.",
+          }),
+        ),
+        flush: Type.Optional(
+          Type.Boolean({
+            description: "When dryRun=false, flush the queue after enqueue (default true).",
+          }),
+        ),
+      }),
+      async execute(_id, params, signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        if (signal?.aborted) throw new Error("Aborted");
+        const result = await operations.seedGitLog({
+          cwd: ctx.cwd,
+          ...(params.limit !== undefined ? { limit: params.limit } : {}),
+          dryRun: params.dryRun ?? true,
+          ...(params.flush !== undefined ? { flush: params.flush } : {}),
+        });
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
           details: result,

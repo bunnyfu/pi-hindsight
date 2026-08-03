@@ -169,17 +169,25 @@ function clientMethod<K extends keyof HindsightLikeClient>(
 
 export function createControlOperations(deps: MemoryOperationsDeps) {
   return {
-    status(cwd: string) {
+    async status(cwd: string) {
       const config = deps.getConfig();
       const fields = buildStatusFields(config, {
         cwd,
         projectBankId: deps.getProjectBankId(),
+      });
+      const { buildSyncStatus } = await import("../lifecycle/git-seed.js");
+      const sync = await buildSyncStatus({
+        cwd,
+        config,
+        client: deps.getClient(),
+        bankId: deps.getProjectBankId(),
       });
       return {
         setupComplete: isMemorySetupComplete(config, cwd),
         ...(isMemorySetupComplete(config, cwd) ? {} : { setupHint: setupRequiredMessage() }),
         project: resolveProjectIdentity(cwd, config),
         fields,
+        sync,
       };
     },
 

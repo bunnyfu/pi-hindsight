@@ -501,6 +501,7 @@ describe("operation catalog", () => {
       "hindsight_retain_global",
       "hindsight_reflect",
       "hindsight_status",
+      "hindsight_seed_git",
       "hindsight_scope",
       "hindsight_config",
       "hindsight_bank",

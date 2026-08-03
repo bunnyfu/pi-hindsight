@@ -49,6 +49,8 @@ export interface DebugReportArgs {
   memoryCount?: number;
   queueRemaining?: number;
   scopeMigrate?: ScopeMigratePlan;
+  /** Memory readiness: queue, git seed receipt, knowledge-page capability. */
+  sync?: unknown;
 }
 
 export function bankSelectionMessage(projectBankId: string, config: ResolvedConfig): string {
@@ -146,6 +148,7 @@ export function formatDebugReport(args: DebugReportArgs): string {
         },
       },
       health,
+      ...(args.sync !== undefined ? { sync: args.sync } : {}),
       cwd: args.cwd,
       repoRoot: findRepoRoot(args.cwd),
       sessionFile: args.sessionFile ?? null,
