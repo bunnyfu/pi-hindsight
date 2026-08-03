@@ -341,6 +341,132 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
     },
 
     /**
+     * Knowledge pages control plane (tree/search/get + dry-run mutating folder/page ops).
+     * Requires a Hindsight client/server that exposes knowledge-base methods.
+     */
+    async knowledge(args: {
+      action: "tree" | "search" | "get" | "create_page" | "create_folder" | "update" | "delete";
+      bank?: string;
+      id?: string;
+      query?: string;
+      limit?: number;
+      name?: string;
+      sourceQuery?: string;
+      parentId?: string | null;
+      tags?: string[];
+      maxTokens?: number;
+      dryRun?: boolean;
+      cwd: string;
+    }) {
+      const config = deps.getConfig();
+      const bankId = resolveOperationBank({
+        requestedBank: args.bank,
+        config,
+        projectBankId: deps.getProjectBankId(),
+      });
+      const project = resolveProjectIdentity(args.cwd, config);
+      const isUserBank =
+        args.bank === "global" ||
+        args.bank === "user" ||
+        (config.banks.user.bankId !== undefined && args.bank === config.banks.user.bankId);
+
+      switch (args.action) {
+        case "tree": {
+          const tree = clientMethod(deps, "getKnowledgeBaseTree");
+          return { bankId, result: await tree(bankId) };
+        }
+        case "search": {
+          if (!args.query?.trim()) throw new Error("query is required for search");
+          const search = clientMethod(deps, "searchKnowledgeBase");
+          return {
+            bankId,
+            result: await search(
+              bankId,
+              args.query.trim(),
+              args.limit !== undefined ? { limit: args.limit } : undefined,
+            ),
+          };
+        }
+        case "get": {
+          if (!args.id) throw new Error("id is required for get");
+          const get = clientMethod(deps, "getKnowledgePage");
+          return { bankId, result: await get(bankId, args.id) };
+        }
+        case "create_page": {
+          if (!args.name?.trim() || !args.sourceQuery?.trim()) {
+            throw new Error("name and sourceQuery are required for create_page");
+          }
+          const tags =
+            args.tags ??
+            (isUserBank ? ["source:pi"] : ["source:pi", `project:${project.projectId}`]);
+          const wouldCreate = {
+            name: args.name.trim(),
+            sourceQuery: args.sourceQuery.trim(),
+            tags,
+            ...(args.parentId !== undefined ? { parentId: args.parentId } : {}),
+            ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}),
+          };
+          if (args.dryRun ?? true) return { dryRun: true, bankId, wouldCreate };
+          const create = clientMethod(deps, "createKnowledgePage");
+          const result = await create(bankId, wouldCreate.name, wouldCreate.sourceQuery, {
+            tags,
+            ...(args.parentId !== undefined ? { parentId: args.parentId } : {}),
+            ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}),
+          });
+          return { bankId, result };
+        }
+        case "create_folder": {
+          if (!args.name?.trim()) throw new Error("name is required for create_folder");
+          const wouldCreate = {
+            name: args.name.trim(),
+            ...(args.parentId !== undefined ? { parentId: args.parentId } : {}),
+          };
+          if (args.dryRun ?? true) return { dryRun: true, bankId, wouldCreate };
+          const create = clientMethod(deps, "createKnowledgeFolder");
+          const result = await create(
+            bankId,
+            wouldCreate.name,
+            args.parentId !== undefined ? { parentId: args.parentId } : undefined,
+          );
+          return { bankId, result };
+        }
+        case "update": {
+          if (!args.id) throw new Error("id is required for update");
+          const options: {
+            name?: string;
+            parentId?: string | null;
+            sourceQuery?: string;
+            tags?: string[];
+            maxTokens?: number;
+          } = {
+            ...(args.name !== undefined ? { name: args.name } : {}),
+            ...("parentId" in args ? { parentId: args.parentId } : {}),
+            ...(args.sourceQuery !== undefined ? { sourceQuery: args.sourceQuery } : {}),
+            ...(args.tags !== undefined ? { tags: args.tags } : {}),
+            ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}),
+          };
+          if (Object.keys(options).length === 0) {
+            throw new Error(
+              "Provide name, parentId, sourceQuery, tags, and/or maxTokens for update",
+            );
+          }
+          if (args.dryRun ?? true)
+            return { dryRun: true, bankId, id: args.id, wouldUpdate: options };
+          const update = clientMethod(deps, "updateKnowledgeNode");
+          return { bankId, result: await update(bankId, args.id, options) };
+        }
+        case "delete": {
+          if (!args.id) throw new Error("id is required for delete");
+          if (args.dryRun ?? true) return { dryRun: true, bankId, id: args.id, wouldDelete: true };
+          const del = clientMethod(deps, "deleteKnowledgeNode");
+          return { bankId, result: await del(bankId, args.id) };
+        }
+        default:
+          throw new Error(`Unknown knowledge action: ${String(args.action)}`);
+      }
+    },
+
+    /**
      * Agent allowlisted config get/patch. Writes project (or optional global) config files.
      * Never accepts direct API keys — use apiKeyEnvVar only.
      */

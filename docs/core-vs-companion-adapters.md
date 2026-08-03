@@ -67,6 +67,7 @@ If most answers are yes, it can be core. If any answer depends on a non-Pi frame
 | Request                                                                   | Location        | Reason                                                              |
 | ------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------- |
 | Selected-bank mental-model list/create/update/refresh (agent tools)       | Core            | Agent-first control plane for banks Pi already uses (ADR-005).      |
+| Selected-bank knowledge pages (tree/search/get + dry-run mutate)          | Core            | Capability-gated; needs knowledge-base client/server support.       |
 | Selected-bank mission inspect/edit (agent tools)                          | Core            | Missions are bank-scoped; agent maintains them without TUI farms.   |
 | Platform-wide bank list/delete, arbitrary template catalog, audit admin   | Web UI          | Full Hindsight control-plane browsing stays upstream.               |
 | Import Markdown, text, or JSON seed files into a selected bank            | Core if generic | Simple content import helps Pi projects without framework coupling. |

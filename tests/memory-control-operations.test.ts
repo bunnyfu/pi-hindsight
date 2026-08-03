@@ -195,6 +195,102 @@ describe("memory control operations", () => {
     expect(disk.banks?.project?.bankId).toBe("kai-coding");
   });
 
+  it("knowledge create_page defaults project tags and dry-runs by default", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-ctrl-kp-"));
+    mkdirSync(join(cwd, ".pi"), { recursive: true });
+    writeFileSync(join(cwd, ".pi", "hindsight.json"), JSON.stringify({ setupComplete: true }));
+    const createKnowledgePage = vi.fn(async () => ({ page_id: "kp1", operation_id: "op1" }));
+    const searchKnowledgeBase = vi.fn(async () => ({ results: [], total: 0 }));
+    const getKnowledgePage = vi.fn(async () => ({ id: "kp1", markdown: "# x" }));
+    const getKnowledgeBaseTree = vi.fn(async () => ({ roots: [] }));
+    const deleteKnowledgeNode = vi.fn(async () => undefined);
+    const ops = createControlOperations({
+      getClient: () => ({
+        retain: async () => undefined,
+        recall: async () => [],
+        reflect: async () => ({}),
+        createKnowledgePage,
+        searchKnowledgeBase,
+        getKnowledgePage,
+        getKnowledgeBaseTree,
+        deleteKnowledgeNode,
+      }),
+      getConfig: () => ({
+        ...DEFAULT_CONFIG,
+        setupComplete: true,
+        banks: {
+          ...DEFAULT_CONFIG.banks,
+          project: { enabled: true, bankId: "coding", derive: "manual" as const },
+        },
+      }),
+      getProjectBankId: () => "coding",
+    });
+
+    const dry = await ops.knowledge({
+      action: "create_page",
+      cwd,
+      name: "Deploy",
+      sourceQuery: "How do we deploy?",
+    });
+    expect(dry).toMatchObject({ dryRun: true, bankId: "coding" });
+    expect((dry as { wouldCreate: { tags: string[] } }).wouldCreate.tags).toEqual(
+      expect.arrayContaining(["source:pi", expect.stringMatching(/^project:/)]),
+    );
+    expect(createKnowledgePage).not.toHaveBeenCalled();
+
+    await ops.knowledge({
+      action: "create_page",
+      cwd,
+      name: "Deploy",
+      sourceQuery: "How do we deploy?",
+      dryRun: false,
+    });
+    expect(createKnowledgePage).toHaveBeenCalledWith(
+      "coding",
+      "Deploy",
+      "How do we deploy?",
+      expect.objectContaining({
+        tags: expect.arrayContaining(["source:pi"]),
+      }),
+    );
+
+    await ops.knowledge({ action: "search", cwd, query: "deploy", limit: 3 });
+    expect(searchKnowledgeBase).toHaveBeenCalledWith("coding", "deploy", { limit: 3 });
+
+    await ops.knowledge({ action: "get", cwd, id: "kp1" });
+    expect(getKnowledgePage).toHaveBeenCalledWith("coding", "kp1");
+
+    await ops.knowledge({ action: "tree", cwd });
+    expect(getKnowledgeBaseTree).toHaveBeenCalledWith("coding");
+
+    const delDry = await ops.knowledge({ action: "delete", cwd, id: "kp1" });
+    expect(delDry).toMatchObject({ dryRun: true, wouldDelete: true });
+    expect(deleteKnowledgeNode).not.toHaveBeenCalled();
+  });
+
+  it("knowledge fails clearly when client lacks knowledge-base methods", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-ctrl-kp-miss-"));
+    const ops = createControlOperations({
+      getClient: () => ({
+        retain: async () => undefined,
+        recall: async () => [],
+        reflect: async () => ({}),
+      }),
+      getConfig: () => ({
+        ...DEFAULT_CONFIG,
+        setupComplete: true,
+        banks: {
+          ...DEFAULT_CONFIG.banks,
+          project: { enabled: true, bankId: "coding", derive: "manual" as const },
+        },
+      }),
+      getProjectBankId: () => "coding",
+    });
+    await expect(ops.knowledge({ action: "tree", cwd })).rejects.toThrow(
+      /does not support getKnowledgeBaseTree/i,
+    );
+  });
+
   it("bank mission and mm create default to dry-run at the op layer", async () => {
     const updateBankConfig = vi.fn(async () => ({ ok: true }));
     const createMentalModel = vi.fn(async () => ({ id: "mm1" }));

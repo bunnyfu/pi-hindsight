@@ -432,6 +432,51 @@ export interface HindsightLikeClient {
     mentalModelId: string,
     options?: { dryRun?: boolean; signal?: AbortSignal },
   ): Promise<unknown>;
+  /** Knowledge pages (client wrappers land after @vectorize-io/hindsight-client 0.8.6). */
+  getKnowledgeBaseTree?(bankId: string, options?: { signal?: AbortSignal }): Promise<unknown>;
+  createKnowledgeFolder?(
+    bankId: string,
+    name: string,
+    options?: { parentId?: string | null; signal?: AbortSignal },
+  ): Promise<unknown>;
+  createKnowledgePage?(
+    bankId: string,
+    name: string,
+    sourceQuery: string,
+    options?: {
+      parentId?: string | null;
+      tags?: string[];
+      maxTokens?: number;
+      signal?: AbortSignal;
+    },
+  ): Promise<unknown>;
+  getKnowledgePage?(
+    bankId: string,
+    pageId: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<unknown>;
+  searchKnowledgeBase?(
+    bankId: string,
+    query: string,
+    options?: { limit?: number; signal?: AbortSignal },
+  ): Promise<unknown>;
+  updateKnowledgeNode?(
+    bankId: string,
+    nodeId: string,
+    options: {
+      name?: string;
+      parentId?: string | null;
+      sourceQuery?: string;
+      tags?: string[];
+      maxTokens?: number;
+      signal?: AbortSignal;
+    },
+  ): Promise<unknown>;
+  deleteKnowledgeNode?(
+    bankId: string,
+    nodeId: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<unknown>;
   updateBankConfig?(
     bankId: string,
     options: {

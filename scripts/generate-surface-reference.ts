@@ -110,7 +110,7 @@ function supportScopeForTool(name: string): string {
     return "Pi workflow 1.0";
   }
   if (
-    /documents?|entities|entity|graphs?|tags?|operations?|memories|memory|chunks?|mental_models?|directives?|templates?|consolidation|observations|retain_files/.test(
+    /documents?|entities|entity|graphs?|tags?|operations?|memories|memory|chunks?|mental_models?|knowledge|directives?|templates?|consolidation|observations|retain_files/.test(
       name,
     )
   ) {

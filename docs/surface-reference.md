@@ -17,6 +17,7 @@ Pi Hindsight 1.0 supports a stable Pi-first Hindsight integration. Core and Pi w
 | `hindsight_config`        | supported 1.0        |
 | `hindsight_bank`          | supported 1.0        |
 | `hindsight_mental_model`  | capability-gated 1.0 |
+| `hindsight_knowledge`     | capability-gated 1.0 |
 | `hindsight_scope_migrate` | supported 1.0        |
 
 ## Deferred or non-goal upstream surfaces
@@ -167,6 +168,24 @@ Agent control plane for mental models on the selected bank. Actions: list|get|cr
 | `tags`        | array<string>                                        | no       |                                                              |
 | `maxTokens`   | integer                                              | no       |                                                              |
 | `dryRun`      | boolean                                              | no       | Mutating actions default true (preview). Set false to apply. |
+
+### `hindsight_knowledge`
+
+Agent control plane for knowledge pages (living docs over bank observations). Actions: tree|search|get|create_page|create_folder|update|delete. Prefer search then get for read path; pages are not auto-injected. Project-tier create_page defaults tags to source:pi + project:<activeId>. Mutating actions default dryRun=true. Requires Hindsight client/server knowledge-base support.
+
+| Parameter     | Type                                                                      | Required | Description                                                                                               |
+| ------------- | ------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------- |
+| `action`      | tree \| search \| get \| create_page \| create_folder \| update \| delete | yes      |                                                                                                           |
+| `bank`        | string                                                                    | no       | Bank id or alias project\|global\|user.                                                                   |
+| `id`          | string                                                                    | no       | Page or folder id for get/update/delete.                                                                  |
+| `query`       | string                                                                    | no       | Search query for action=search (hybrid page search).                                                      |
+| `limit`       | integer                                                                   | no       | Search result limit (1–50).                                                                               |
+| `name`        | string                                                                    | no       |                                                                                                           |
+| `sourceQuery` | string                                                                    | no       | Page question for create_page / update.                                                                   |
+| `parentId`    | string \| null                                                            | no       | Folder parent. Omit for root create; pass null on update to move to root.                                 |
+| `tags`        | array<string>                                                             | no       |                                                                                                           |
+| `maxTokens`   | integer                                                                   | no       |                                                                                                           |
+| `dryRun`      | boolean                                                                   | no       | Mutating actions (create_page\|create_folder\|update\|delete) default true (preview). Set false to apply. |
 
 ### `hindsight_scope_migrate`
 

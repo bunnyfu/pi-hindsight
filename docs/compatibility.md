@@ -10,8 +10,8 @@ Pi Hindsight 1.0 is a Pi-first Hindsight integration. This page is the support c
 | npm                         | `>=10`                                                                                                                                                                               | `package.json#engines.npm`                                           |
 | Pi runtime packages         | Tested with the `@earendil-works/pi-*` versions pinned in `devDependencies`; peer dependencies accept Pi runtime packages supplied by the host Pi installation.                      | `package.json#devDependencies` and `package.json#peerDependencies`   |
 | TypeBox                     | `>=1.1.24 <2`                                                                                                                                                                        | `package.json#peerDependencies.typebox`                              |
-| Hindsight TypeScript client | `@vectorize-io/hindsight-client ^0.8.4`                                                                                                                                              | `package.json#dependencies`                                          |
-| Hindsight server            | **Hindsight 0.8+** with append `update_mode` support, compatible with `@vectorize-io/hindsight-client ^0.8.4`. Advanced surfaces are capability-gated where upstream support varies. | `/hindsight:doctor`, live smoke, and official Hindsight API behavior |
+| Hindsight TypeScript client | `@vectorize-io/hindsight-client ^0.8.6`                                                                                                                                              | `package.json#dependencies`                                          |
+| Hindsight server            | **Hindsight 0.8+** with append `update_mode` support, compatible with `@vectorize-io/hindsight-client ^0.8.6`. Advanced surfaces are capability-gated where upstream support varies. | `/hindsight:doctor`, live smoke, and official Hindsight API behavior |
 
 ## Required Hindsight capabilities
 
@@ -31,6 +31,7 @@ If append retain is unavailable, live automatic retain is not considered support
 These surfaces are part of the 1.0 Pi surface, but the exact fields and behavior can depend on the connected Hindsight server version:
 
 - advanced recall/reflect options such as trace, source facts, included chunks, response schemas, and tool-call facts
+- knowledge pages (`hindsight_knowledge` tree/search/get and dry-run mutating ops) — needs a client and server that expose knowledge-base APIs; published client wrappers may lag monorepo docs
 - read-only bank config/stats facts in status
 
 When a server does not expose one of these endpoints or fields, Pi Hindsight should fail with a clear unsupported-capability message rather than silently changing request shape. Admin and browsing surfaces (documents, entities, graphs, tags, memory units, mental models, directives, bank templates, operations) live in the Hindsight control-plane web UI.

@@ -707,6 +707,81 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
       renderResult: renderMemoryToolTextResult,
     }),
     defineCatalogTool({
+      name: "hindsight_knowledge",
+      label: "Hindsight Knowledge Pages",
+      description:
+        "Agent control plane for knowledge pages (living docs over bank observations). Actions: tree|search|get|create_page|create_folder|update|delete. Prefer search then get for read path; pages are not auto-injected. Project-tier create_page defaults tags to source:pi + project:<activeId>. Mutating actions default dryRun=true. Requires Hindsight client/server knowledge-base support.",
+      parameters: Type.Object({
+        action: Type.Union([
+          Type.Literal("tree"),
+          Type.Literal("search"),
+          Type.Literal("get"),
+          Type.Literal("create_page"),
+          Type.Literal("create_folder"),
+          Type.Literal("update"),
+          Type.Literal("delete"),
+        ]),
+        bank: Type.Optional(Type.String({ description: "Bank id or alias project|global|user." })),
+        id: Type.Optional(Type.String({ description: "Page or folder id for get/update/delete." })),
+        query: Type.Optional(
+          Type.String({ description: "Search query for action=search (hybrid page search)." }),
+        ),
+        limit: Type.Optional(
+          Type.Integer({ minimum: 1, maximum: 50, description: "Search result limit (1–50)." }),
+        ),
+        name: Type.Optional(Type.String()),
+        sourceQuery: Type.Optional(
+          Type.String({ description: "Page question for create_page / update." }),
+        ),
+        parentId: Type.Optional(
+          Type.Union([Type.String(), Type.Null()], {
+            description:
+              "Folder parent. Omit for root create; pass null on update to move to root.",
+          }),
+        ),
+        tags: Type.Optional(Type.Array(Type.String())),
+        maxTokens: Type.Optional(Type.Integer({ minimum: 1 })),
+        dryRun: Type.Optional(
+          Type.Boolean({
+            description:
+              "Mutating actions (create_page|create_folder|update|delete) default true (preview). Set false to apply.",
+          }),
+        ),
+      }),
+      async execute(_id, params, signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        if (signal?.aborted) throw new Error("Aborted");
+        const mutating =
+          params.action === "create_page" ||
+          params.action === "create_folder" ||
+          params.action === "update" ||
+          params.action === "delete";
+        const result = await operations.knowledge({
+          action: params.action,
+          cwd: ctx.cwd,
+          ...(params.bank ? { bank: params.bank } : {}),
+          ...(params.id ? { id: params.id } : {}),
+          ...(params.query ? { query: params.query } : {}),
+          ...(params.limit !== undefined ? { limit: params.limit } : {}),
+          ...(params.name ? { name: params.name } : {}),
+          ...(params.sourceQuery ? { sourceQuery: params.sourceQuery } : {}),
+          ...(params.parentId !== undefined ? { parentId: params.parentId } : {}),
+          ...(params.tags ? { tags: params.tags } : {}),
+          ...(params.maxTokens !== undefined ? { maxTokens: params.maxTokens } : {}),
+          ...(mutating
+            ? { dryRun: params.dryRun ?? true }
+            : params.dryRun !== undefined
+              ? { dryRun: params.dryRun }
+              : {}),
+        });
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          details: result,
+        };
+      },
+      renderResult: renderMemoryToolTextResult,
+    }),
+    defineCatalogTool({
       name: "hindsight_scope_migrate",
       label: "Hindsight Scope Migrate Dry-Run",
       description:

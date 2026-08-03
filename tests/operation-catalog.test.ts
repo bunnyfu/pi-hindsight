@@ -505,6 +505,7 @@ describe("operation catalog", () => {
       "hindsight_config",
       "hindsight_bank",
       "hindsight_mental_model",
+      "hindsight_knowledge",
       "hindsight_scope_migrate",
     ]);
 

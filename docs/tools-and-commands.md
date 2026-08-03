@@ -28,7 +28,7 @@ Pi Hindsight is **TUI-first**. Public slash commands:
 | `a` | Toggle advanced settings (prefer agent tools for day-to-day edits)    |
 | `q` | Close                                                                 |
 
-Day-to-day mission, mental-model, and config edits: prefer agent control-plane tools (`hindsight_status`, `hindsight_config`, `hindsight_bank`, `hindsight_mental_model`); the advanced TUI farm is an escape hatch, not the primary surface.
+Day-to-day mission, mental-model, knowledge-page, and config edits: prefer agent control-plane tools (`hindsight_status`, `hindsight_config`, `hindsight_bank`, `hindsight_mental_model`, `hindsight_knowledge`); the advanced TUI farm is an escape hatch, not the primary surface.
 
 ### Agent use and mental models
 
@@ -56,6 +56,7 @@ Available for the agent (control plane is agent-first; TUI is thin):
 - `hindsight_config` — allowlisted config get/patch (dry-run default on patch; no raw secrets)
 - `hindsight_bank` — get bank or update missions (dry-run default)
 - `hindsight_mental_model` — list/get/create/update/refresh/delete (delete dry-run default)
+- `hindsight_knowledge` — tree/search/get/create_page/create_folder/update/delete for knowledge pages (mutating dry-run default; requires knowledge-base-capable client/server; pages are tool-driven, not auto-injected)
 - `hindsight_scope_migrate` — dry-run dual-tag / legacy `repo:` migration plan + local receipt (never rewrites)
 
 See the generated [surface reference](surface-reference.md) for parameter schemas.
