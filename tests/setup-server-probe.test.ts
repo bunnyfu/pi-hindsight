@@ -55,9 +55,9 @@ describe("setup server probe", () => {
           },
         ],
         hasApiKey: false,
-        apiKeyEnvLabel: "HINDSIGHT_API_KEY",
+        apiKeyEnvLabel: "HINDSIGHT_API_TOKEN",
       }),
-    ).toMatch(/Could not reach|ECONNREFUSED|HINDSIGHT_API_KEY/s);
+    ).toMatch(/Could not reach|ECONNREFUSED|HINDSIGHT_API_TOKEN/s);
   });
 
   it("returns first healthy candidate", async () => {

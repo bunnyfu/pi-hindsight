@@ -73,7 +73,7 @@ export function formatServerProbeFailure(args: {
     ...lines,
     `API key: ${args.hasApiKey ? "resolved" : `not set (${args.apiKeyEnvLabel})`}`,
     "",
-    "Local embed often needs no key. Cloud / locked APIs need HINDSIGHT_API_KEY (or your env name).",
+    "Local embed often needs no key. Cloud / locked APIs need HINDSIGHT_API_TOKEN (or HINDSIGHT_API_KEY / your env name).",
     "Cloud base URL comes from your Hindsight dashboard after signup — not a fixed public URL.",
   ].join("\n");
 }
@@ -224,7 +224,7 @@ export async function ensureServerConnectionForSetup(args: {
     }
 
     const apiKeyEnvLabel =
-      apiKeyEnvName(config) !== "not set" ? apiKeyEnvName(config) : "HINDSIGHT_API_KEY";
+      apiKeyEnvName(config) !== "not set" ? apiKeyEnvName(config) : "HINDSIGHT_API_TOKEN";
     ctx.ui.notify(
       formatServerProbeFailure({
         results: probeAttempts,

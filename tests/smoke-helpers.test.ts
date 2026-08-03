@@ -48,6 +48,15 @@ describe("smoke helpers", () => {
       cleanupTimeoutMs: 5000,
       cleanupOnFailure: true,
     });
+    expect(
+      smokeConfig(
+        {
+          HINDSIGHT_API_TOKEN: " token ",
+          HINDSIGHT_API_KEY: " key ",
+        },
+        1,
+      ).apiKey,
+    ).toBe("token");
   });
 
   it("creates deterministic markers when clock/random are injected", () => {

@@ -30,7 +30,7 @@ Prefer secret references such as:
 ```json
 {
   "hindsight": {
-    "apiKey": { "source": "env", "name": "HINDSIGHT_API_KEY" }
+    "apiKey": { "source": "env", "name": "HINDSIGHT_API_TOKEN" }
   }
 }
 ```

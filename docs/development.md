@@ -88,7 +88,7 @@ For memory-path behavior changes, prove the live path with a configured Hindsigh
 
 ```bash
 export HINDSIGHT_BASE_URL=http://localhost:8888
-# export HINDSIGHT_API_KEY=... # if needed
+# export HINDSIGHT_API_TOKEN=... # if needed (or HINDSIGHT_API_KEY)
 npm run smoke:hindsight
 ```
 
@@ -101,7 +101,7 @@ The GitHub `Hindsight Integration` workflow also runs live smoke when configured
 ```bash
 export HINDSIGHT_INTEGRATION_ENABLED=true
 export HINDSIGHT_BASE_URL=http://localhost:8888
-# export HINDSIGHT_API_KEY=... # if needed
+# export HINDSIGHT_API_TOKEN=... # if needed (or HINDSIGHT_API_KEY)
 npm run bench:memory
 ```
 

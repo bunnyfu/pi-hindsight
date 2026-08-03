@@ -24,7 +24,7 @@ For memory-path changes, also prove the live Hindsight path:
 
 ```bash
 export HINDSIGHT_BASE_URL=http://localhost:8888
-# export HINDSIGHT_API_KEY=... # if needed
+# export HINDSIGHT_API_TOKEN=... # if needed (or HINDSIGHT_API_KEY)
 npm run smoke:hindsight
 ```
 
@@ -112,7 +112,7 @@ Required secret when enabled:
 
 Optional secret and variables:
 
-- `HINDSIGHT_API_KEY`
+- `HINDSIGHT_API_TOKEN` (fallback: `HINDSIGHT_API_KEY`)
 - `HINDSIGHT_SMOKE_ATTEMPTS`, default `20`
 - `HINDSIGHT_SMOKE_CLEANUP_TIMEOUT_MS`, default `5000`
 - `PI_HINDSIGHT_SMOKE_BANK_ID`

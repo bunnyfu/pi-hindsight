@@ -141,9 +141,11 @@ export function resolveConfig(cwd: string, env: NodeJS.ProcessEnv = process.env)
     rawConfig = merge(rawConfig, { hindsight: { apiKey: ref } });
     config = merge(config, { hindsight: { apiKey: ref } });
   }
-  if (env.HINDSIGHT_API_KEY) {
-    rawConfig = merge(rawConfig, { hindsight: { apiKey: env.HINDSIGHT_API_KEY } });
-    config = merge(config, { hindsight: { apiKey: env.HINDSIGHT_API_KEY } });
+  // Prefer HINDSIGHT_API_TOKEN; keep HINDSIGHT_API_KEY as legacy fallback.
+  const apiKeyFromEnv = env.HINDSIGHT_API_TOKEN?.trim() || env.HINDSIGHT_API_KEY?.trim();
+  if (apiKeyFromEnv) {
+    rawConfig = merge(rawConfig, { hindsight: { apiKey: apiKeyFromEnv } });
+    config = merge(config, { hindsight: { apiKey: apiKeyFromEnv } });
   }
   if (env.PI_HINDSIGHT_PROJECT_BANK_ID) {
     const patch = {
