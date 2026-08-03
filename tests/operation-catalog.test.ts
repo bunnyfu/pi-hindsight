@@ -12,6 +12,7 @@ type ReflectOptions = Parameters<HindsightLikeClient["reflect"]>[2];
 
 type JsonSchema = {
   type?: string;
+  enum?: unknown[];
   properties?: Record<string, JsonSchema>;
   patternProperties?: Record<string, JsonSchema>;
   items?: JsonSchema;
@@ -315,6 +316,37 @@ describe("operation catalog", () => {
         ]),
       }),
     );
+  });
+
+  it("declares a type on every tagGroups.match enum so strict JSON schema validators (Moonshot MFJS) accept the tool", () => {
+    // Regression: Moonshot's "Moonshot Flavored JSON Schema" (MFJS) rejects any
+    // property schema that omits `type`, even when `enum` is present. The
+    // tagGroups.match field is a hand-written JSON schema literal wrapped in
+    // Type.Unsafe, so TypeBox cannot add `type` automatically. Without an
+    // explicit `type: "string"`, every request carrying hindsight_recall /
+    // hindsight_reflect is rejected by api.kimi.com/coding/v1 with:
+    //   tools.function.parameters is not a valid moonshot flavored json schema,
+    //   details: <At path 'properties.tagGroups.items.properties.match': type is not defined>
+    // See https://github.com/MoonshotAI/kimi-cli/issues/1595
+    const catalog = createOperationCatalog({
+      getClient: () => client(),
+      getConfig: () => DEFAULT_CONFIG,
+      getProjectBankId: () => "project-bank",
+    });
+
+    for (const name of ["hindsight_recall", "hindsight_reflect"] as const) {
+      const tool = requireTool(catalog, name);
+      const properties = (tool.parameters as JsonSchema).properties ?? {};
+      const tagGroupsItems = properties.tagGroups?.items as JsonSchema | undefined;
+      const matchSchema = tagGroupsItems?.properties?.match;
+
+      expect(matchSchema, `${name} should declare tagGroups.items.properties.match`).toBeDefined();
+      expect(
+        matchSchema?.type,
+        `${name}.tagGroups.items.properties.match must declare type for MFJS`,
+      ).toBe("string");
+      expect(matchSchema?.enum).toEqual(["any", "all", "any_strict", "all_strict"]);
+    }
   });
 
   it("folds automatic scope tags into an exact tagsMatch filter for recall", async () => {
