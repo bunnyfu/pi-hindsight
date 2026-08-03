@@ -120,7 +120,7 @@ describe("recall formatting", () => {
     expect(query).toContain("user: look at this");
     expect(query).toContain("[image omitted]");
     expect(query).toContain("assistant: running command");
-    expect(query).toContain("[toolCall bash]");
+    expect(query).toContain("[action bash echo hi]");
     expect(query).not.toContain("base64-secret");
     expect(query).not.toContain('"type"');
   });

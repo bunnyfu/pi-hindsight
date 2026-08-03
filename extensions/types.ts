@@ -171,6 +171,11 @@ export interface ResolvedConfig {
       toolCall: { include?: string[]; exclude?: string[] };
       toolResult: { include?: string[]; exclude?: string[] };
     };
+    /**
+     * When true (default), assistant tool calls retain name + primary target only
+     * (no full args). Set false for full argument objects (debug / forensic).
+     */
+    compactToolCalls: boolean;
     strip: {
       message: string[];
       topLevel: string[];

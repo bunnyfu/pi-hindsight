@@ -101,6 +101,7 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
         ],
       },
     },
+    compactToolCalls: true,
     strip: { message: ["usage", "cost", "responseId"], topLevel: ["id", "parentId"] },
     redactSecrets: true,
     entities: [],

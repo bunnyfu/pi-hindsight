@@ -132,7 +132,7 @@ describe("buildRetainJob", () => {
       content: Array<Record<string, unknown>>;
     }>;
     expect(toolOnlyRetained[0]?.content).toEqual([
-      { type: "toolCall", name: "bash", arguments: { command: "echo hi" } },
+      { type: "toolCall", name: "bash", arguments: { target: "echo hi" } },
     ]);
     expect(toolOnly?.item.content).not.toContain("assistant text");
 
@@ -176,9 +176,59 @@ describe("buildRetainJob", () => {
     }>;
     expect(retained[0]?.content).toEqual([
       { type: "text", text: "keep this" },
-      { type: "toolCall", name: "bash", arguments: { command: "echo ok" } },
+      { type: "toolCall", name: "bash", arguments: { target: "echo ok" } },
     ]);
     expect(job?.item.content).not.toContain("hindsight_recall");
+  });
+
+  it("compacts tool-call arguments to primary target by default", () => {
+    const messages = [
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "toolCall",
+            name: "edit",
+            arguments: { file_path: "src/a.ts", old_string: "x", new_string: "y".repeat(50) },
+          },
+        ],
+        timestamp: Date.now(),
+      },
+    ] as unknown as AgentEndEvent["messages"];
+    const job = buildRetainJob({ config: DEFAULT_CONFIG, cwd: "/repo", bankId: "bank", messages });
+    const retained = JSON.parse(job?.item.content ?? "[]") as Array<{
+      content: Array<Record<string, unknown>>;
+    }>;
+    expect(retained[0]?.content).toEqual([
+      { type: "toolCall", name: "edit", arguments: { target: "src/a.ts" } },
+    ]);
+    expect(job?.item.content).not.toContain("old_string");
+    expect(job?.item.content).not.toContain("new_string");
+  });
+
+  it("keeps full tool-call arguments when compactToolCalls is false", () => {
+    const messages = [
+      {
+        role: "assistant",
+        content: [{ type: "toolCall", name: "bash", arguments: { command: "echo hi" } }],
+        timestamp: Date.now(),
+      },
+    ] as unknown as AgentEndEvent["messages"];
+    const job = buildRetainJob({
+      config: {
+        ...DEFAULT_CONFIG,
+        retain: { ...DEFAULT_CONFIG.retain, compactToolCalls: false },
+      },
+      cwd: "/repo",
+      bankId: "bank",
+      messages,
+    });
+    const retained = JSON.parse(job?.item.content ?? "[]") as Array<{
+      content: Array<Record<string, unknown>>;
+    }>;
+    expect(retained[0]?.content).toEqual([
+      { type: "toolCall", name: "bash", arguments: { command: "echo hi" } },
+    ]);
   });
 
   it("preserves rich user content instead of flattening to text", () => {

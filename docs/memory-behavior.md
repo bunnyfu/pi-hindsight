@@ -128,7 +128,7 @@ The retain projection is controlled by:
 - `retain.toolFilter`
 - `retain.strip`
 
-Defaults keep user/assistant text, assistant tool calls, tool result errors, and per-message timestamps while excluding recursive Hindsight tool output and noisy read/search results.
+Defaults keep user/assistant text, assistant tool calls, tool result errors, and per-message timestamps while excluding recursive Hindsight tool output and noisy read/search results. Assistant tool calls are compacted by default (`retain.compactToolCalls: true`) to name + primary target only (no full args), matching coding-agents write-back noise discipline. Set `retain.compactToolCalls: false` for full argument objects.
 
 Live session retains set the named bank strategy `conversation` (coding project templates define multi-strategy maps: `git`, `gitlog`, `conversation`, `document`, `survey`, plus knowledge `entity_labels` for page routing). Default bank mission text prefers final-state-wins extraction when a conversation amends itself.
 
