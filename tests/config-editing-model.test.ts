@@ -212,7 +212,7 @@ describe("config editing model", () => {
       importToolResultSummaryMaxChars: 250,
     });
     expect(inputDefaultForConfigEditingField("apiKeyEnv", DEFAULT_CONFIG, "bank")).toBe(
-      "HINDSIGHT_API_KEY",
+      "HINDSIGHT_API_TOKEN",
     );
     expect(inputDefaultForConfigEditingField("projectBankId", DEFAULT_CONFIG, "bank")).toBe("bank");
     expect(parseConfigEditingFieldInput({ id: "recallMaxTokens", kind: "positive-int" }, "5")).toBe(

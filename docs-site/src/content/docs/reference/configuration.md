@@ -20,9 +20,11 @@ Environment variables win the effective value. Project/user stored values can st
 
 ```bash
 export HINDSIGHT_BASE_URL=http://localhost:8888
-export HINDSIGHT_API_KEY=...
+export HINDSIGHT_API_TOKEN=...
+# Legacy fallback still accepted when TOKEN is unset:
+# export HINDSIGHT_API_KEY=...
 # or point config/env at another env var without storing the raw key:
-export HINDSIGHT_API_KEY_REF=HINDSIGHT_API_KEY
+export HINDSIGHT_API_KEY_REF=HINDSIGHT_API_TOKEN
 
 export PI_HINDSIGHT_ENABLED=true
 export PI_HINDSIGHT_PROJECT_BANK_ID=pi-project-my-repo
@@ -39,7 +41,7 @@ Project config SecretRef shape:
 ```json
 {
   "hindsight": {
-    "apiKey": { "source": "env", "name": "HINDSIGHT_API_KEY" }
+    "apiKey": { "source": "env", "name": "HINDSIGHT_API_TOKEN" }
   }
 }
 ```

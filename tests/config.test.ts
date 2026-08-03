@@ -143,6 +143,18 @@ describe("resolveConfig", () => {
     });
     expect(override.hindsight.apiKey).toBe("override-secret");
 
+    const tokenPreferred = resolveConfig(cwd, {
+      PROJECT_KEY: "project-secret",
+      HINDSIGHT_API_TOKEN: "token-secret",
+      HINDSIGHT_API_KEY: "key-secret",
+    });
+    expect(tokenPreferred.hindsight.apiKey).toBe("token-secret");
+
+    const keyFallback = resolveConfig(cwd, {
+      HINDSIGHT_API_KEY: "key-only-secret",
+    });
+    expect(keyFallback.hindsight.apiKey).toBe("key-only-secret");
+
     const refFromEnv = resolveConfig(cwd, {
       HINDSIGHT_API_KEY_REF: "OTHER_KEY",
       OTHER_KEY: "other-secret",

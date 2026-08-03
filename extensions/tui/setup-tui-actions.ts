@@ -184,7 +184,7 @@ export async function handleDeployment(
   if (value === "Hindsight Cloud") {
     const baseUrl = await ctx.ui.input("Hindsight Cloud base URL", config.hindsight.baseUrl);
     if (baseUrl) await writeAndReload(ctx, deps, { baseUrl: baseUrl.trim() });
-    const envName = await ctx.ui.input("API key env var name", "HINDSIGHT_API_KEY");
+    const envName = await ctx.ui.input("API key env var name", "HINDSIGHT_API_TOKEN");
     if (envName) await writeAndReload(ctx, deps, { apiKeyEnvVar: envName.trim() });
   } else if (value === "Existing local/external API") {
     const baseUrl = await ctx.ui.input("Hindsight API base URL", config.hindsight.baseUrl);

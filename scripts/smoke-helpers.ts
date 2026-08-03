@@ -29,7 +29,7 @@ export function smokeConfig(
   now = Date.now(),
 ): SmokeConfig {
   const configuredBankId = envValue("PI_HINDSIGHT_SMOKE_BANK_ID", env);
-  const apiKey = envValue("HINDSIGHT_API_KEY", env);
+  const apiKey = envValue("HINDSIGHT_API_TOKEN", env) ?? envValue("HINDSIGHT_API_KEY", env);
   return {
     baseUrl: envValue("HINDSIGHT_BASE_URL", env) ?? "http://localhost:8888",
     ...(apiKey ? { apiKey } : {}),

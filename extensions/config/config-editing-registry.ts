@@ -79,7 +79,7 @@ function apiKeySourceLabel(config: ResolvedConfig): string {
   const envName = apiKeyEnvName(config);
   if (envName !== "not set")
     return config.hindsight.apiKey ? `${envName} (resolved)` : `${envName} (missing)`;
-  return config.hindsight.apiKey ? "set directly or HINDSIGHT_API_KEY env" : "not set";
+  return config.hindsight.apiKey ? "set directly or HINDSIGHT_API_TOKEN/KEY env" : "not set";
 }
 
 type BaseConfigEditingField = Omit<
@@ -658,9 +658,13 @@ export function configEnvValues(env: NodeJS.ProcessEnv): Partial<Record<FieldId,
   return {
     ...(env.PI_HINDSIGHT_ENABLED ? { enabled: env.PI_HINDSIGHT_ENABLED } : {}),
     ...(env.HINDSIGHT_BASE_URL ? { baseUrl: env.HINDSIGHT_BASE_URL } : {}),
-    ...(env.HINDSIGHT_API_KEY || env.HINDSIGHT_API_KEY_REF
-      ? { apiKeyEnv: env.HINDSIGHT_API_KEY_REF ?? "HINDSIGHT_API_KEY" }
-      : {}),
+    ...(env.HINDSIGHT_API_KEY_REF
+      ? { apiKeyEnv: env.HINDSIGHT_API_KEY_REF }
+      : env.HINDSIGHT_API_TOKEN
+        ? { apiKeyEnv: "HINDSIGHT_API_TOKEN" }
+        : env.HINDSIGHT_API_KEY
+          ? { apiKeyEnv: "HINDSIGHT_API_KEY" }
+          : {}),
     ...(env.PI_HINDSIGHT_PROJECT_BANK_ID
       ? { projectBankId: env.PI_HINDSIGHT_PROJECT_BANK_ID }
       : {}),
@@ -824,7 +828,7 @@ export function inputDefaultForConfigEditingField(
 ): string {
   switch (fieldId) {
     case "apiKeyEnv":
-      return apiKeyEnvName(config) === "not set" ? "HINDSIGHT_API_KEY" : apiKeyEnvName(config);
+      return apiKeyEnvName(config) === "not set" ? "HINDSIGHT_API_TOKEN" : apiKeyEnvName(config);
     case "apiKeyDirect":
       return "";
     case "projectBankId":
