@@ -142,7 +142,7 @@ export function resolveConfig(cwd: string, env: NodeJS.ProcessEnv = process.env)
     config = merge(config, { hindsight: { apiKey: ref } });
   }
   // Prefer HINDSIGHT_API_TOKEN; keep HINDSIGHT_API_KEY as legacy fallback.
-  const apiKeyFromEnv = env.HINDSIGHT_API_TOKEN || env.HINDSIGHT_API_KEY;
+  const apiKeyFromEnv = env.HINDSIGHT_API_TOKEN?.trim() || env.HINDSIGHT_API_KEY?.trim();
   if (apiKeyFromEnv) {
     rawConfig = merge(rawConfig, { hindsight: { apiKey: apiKeyFromEnv } });
     config = merge(config, { hindsight: { apiKey: apiKeyFromEnv } });
