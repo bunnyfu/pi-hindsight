@@ -379,8 +379,20 @@ try {
     droppedToolResultCount: importedDocument.droppedToolResultCount,
   });
 
+  // Import verification must not wait on observation consolidation: default recall
+  // types are observation-only, and consolidation latency for imported JSON chats has
+  // been flaky/slow on the live server (ops observations win semantic search first).
+  // Scope to import:historical + raw fact types so we prove retain projection directly.
   const importRecall = await retry(
-    async () => operations.recall(operationsCwd, importMarker, "project"),
+    async () =>
+      operations.recall(operationsCwd, importMarker, "project", undefined, {
+        types: ["world", "experience", "observation"],
+        preferObservations: false,
+        budget: "mid",
+        maxTokens: 2000,
+        tags: ["import:historical"],
+        tagsMatch: "any_strict",
+      }),
     (result) => {
       const text = JSON.stringify(result);
       return (
