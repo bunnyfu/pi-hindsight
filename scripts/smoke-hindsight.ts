@@ -46,6 +46,12 @@ const smokeExtensionConfig = {
     ...DEFAULT_CONFIG.recall,
     budget: "low" as const,
   },
+  // Sync retain so import getDocument/recall see materialized content without waiting
+  // on background operation completion (async retain left documents null for 40s+).
+  retain: {
+    ...DEFAULT_CONFIG.retain,
+    async: false,
+  },
   import: {
     ...DEFAULT_CONFIG.import,
     qualityProfile: "strict" as const,
