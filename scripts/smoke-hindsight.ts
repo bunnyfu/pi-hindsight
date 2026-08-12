@@ -39,7 +39,8 @@ const smokeExtensionConfig = {
   hindsight: {
     ...DEFAULT_CONFIG.hindsight,
     baseUrl: config.baseUrl,
-    timeoutMs: 90_000,
+    // Sync import retain under parallel CI can exceed 90s; leave headroom for load.
+    timeoutMs: 180_000,
     ...(config.apiKey ? { apiKey: config.apiKey } : {}),
   },
   recall: {
