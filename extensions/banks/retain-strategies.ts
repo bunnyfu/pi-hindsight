@@ -78,9 +78,16 @@ export const PI_RETAIN_STRATEGIES: Record<string, RetainStrategyConfig> = {
 };
 
 /** Fixed knowledge-tier entity labels (tag: true → knowledge:<value> on facts). */
-export const KNOWLEDGE_ENTITY_LABELS = {
+export const KNOWLEDGE_ENTITY_LABELS: {
+  key: string;
+  type: "multi-values";
+  optional: boolean;
+  tag: boolean;
+  description: string;
+  values: Array<{ value: string; description: string }>;
+} = {
   key: "knowledge",
-  type: "multi-values" as const,
+  type: "multi-values",
   optional: true,
   tag: true,
   description:
@@ -114,7 +121,7 @@ export const KNOWLEDGE_ENTITY_LABELS = {
         "A domain concept, key abstraction, or project vocabulary a contributor must understand.",
     },
   ],
-} as const;
+};
 
 /** Seed taxonomy for knowledge pages (used by knowledge seed path; not bare mental models). */
 export interface KnowledgePageSeed {
