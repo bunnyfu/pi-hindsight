@@ -379,19 +379,47 @@ try {
     droppedToolResultCount: importedDocument.droppedToolResultCount,
   });
 
-  // Import verification must not wait on observation consolidation: default recall
-  // types are observation-only, and consolidation latency for imported JSON chats has
-  // been flaky/slow on the live server (ops observations win semantic search first).
-  // Scope to import:historical + raw fact types so we prove retain projection directly.
+  // Prove the retained import document text (not observation consolidation). Default
+  // operations.recall is observation-only and has been timing out on imported JSON chats
+  // since ~2026-07-31 while earlier ops observations win semantic search.
+  const importDocumentId = importedDocument.documentId;
+  if (!importDocumentId) throw new Error("strict import smoke missing retained documentId");
+  const importDocument = await retry(
+    async () => client.getDocument(config.bankId, importDocumentId),
+    (result) => {
+      const text = result?.original_text ?? "";
+      return (
+        text.includes(importMarker) &&
+        text.includes(importKeptToolMarker) &&
+        !text.includes(importNoiseMarker)
+      );
+    },
+    {
+      attempts: config.attempts,
+      delayMs: 2000,
+      onWait: ({ attempt, delayMs }) => recorder.step("import_document_wait", { attempt, delayMs }),
+      failureMessage: ({ attempts, preview }) =>
+        `strict import document did not contain kept markers without dropped noise after ${attempts} attempts: ${preview}`,
+    },
+  );
+  const importDocumentText = importDocument?.original_text ?? "";
+  recorder.step("import_document_ok", {
+    documentId: importDocumentId,
+    containsMarker: importDocumentText.includes(importMarker),
+    containsKeptToolMarker: importDocumentText.includes(importKeptToolMarker),
+    containsNoiseMarker: importDocumentText.includes(importNoiseMarker),
+  });
+
+  // Also prove extracted facts become recallable. Use the raw adapter (dedicated smoke
+  // bank — no project tag AND) and include world/experience so we do not wait on
+  // observation consolidation.
   const importRecall = await retry(
     async () =>
-      operations.recall(operationsCwd, importMarker, "project", undefined, {
+      adapter.recall(config.bankId, `${importMarker} ${importKeptToolMarker}`, {
         types: ["world", "experience", "observation"],
         preferObservations: false,
         budget: "mid",
         maxTokens: 2000,
-        tags: ["import:historical"],
-        tagsMatch: "any_strict",
       }),
     (result) => {
       const text = JSON.stringify(result);
