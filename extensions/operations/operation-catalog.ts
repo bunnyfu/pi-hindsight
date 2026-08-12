@@ -692,7 +692,7 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
       name: "hindsight_mental_model",
       label: "Hindsight Mental Model",
       description:
-        "Agent control plane for mental models on the selected bank. Actions: list|get|create|update|refresh|delete. Project-tier create defaults tags to source:pi + project:<activeId>. Optional tagsMatch sets refresh tag matching on create/update trigger. Mutating actions default dryRun=true; set dryRun=false to apply.",
+        "Agent control plane for mental models on the selected bank. Actions: list|get|create|update|refresh|delete. list returns metadata only (id, name, tags, max_tokens, last_refreshed_at); use get for full content/reflect_response. Project-tier create defaults tags to source:pi + project:<activeId>. Optional tagsMatch sets refresh tag matching on create/update trigger. Mutating actions default dryRun=true; set dryRun=false to apply.",
       parameters: Type.Object({
         action: Type.Union([
           Type.Literal("list"),

@@ -55,7 +55,7 @@ Available for the agent (control plane is agent-first; TUI is thin):
 - `hindsight_scope` — project id derivation
 - `hindsight_config` — allowlisted config get/patch (dry-run default on patch; no raw secrets)
 - `hindsight_bank` — get bank or update missions (dry-run default)
-- `hindsight_mental_model` — list/get/create/update/refresh/delete (delete dry-run default)
+- `hindsight_mental_model` — list/get/create/update/refresh/delete (list is metadata-only; use get for full content; mutating actions dry-run by default)
 - `hindsight_knowledge` — tree/search/get/export/create_page/create_folder/update/delete for knowledge pages (mutating dry-run default; requires knowledge-base-capable client/server; pages are tool-driven, not auto-injected; export = full-bank markdown bundle only)
 - `hindsight_scope_migrate` — dry-run dual-tag / legacy `repo:` migration plan + local receipt (never rewrites)
 

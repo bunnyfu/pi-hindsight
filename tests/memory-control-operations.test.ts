@@ -3,7 +3,10 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG } from "../extensions/config/config.js";
-import { createControlOperations } from "../extensions/operations/memory-control-operations.js";
+import {
+  createControlOperations,
+  projectMentalModelListMetadata,
+} from "../extensions/operations/memory-control-operations.js";
 
 describe("memory control operations", () => {
   it("status reports setup required on fresh cwd", async () => {
@@ -103,6 +106,121 @@ describe("memory control operations", () => {
     });
     await ops.mentalModel({ action: "delete", cwd, id: "mm1" });
     expect(deleteMentalModel).toHaveBeenCalledWith("coding", "mm1", { dryRun: true });
+  });
+
+  it("mental model list returns metadata only and omits content/reflect payloads", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-ctrl-mm-list-"));
+    const listMentalModels = vi.fn(async () => ({
+      items: [
+        {
+          id: "mm1",
+          name: "Architecture",
+          tags: ["source:pi", "project:demo"],
+          max_tokens: 1200,
+          last_refreshed_at: "2026-03-01T00:00:00Z",
+          content: "Huge curated markdown that must not reach the agent on list.",
+          bank_id: "coding",
+          source_query: "What is the architecture?",
+          reflect_response: {
+            text: "full reflection",
+            based_on: [{ id: "fact-1", text: "nested source fact" }],
+          },
+        },
+      ],
+    }));
+    const getMentalModel = vi.fn(async () => ({
+      id: "mm1",
+      name: "Architecture",
+      content: "Full model content for get.",
+      reflect_response: {
+        text: "full reflection",
+        based_on: [{ id: "fact-1", text: "nested source fact" }],
+      },
+    }));
+    const ops = createControlOperations({
+      getClient: () => ({
+        retain: async () => undefined,
+        recall: async () => [],
+        reflect: async () => ({}),
+        listMentalModels,
+        getMentalModel,
+      }),
+      getConfig: () => ({
+        ...DEFAULT_CONFIG,
+        setupComplete: true,
+        banks: {
+          ...DEFAULT_CONFIG.banks,
+          project: { enabled: true, bankId: "coding", derive: "manual" as const },
+        },
+      }),
+      getProjectBankId: () => "coding",
+    });
+
+    const listed = await ops.mentalModel({ action: "list", cwd });
+    expect(listMentalModels).toHaveBeenCalledWith("coding", { detail: "metadata" });
+    expect(listed).toEqual({
+      bankId: "coding",
+      result: {
+        items: [
+          {
+            id: "mm1",
+            name: "Architecture",
+            tags: ["source:pi", "project:demo"],
+            max_tokens: 1200,
+            last_refreshed_at: "2026-03-01T00:00:00Z",
+          },
+        ],
+      },
+    });
+    const listedJson = JSON.stringify(listed);
+    expect(listedJson).not.toContain("content");
+    expect(listedJson).not.toContain("reflect_response");
+    expect(listedJson).not.toContain("based_on");
+    expect(listedJson).not.toContain("Huge curated markdown");
+    expect(listedJson).not.toContain("nested source fact");
+
+    const got = await ops.mentalModel({ action: "get", cwd, id: "mm1" });
+    expect(getMentalModel).toHaveBeenCalledWith("coding", "mm1");
+    expect(got).toEqual({
+      bankId: "coding",
+      result: {
+        id: "mm1",
+        name: "Architecture",
+        content: "Full model content for get.",
+        reflect_response: {
+          text: "full reflection",
+          based_on: [{ id: "fact-1", text: "nested source fact" }],
+        },
+      },
+    });
+  });
+
+  it("projectMentalModelListMetadata strips non-metadata fields from alternate shapes", () => {
+    const projected = projectMentalModelListMetadata({
+      mental_models: [
+        {
+          id: "x",
+          name: "X",
+          maxTokens: 50,
+          lastRefreshedAt: "2026-01-01T00:00:00Z",
+          content: "nope",
+          reflect_response: { based_on: ["secret-fact"] },
+        },
+      ],
+    });
+    expect(projected).toEqual({
+      items: [
+        {
+          id: "x",
+          name: "X",
+          max_tokens: 50,
+          last_refreshed_at: "2026-01-01T00:00:00Z",
+        },
+      ],
+    });
+    expect(JSON.stringify(projected)).not.toMatch(
+      /content|reflect_response|based_on|nope|secret-fact/,
+    );
   });
 
   it("config get returns allowlisted view without secrets", async () => {
