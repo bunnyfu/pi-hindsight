@@ -441,6 +441,10 @@ export function normalizeConfig(
           DEFAULT_CONFIG.retain.toolFilter.toolResult,
         ),
       },
+      compactToolCalls: bool(
+        config.retain?.compactToolCalls,
+        DEFAULT_CONFIG.retain.compactToolCalls,
+      ),
       strip: {
         message: stringArray(config.retain?.strip?.message, DEFAULT_CONFIG.retain.strip.message),
         topLevel: stringArray(config.retain?.strip?.topLevel, DEFAULT_CONFIG.retain.strip.topLevel),

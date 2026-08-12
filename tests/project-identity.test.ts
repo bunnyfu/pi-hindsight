@@ -65,6 +65,11 @@ describe("stable project identity", () => {
     expect(normalizeGitRemoteToProjectId("https://github.com/luxus/finalform")).toBe(
       "github-com-luxus-finalform",
     );
+    expect(
+      normalizeGitRemoteToProjectId(
+        "https://x-access-token:ghs_example@github.com/luxus/finalform.git",
+      ),
+    ).toBe("github-com-luxus-finalform");
   });
 
   it("prefers an explicit pin over remote and basename", () => {

@@ -4,14 +4,14 @@ Pi Hindsight 1.0 is a Pi-first Hindsight integration. This page is the support c
 
 ## Supported runtime matrix
 
-| Component                   | 1.0 support policy                                                                                                                                                                   | Source of truth                                                      |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| Node.js                     | `>=20`                                                                                                                                                                               | `package.json#engines.node`                                          |
-| npm                         | `>=10`                                                                                                                                                                               | `package.json#engines.npm`                                           |
-| Pi runtime packages         | Tested with the `@earendil-works/pi-*` versions pinned in `devDependencies`; peer dependencies accept Pi runtime packages supplied by the host Pi installation.                      | `package.json#devDependencies` and `package.json#peerDependencies`   |
-| TypeBox                     | `>=1.1.24 <2`                                                                                                                                                                        | `package.json#peerDependencies.typebox`                              |
-| Hindsight TypeScript client | `@vectorize-io/hindsight-client ^0.8.4`                                                                                                                                              | `package.json#dependencies`                                          |
-| Hindsight server            | **Hindsight 0.8+** with append `update_mode` support, compatible with `@vectorize-io/hindsight-client ^0.8.4`. Advanced surfaces are capability-gated where upstream support varies. | `/hindsight:doctor`, live smoke, and official Hindsight API behavior |
+| Component                   | 1.0 support policy                                                                                                                                                                                                          | Source of truth                                                      |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Node.js                     | `>=20`                                                                                                                                                                                                                      | `package.json#engines.node`                                          |
+| npm                         | `>=10`                                                                                                                                                                                                                      | `package.json#engines.npm`                                           |
+| Pi runtime packages         | Tested with the `@earendil-works/pi-*` versions pinned in `devDependencies`; peer dependencies accept Pi runtime packages supplied by the host Pi installation.                                                             | `package.json#devDependencies` and `package.json#peerDependencies`   |
+| TypeBox                     | `>=1.1.24 <2`                                                                                                                                                                                                               | `package.json#peerDependencies.typebox`                              |
+| Hindsight TypeScript client | `@vectorize-io/hindsight-client ^0.9.0`                                                                                                                                                                                     | `package.json#dependencies`                                          |
+| Hindsight server            | **Hindsight 0.8+** with append `update_mode` support, compatible with `@vectorize-io/hindsight-client ^0.9.0`. Knowledge pages need server routes that match the 0.9 client; other advanced surfaces stay capability-gated. | `/hindsight:doctor`, live smoke, and official Hindsight API behavior |
 
 ## Required Hindsight capabilities
 
@@ -31,6 +31,7 @@ If append retain is unavailable, live automatic retain is not considered support
 These surfaces are part of the 1.0 Pi surface, but the exact fields and behavior can depend on the connected Hindsight server version:
 
 - advanced recall/reflect options such as trace, source facts, included chunks, response schemas, and tool-call facts
+- knowledge pages (`hindsight_knowledge` tree/search/get/export and dry-run mutating ops) — requires `@vectorize-io/hindsight-client ^0.9.0` and a server that exposes knowledge-base APIs
 - read-only bank config/stats facts in status
 
 When a server does not expose one of these endpoints or fields, Pi Hindsight should fail with a clear unsupported-capability message rather than silently changing request shape. Admin and browsing surfaces (documents, entities, graphs, tags, memory units, mental models, directives, bank templates, operations) live in the Hindsight control-plane web UI.

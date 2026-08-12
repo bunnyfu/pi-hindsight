@@ -91,6 +91,9 @@ export function normalizeGitRemoteToProjectId(remoteUrl: string): string {
   const scp = value.match(/^git@([^:]+):(.+)$/i);
   if (scp) value = `${scp[1]}/${scp[2]}`;
   value = value
+    // Drop userinfo (tokens/credentials) before slugging so insteadOf/helper URLs
+    // cannot leak into stable project:<id> tags.
+    .replace(/^(https?:\/\/)[^/@]+@/i, "$1")
     .replace(/^https?:\/\//i, "")
     .replace(/^ssh:\/\/git@/i, "")
     .replace(/^git:\/\//i, "")
@@ -102,7 +105,9 @@ export function normalizeGitRemoteToProjectId(remoteUrl: string): string {
 
 function gitRemoteOrigin(repoRoot: string): string | undefined {
   try {
-    const url = execFileSync("git", ["remote", "get-url", "origin"], {
+    // Read the configured URL, not `git remote get-url`, so url.*.insteadOf
+    // credential rewrites (CI/cloud agents) do not change project identity.
+    const url = execFileSync("git", ["config", "--get", "remote.origin.url"], {
       cwd: repoRoot,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
@@ -210,6 +215,8 @@ export function baseTags(
   const identity = resolveProjectIdentity(cwd, config);
   const tags = [
     "source:pi",
+    // Provenance host tag (coding-agents uses harness:<name> + source:chat).
+    "harness:pi",
     projectScopeTag(identity.projectId),
     // Dual-tag window: keep legacy path-hash tag so older memories still match any_strict.
     legacyRepoScopeTag(identity.legacyRepoKey),

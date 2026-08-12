@@ -539,6 +539,7 @@ describe("extension hooks", () => {
     expect(Object.keys(tools).sort()).toEqual([
       "hindsight_bank",
       "hindsight_config",
+      "hindsight_knowledge",
       "hindsight_mental_model",
       "hindsight_recall",
       "hindsight_reflect",
@@ -546,6 +547,7 @@ describe("extension hooks", () => {
       "hindsight_retain_global",
       "hindsight_scope",
       "hindsight_scope_migrate",
+      "hindsight_seed_git",
       "hindsight_status",
     ]);
   });

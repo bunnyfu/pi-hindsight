@@ -34,6 +34,20 @@ What Vectorize’s own evaluation surface implies for **pi-hindsight** defaults.
 - Mega bank-global “everything about the user” models.
 - Pre-summarizing before retain.
 - Silent background MM create on every boot (setup / hub `t` is explicit).
+- Default session-start `reflect` or per-repo banks (ADR-005 domain-tagged + Pi `context`/`recall` stay).
+
+## Conversation / amended-rule eval tasks (in-repo)
+
+sde-bench treats **non-guessable project decisions from conversation** (including later amendments that must win) as the hard discriminator. We do **not** vendor sde-bench; we encode client-side signals that preserve that evaluation path:
+
+| Task id                 | Scenario                                                        | What must hold in pi-hindsight                                                                                                               | Enforced by                                                                       |
+| ----------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `conv-final-state`      | User proposes rule A, then amends to rule B in the same session | Project + conversation retain missions require FINAL/LAST state only; superseded proposals only as rejected                                  | `tests/coding-memory-eval.test.ts`, bank missions / `CONVERSATION_RETAIN_MISSION` |
+| `conv-not-git-only`     | Decision exists only in chat, not in git history                | Live session retain uses strategy `conversation` and remains the product core; git seed is opt-in only                                       | retain job strategy + seed tool dry-run defaults                                  |
+| `tool-noise`            | Assistant runs many tools with large args                       | Compact tool-call write-back keeps name + target, drops full args by default                                                                 | `retain.compactToolCalls` + retain projection tests                               |
+| `amended-cross-session` | Later session revises an earlier rule                           | Append + stable live document IDs + final-state mission text (server consolidation); client does not re-emit intermediate proposals as facts | missions + append/cursor design (docs)                                            |
+
+Release validation priority: **conversation-amended / cross-session consolidation** over git-only smoke. Prefer live or fixture paths that retain a short decision chat that revises itself, then recall/reflect for the **last** rule.
 
 ## Related issues
 
@@ -41,3 +55,4 @@ What Vectorize’s own evaluation surface implies for **pi-hindsight** defaults.
 - Delta MM triggers on templates: #529
 - MM size discipline: #530
 - Mission wording vs best practices: #531
+- Coding-agents shortlist stack: #557–#562

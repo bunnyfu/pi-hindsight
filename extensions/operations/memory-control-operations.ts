@@ -4,7 +4,8 @@ import { buildStatusFields } from "../utils/status-fields.js";
 import type { MemoryOperationsDeps } from "./memory-operation-types.js";
 import { isMemorySetupComplete, setupRequiredMessage } from "../config/setup-gate.js";
 import { configureMemory, type ProjectConfigPatchInput } from "../config/config-writer.js";
-import type { HindsightLikeClient, ResolvedConfig } from "../types.js";
+import { seedKnowledgePages } from "../banks/knowledge-page-seed.js";
+import type { HindsightLikeClient, ResolvedConfig, TagsMatch } from "../types.js";
 
 /** Keys agents may read/patch via hindsight_config (no raw secrets). */
 export const AGENT_CONFIG_ALLOWLIST = [
@@ -168,17 +169,25 @@ function clientMethod<K extends keyof HindsightLikeClient>(
 
 export function createControlOperations(deps: MemoryOperationsDeps) {
   return {
-    status(cwd: string) {
+    async status(cwd: string) {
       const config = deps.getConfig();
       const fields = buildStatusFields(config, {
         cwd,
         projectBankId: deps.getProjectBankId(),
+      });
+      const { buildSyncStatus } = await import("../lifecycle/git-seed.js");
+      const sync = await buildSyncStatus({
+        cwd,
+        config,
+        client: deps.getClient(),
+        bankId: deps.getProjectBankId(),
       });
       return {
         setupComplete: isMemorySetupComplete(config, cwd),
         ...(isMemorySetupComplete(config, cwd) ? {} : { setupHint: setupRequiredMessage() }),
         project: resolveProjectIdentity(cwd, config),
         fields,
+        sync,
       };
     },
 
@@ -256,6 +265,8 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
       sourceQuery?: string;
       tags?: string[];
       maxTokens?: number;
+      /** How model tags filter source memories on refresh (create/update trigger). */
+      tagsMatch?: TagsMatch;
       dryRun?: boolean;
       cwd: string;
     }) {
@@ -288,11 +299,20 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
           const tags =
             args.tags ??
             (isUserBank ? ["source:pi"] : ["source:pi", `project:${project.projectId}`]);
+          const trigger = {
+            refreshAfterConsolidation: true as const,
+            ...(args.tagsMatch ? { tagsMatch: args.tagsMatch } : {}),
+          };
           if (args.dryRun ?? true) {
             return {
               dryRun: true,
               bankId,
-              wouldCreate: { name: args.name, sourceQuery: args.sourceQuery, tags },
+              wouldCreate: {
+                name: args.name,
+                sourceQuery: args.sourceQuery,
+                tags,
+                trigger,
+              },
             };
           }
           const create = clientMethod(deps, "createMentalModel");
@@ -300,8 +320,7 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
             ...(args.id ? { id: args.id } : {}),
             tags,
             ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}),
-            // Client maps only refreshAfterConsolidation; template import carries full delta trigger.
-            trigger: { refreshAfterConsolidation: true },
+            trigger,
           });
           return { bankId, result };
         }
@@ -312,9 +331,14 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
             ...(args.sourceQuery !== undefined ? { sourceQuery: args.sourceQuery } : {}),
             ...(args.tags !== undefined ? { tags: args.tags } : {}),
             ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}),
+            ...(args.tagsMatch
+              ? { trigger: { refreshAfterConsolidation: true, tagsMatch: args.tagsMatch } }
+              : {}),
           };
           if (Object.keys(options).length === 0) {
-            throw new Error("Provide name, sourceQuery, tags, and/or maxTokens for update");
+            throw new Error(
+              "Provide name, sourceQuery, tags, maxTokens, and/or tagsMatch for update",
+            );
           }
           if (args.dryRun ?? true)
             return { dryRun: true, bankId, id: args.id, wouldUpdate: options };
@@ -337,6 +361,174 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
         }
         default:
           throw new Error(`Unknown mental model action: ${String(args.action)}`);
+      }
+    },
+
+    /**
+     * Knowledge pages control plane (tree/search/get + dry-run mutating folder/page ops).
+     * Requires a Hindsight client/server that exposes knowledge-base methods.
+     */
+    async knowledge(args: {
+      action:
+        | "tree"
+        | "search"
+        | "get"
+        | "export"
+        | "seed_taxonomy"
+        | "create_page"
+        | "create_folder"
+        | "update"
+        | "delete";
+      bank?: string;
+      id?: string;
+      query?: string;
+      limit?: number;
+      name?: string;
+      sourceQuery?: string;
+      parentId?: string | null;
+      tags?: string[];
+      maxTokens?: number;
+      /** Page create only — when set, restates server page defaults + tagsMatch (trigger replace). */
+      tagsMatch?: TagsMatch;
+      dryRun?: boolean;
+      cwd: string;
+    }) {
+      const config = deps.getConfig();
+      const bankId = resolveOperationBank({
+        requestedBank: args.bank,
+        config,
+        projectBankId: deps.getProjectBankId(),
+      });
+      const project = resolveProjectIdentity(args.cwd, config);
+      const isUserBank =
+        args.bank === "global" ||
+        args.bank === "user" ||
+        (config.banks.user.bankId !== undefined && args.bank === config.banks.user.bankId);
+
+      switch (args.action) {
+        case "tree": {
+          const tree = clientMethod(deps, "getKnowledgeBaseTree");
+          return { bankId, result: await tree(bankId) };
+        }
+        case "seed_taxonomy": {
+          // Idempotent five-page coding taxonomy; degrades when pages are unavailable.
+          const baseTags = isUserBank
+            ? ["source:pi"]
+            : ["source:pi", `project:${project.projectId}`];
+          const seed = await seedKnowledgePages({
+            client: deps.getClient(),
+            bankId,
+            baseTags,
+            dryRun: args.dryRun ?? true,
+          });
+          return { bankId, seed };
+        }
+        case "search": {
+          if (!args.query?.trim()) throw new Error("query is required for search");
+          const search = clientMethod(deps, "searchKnowledgeBase");
+          return {
+            bankId,
+            result: await search(
+              bankId,
+              args.query.trim(),
+              args.limit !== undefined ? { limit: args.limit } : undefined,
+            ),
+          };
+        }
+        case "get": {
+          if (!args.id) throw new Error("id is required for get");
+          const get = clientMethod(deps, "getKnowledgePage");
+          return { bankId, result: await get(bankId, args.id) };
+        }
+        case "export": {
+          // Portable markdown bundle of the whole knowledge base (not for routine Q&A).
+          const exp = clientMethod(deps, "exportKnowledgeBase");
+          return { bankId, result: await exp(bankId) };
+        }
+        case "create_page": {
+          if (!args.name?.trim() || !args.sourceQuery?.trim()) {
+            throw new Error("name and sourceQuery are required for create_page");
+          }
+          const tags =
+            args.tags ??
+            (isUserBank ? ["source:pi"] : ["source:pi", `project:${project.projectId}`]);
+          // Omit trigger to keep server page defaults; only restate them when tagsMatch is set
+          // (a supplied trigger replaces defaults rather than merging).
+          const trigger = args.tagsMatch
+            ? {
+                mode: "delta" as const,
+                factTypes: ["observation" as const],
+                excludeMentalModels: true,
+                refreshAfterConsolidation: true,
+                tagsMatch: args.tagsMatch,
+              }
+            : undefined;
+          const wouldCreate = {
+            name: args.name.trim(),
+            sourceQuery: args.sourceQuery.trim(),
+            tags,
+            ...(args.parentId !== undefined ? { parentId: args.parentId } : {}),
+            ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}),
+            ...(trigger ? { trigger } : {}),
+          };
+          if (args.dryRun ?? true) return { dryRun: true, bankId, wouldCreate };
+          const create = clientMethod(deps, "createKnowledgePage");
+          const result = await create(bankId, wouldCreate.name, wouldCreate.sourceQuery, {
+            tags,
+            ...(args.parentId !== undefined ? { parentId: args.parentId } : {}),
+            ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}),
+            ...(trigger ? { trigger } : {}),
+          });
+          return { bankId, result };
+        }
+        case "create_folder": {
+          if (!args.name?.trim()) throw new Error("name is required for create_folder");
+          const wouldCreate = {
+            name: args.name.trim(),
+            ...(args.parentId !== undefined ? { parentId: args.parentId } : {}),
+          };
+          if (args.dryRun ?? true) return { dryRun: true, bankId, wouldCreate };
+          const create = clientMethod(deps, "createKnowledgeFolder");
+          const result = await create(
+            bankId,
+            wouldCreate.name,
+            args.parentId !== undefined ? { parentId: args.parentId } : undefined,
+          );
+          return { bankId, result };
+        }
+        case "update": {
+          if (!args.id) throw new Error("id is required for update");
+          const options: {
+            name?: string;
+            parentId?: string | null;
+            sourceQuery?: string;
+            tags?: string[];
+            maxTokens?: number;
+          } = {
+            ...(args.name !== undefined ? { name: args.name } : {}),
+            ...("parentId" in args ? { parentId: args.parentId } : {}),
+            ...(args.sourceQuery !== undefined ? { sourceQuery: args.sourceQuery } : {}),
+            ...(args.tags !== undefined ? { tags: args.tags } : {}),
+            ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}),
+          };
+          if (Object.keys(options).length === 0) {
+            throw new Error(
+              "Provide name, parentId, sourceQuery, tags, and/or maxTokens for update",
+            );
+          }
+          if (args.dryRun ?? true)
+            return { dryRun: true, bankId, id: args.id, wouldUpdate: options };
+          const update = clientMethod(deps, "updateKnowledgeNode");
+          return { bankId, result: await update(bankId, args.id, options) };
+        }
+        case "delete": {
+          if (!args.id) throw new Error("id is required for delete");
+          if (args.dryRun ?? true) return { dryRun: true, bankId, id: args.id, wouldDelete: true };
+          const del = clientMethod(deps, "deleteKnowledgeNode");
+          return { bankId, result: await del(bankId, args.id) };
+        }
+        default:
+          throw new Error(`Unknown knowledge action: ${String(args.action)}`);
       }
     },
 

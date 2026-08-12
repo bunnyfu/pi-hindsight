@@ -32,7 +32,7 @@ Pi Hindsight is **TUI-first**. Public slash commands:
 | `a` | Toggle advanced settings (prefer agent tools for day-to-day edits)    |
 | `q` | Close                                                                 |
 
-Day-to-day mission, mental-model, and config edits: prefer agent control-plane tools (`hindsight_status`, `hindsight_config`, `hindsight_bank`, `hindsight_mental_model`); the advanced TUI farm is an escape hatch, not the primary surface.
+Day-to-day mission, mental-model, knowledge-page, and config edits: prefer agent control-plane tools (`hindsight_status`, `hindsight_config`, `hindsight_bank`, `hindsight_mental_model`, `hindsight_knowledge`); the advanced TUI farm is an escape hatch, not the primary surface.
 
 ### Agent use and mental models
 
@@ -58,6 +58,7 @@ Pi exposes memory tools plus an agent control plane for selected banks:
 - `hindsight_config` (allowlisted get/patch; dry-run default on patch; no raw secrets)
 - `hindsight_bank`
 - `hindsight_mental_model`
+- `hindsight_knowledge` — tree/search/get + dry-run mutating page/folder ops (knowledge-base client/server required; not auto-injected)
 - `hindsight_scope_migrate`
 
 Platform-wide bank list/delete and full control-plane browsing stay in the Hindsight web UI. Bundled mental-model templates remain available from the hub (`t`).

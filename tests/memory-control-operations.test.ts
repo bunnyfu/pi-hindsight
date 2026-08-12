@@ -6,7 +6,7 @@ import { DEFAULT_CONFIG } from "../extensions/config/config.js";
 import { createControlOperations } from "../extensions/operations/memory-control-operations.js";
 
 describe("memory control operations", () => {
-  it("status reports setup required on fresh cwd", () => {
+  it("status reports setup required on fresh cwd", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-ctrl-"));
     const ops = createControlOperations({
       getClient: () => ({
@@ -17,9 +17,13 @@ describe("memory control operations", () => {
       getConfig: () => DEFAULT_CONFIG,
       getProjectBankId: () => "pi-project-x",
     });
-    const status = ops.status(cwd);
+    const status = await ops.status(cwd);
     expect(status.setupComplete).toBe(false);
     expect(status.fields.some((f) => f.key === "setup" && f.tone === "warn")).toBe(true);
+    expect(status.sync).toMatchObject({
+      queue: expect.objectContaining({ active: expect.any(Number) }),
+      knowledgePages: expect.any(String),
+    });
   });
 
   it("mental model create defaults project tags and supports dry-run", async () => {
@@ -193,6 +197,161 @@ describe("memory control operations", () => {
     };
     expect(disk.setupComplete).toBe(true);
     expect(disk.banks?.project?.bankId).toBe("kai-coding");
+  });
+
+  it("knowledge create_page defaults project tags and dry-runs by default", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-ctrl-kp-"));
+    mkdirSync(join(cwd, ".pi"), { recursive: true });
+    writeFileSync(join(cwd, ".pi", "hindsight.json"), JSON.stringify({ setupComplete: true }));
+    const createKnowledgePage = vi.fn(async () => ({ page_id: "kp1", operation_id: "op1" }));
+    const searchKnowledgeBase = vi.fn(async () => ({ results: [], total: 0 }));
+    const getKnowledgePage = vi.fn(async () => ({ id: "kp1", markdown: "# x" }));
+    const getKnowledgeBaseTree = vi.fn(async () => ({ roots: [] }));
+    const deleteKnowledgeNode = vi.fn(async () => undefined);
+    const ops = createControlOperations({
+      getClient: () => ({
+        retain: async () => undefined,
+        recall: async () => [],
+        reflect: async () => ({}),
+        createKnowledgePage,
+        searchKnowledgeBase,
+        getKnowledgePage,
+        getKnowledgeBaseTree,
+        deleteKnowledgeNode,
+      }),
+      getConfig: () => ({
+        ...DEFAULT_CONFIG,
+        setupComplete: true,
+        banks: {
+          ...DEFAULT_CONFIG.banks,
+          project: { enabled: true, bankId: "coding", derive: "manual" as const },
+        },
+      }),
+      getProjectBankId: () => "coding",
+    });
+
+    const dry = await ops.knowledge({
+      action: "create_page",
+      cwd,
+      name: "Deploy",
+      sourceQuery: "How do we deploy?",
+    });
+    expect(dry).toMatchObject({ dryRun: true, bankId: "coding" });
+    expect((dry as { wouldCreate: { tags: string[] } }).wouldCreate.tags).toEqual(
+      expect.arrayContaining(["source:pi", expect.stringMatching(/^project:/)]),
+    );
+    expect(createKnowledgePage).not.toHaveBeenCalled();
+
+    await ops.knowledge({
+      action: "create_page",
+      cwd,
+      name: "Deploy",
+      sourceQuery: "How do we deploy?",
+      dryRun: false,
+    });
+    expect(createKnowledgePage).toHaveBeenCalledWith(
+      "coding",
+      "Deploy",
+      "How do we deploy?",
+      expect.objectContaining({
+        tags: expect.arrayContaining(["source:pi"]),
+      }),
+    );
+
+    await ops.knowledge({ action: "search", cwd, query: "deploy", limit: 3 });
+    expect(searchKnowledgeBase).toHaveBeenCalledWith("coding", "deploy", { limit: 3 });
+
+    await ops.knowledge({ action: "get", cwd, id: "kp1" });
+    expect(getKnowledgePage).toHaveBeenCalledWith("coding", "kp1");
+
+    await ops.knowledge({ action: "tree", cwd });
+    expect(getKnowledgeBaseTree).toHaveBeenCalledWith("coding");
+
+    const exportKnowledgeBase = vi.fn(async () => ({ files: [] }));
+    const opsWithExport = createControlOperations({
+      getClient: () => ({
+        retain: async () => undefined,
+        recall: async () => [],
+        reflect: async () => ({}),
+        exportKnowledgeBase,
+      }),
+      getConfig: () => ({
+        ...DEFAULT_CONFIG,
+        setupComplete: true,
+        banks: {
+          ...DEFAULT_CONFIG.banks,
+          project: { enabled: true, bankId: "coding", derive: "manual" as const },
+        },
+      }),
+      getProjectBankId: () => "coding",
+    });
+    await opsWithExport.knowledge({ action: "export", cwd });
+    expect(exportKnowledgeBase).toHaveBeenCalledWith("coding");
+
+    const delDry = await ops.knowledge({ action: "delete", cwd, id: "kp1" });
+    expect(delDry).toMatchObject({ dryRun: true, wouldDelete: true });
+    expect(deleteKnowledgeNode).not.toHaveBeenCalled();
+  });
+
+  it("mental model create passes tagsMatch on trigger", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-ctrl-mm-tm-"));
+    const createMentalModel = vi.fn(async () => ({ mental_model_id: "mm1" }));
+    const ops = createControlOperations({
+      getClient: () => ({
+        retain: async () => undefined,
+        recall: async () => [],
+        reflect: async () => ({}),
+        createMentalModel,
+      }),
+      getConfig: () => ({
+        ...DEFAULT_CONFIG,
+        setupComplete: true,
+        banks: {
+          ...DEFAULT_CONFIG.banks,
+          project: { enabled: true, bankId: "coding", derive: "manual" as const },
+        },
+      }),
+      getProjectBankId: () => "coding",
+    });
+    await ops.mentalModel({
+      action: "create",
+      cwd,
+      name: "Arch",
+      sourceQuery: "architecture?",
+      tagsMatch: "any",
+      dryRun: false,
+    });
+    expect(createMentalModel).toHaveBeenCalledWith(
+      "coding",
+      "Arch",
+      "architecture?",
+      expect.objectContaining({
+        trigger: { refreshAfterConsolidation: true, tagsMatch: "any" },
+      }),
+    );
+  });
+
+  it("knowledge fails clearly when client lacks knowledge-base methods", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "pi-hindsight-ctrl-kp-miss-"));
+    const ops = createControlOperations({
+      getClient: () => ({
+        retain: async () => undefined,
+        recall: async () => [],
+        reflect: async () => ({}),
+      }),
+      getConfig: () => ({
+        ...DEFAULT_CONFIG,
+        setupComplete: true,
+        banks: {
+          ...DEFAULT_CONFIG.banks,
+          project: { enabled: true, bankId: "coding", derive: "manual" as const },
+        },
+      }),
+      getProjectBankId: () => "coding",
+    });
+    await expect(ops.knowledge({ action: "tree", cwd })).rejects.toThrow(
+      /does not support getKnowledgeBaseTree/i,
+    );
   });
 
   it("bank mission and mm create default to dry-run at the op layer", async () => {

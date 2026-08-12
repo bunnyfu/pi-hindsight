@@ -18,6 +18,53 @@ function toolAllowed(name: string, filter: { include?: string[]; exclude?: strin
   return !filter.exclude?.includes(name);
 }
 
+/** Keys tried, in order, for a compact tool-action target (coding-agents write-back discipline). */
+const TOOL_TARGET_KEYS = [
+  "file_path",
+  "path",
+  "notebook_path",
+  "command",
+  "pattern",
+  "query",
+  "url",
+  "name",
+  "id",
+] as const;
+
+const ACTION_TARGET_CAP = 100;
+
+/**
+ * Compact tool input to a primary target string (file path, command, pattern, …).
+ * Full args/outputs bury decisions in mechanical noise; retain only WHAT was touched.
+ */
+export function toolActionTarget(input: unknown): string {
+  let target = "";
+  if (input && typeof input === "object") {
+    const rec = input as Record<string, unknown>;
+    for (const key of TOOL_TARGET_KEYS) {
+      const value = rec[key];
+      if (typeof value === "string" && value.trim()) {
+        target = value.trim().split("\n")[0] ?? "";
+        break;
+      }
+    }
+  } else if (typeof input === "string") {
+    target = input.trim().split("\n")[0] ?? "";
+  }
+  if (target.length > ACTION_TARGET_CAP) target = `${target.slice(0, ACTION_TARGET_CAP)}…`;
+  return target;
+}
+
+function compactToolCallPart(name: string, args: unknown): Record<string, unknown> {
+  const target = toolActionTarget(args);
+  return {
+    type: "toolCall",
+    name,
+    // Compact form: name + primary target only (no full argument object / no outputs).
+    arguments: target ? { target } : {},
+  };
+}
+
 function textFromContent(
   content: unknown,
   options: {
@@ -26,6 +73,8 @@ function textFromContent(
     includeToolCall: boolean;
     includeUnknownJson?: boolean;
     toolCallFilter?: { include?: string[]; exclude?: string[] };
+    /** When true (default), tool calls become name+target only. */
+    compactToolCalls?: boolean;
   },
 ): string {
   if (typeof content === "string") return options.includeText ? content : "";
@@ -41,6 +90,10 @@ function textFromContent(
           if (!options.includeToolCall) return "";
           const name = stringValue(p.name, "unknown");
           if (options.toolCallFilter && !toolAllowed(name, options.toolCallFilter)) return "";
+          if (options.compactToolCalls !== false) {
+            const target = toolActionTarget(p.arguments);
+            return target ? `[action ${name} ${target}]` : `[action ${name}]`;
+          }
           return `[toolCall ${name}] ${JSON.stringify(p.arguments ?? {})}`;
         }
         if (p.type === "image") return options.includeText ? "[image omitted]" : "";
@@ -60,6 +113,7 @@ function projectContent(
     includeThinking: boolean;
     includeToolCall: boolean;
     toolCallFilter?: { include?: string[]; exclude?: string[] };
+    compactToolCalls?: boolean;
   },
 ): unknown {
   if (typeof content === "string") return options.includeText ? content : "";
@@ -75,6 +129,9 @@ function projectContent(
           const name = stringValue(p.name, "unknown");
           if (options.toolCallFilter && !toolAllowed(name, options.toolCallFilter))
             return undefined;
+          if (options.compactToolCalls !== false) {
+            return compactToolCallPart(name, p.arguments);
+          }
           return part;
         }
         if (p.type === "image") return options.includeText ? part : undefined;
@@ -108,6 +165,7 @@ export function projectMessage(
   const includeAssistantText = retain?.content.assistant.includes("text") ?? true;
   const includeThinking = retain?.content.assistant.includes("thinking") ?? false;
   const includeToolCall = retain?.content.assistant.includes("toolCall") ?? true;
+  const compactToolCalls = retain?.compactToolCalls !== false;
   const base: Record<string, unknown> = {
     role,
     timestamp: messageTimestamp(m),
@@ -115,6 +173,7 @@ export function projectMessage(
       includeText: !isAssistant || includeAssistantText,
       includeThinking: isAssistant && includeThinking,
       includeToolCall: isAssistant && includeToolCall,
+      compactToolCalls,
       ...(retain ? { toolCallFilter: retain.toolFilter.toolCall } : {}),
     }),
   };
@@ -140,6 +199,7 @@ export function projectMessageText(
   const includeAssistantText = retain?.content.assistant.includes("text") ?? true;
   const includeThinking = retain?.content.assistant.includes("thinking") ?? false;
   const includeToolCall = retain?.content.assistant.includes("toolCall") ?? true;
+  const compactToolCalls = retain?.compactToolCalls !== false;
   const base: Record<string, unknown> = {
     role,
     timestamp: messageTimestamp(m),
@@ -148,6 +208,7 @@ export function projectMessageText(
       includeThinking: isAssistant && includeThinking,
       includeToolCall: isAssistant && includeToolCall,
       includeUnknownJson: false,
+      compactToolCalls,
       ...(retain ? { toolCallFilter: retain.toolFilter.toolCall } : {}),
     }),
   };

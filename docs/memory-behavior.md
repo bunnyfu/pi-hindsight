@@ -15,6 +15,7 @@ Defaults:
 - `recall.injectionPosition: "append"`
 - project recall is scoped by stable `project:<id>` tags (plus dual-tag legacy `repo:<path-hash>`; see [project identity](project-identity.md))
 - global recall uses explicit non-repo `source:pi` scope
+- automatic retain tags include `source:pi` and `harness:pi` (coding-agents-style host provenance; observation scopes already default to `harness:pi`)
 
 Set `recall.types` to include `world` or `experience`, or to an empty list, only when you explicitly want lower-level memory types.
 
@@ -127,7 +128,13 @@ The retain projection is controlled by:
 - `retain.toolFilter`
 - `retain.strip`
 
-Defaults keep user/assistant text, assistant tool calls, tool result errors, and per-message timestamps while excluding recursive Hindsight tool output and noisy read/search results.
+Defaults keep user/assistant text, assistant tool calls, tool result errors, and per-message timestamps while excluding recursive Hindsight tool output and noisy read/search results. Assistant tool calls are compacted by default (`retain.compactToolCalls: true`) to name + primary target only (no full args), matching coding-agents write-back noise discipline. Set `retain.compactToolCalls: false` for full argument objects.
+
+Live session retains set the named bank strategy `conversation` (coding project templates define multi-strategy maps: `git`, `gitlog`, `conversation`, `document`, `survey`, plus knowledge `entity_labels` for page routing). Default bank mission text prefers final-state-wins extraction when a conversation amends itself.
+
+Applying the `pi-coding-project` bank template (or `hindsight_knowledge` action `seed_taxonomy`) idempotently seeds a fixed five-page knowledge taxonomy tagged `knowledge:component|concept|convention|decision|feature-work`. When the client/server lacks knowledge-base APIs, seeding returns `knowledge_pages_unavailable` and does not fail template apply.
+
+Opt-in cold-repo git seed: `hindsight_seed_git` retains recent commit messages (strategy `gitlog`, stable `pi-gitlog:<head>` document ids) without replacing live session retain. It is never automatic on session start. `hindsight_status` and doctor include a `sync` readiness block (queue depth, git seed receipt, knowledge-page capability).
 
 Explicit retain tool tags are merged with base `source:pi`, repo, and session tags so manually retained memories remain visible to default project recall.
 

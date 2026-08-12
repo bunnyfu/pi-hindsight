@@ -171,6 +171,11 @@ export interface ResolvedConfig {
       toolCall: { include?: string[]; exclude?: string[] };
       toolResult: { include?: string[]; exclude?: string[] };
     };
+    /**
+     * When true (default), assistant tool calls retain name + primary target only
+     * (no full args). Set false for full argument objects (debug / forensic).
+     */
+    compactToolCalls: boolean;
     strip: {
       message: string[];
       topLevel: string[];
@@ -274,6 +279,8 @@ export interface RetainJob {
     observationScopes?: HindsightObservationScopes;
     documentTags?: string[];
     entities?: HindsightEntityInput[];
+    /** Named bank retain strategy (conversation, git, gitlog, document, survey). */
+    strategy?: string;
   };
   retries: number;
   lastError?: string;
@@ -299,10 +306,14 @@ export interface HindsightLikeClient {
       documentId?: string;
       documentTags?: string[];
       async?: boolean;
+      /** Caller-supplied UUID for idempotent async retain retries. */
+      operationId?: string;
       entities?: HindsightEntityInput[];
       tags?: string[];
       updateMode?: UpdateMode;
       observationScopes?: HindsightObservationScopes;
+      /** Named bank retain strategy override for this item. */
+      strategy?: string;
       signal?: AbortSignal;
     },
   ): Promise<unknown>;
@@ -318,11 +329,13 @@ export interface HindsightLikeClient {
       tags?: string[];
       observation_scopes?: HindsightObservationScopes;
       update_mode?: UpdateMode;
+      strategy?: string;
     }>,
     options?: {
       documentId?: string;
       documentTags?: string[];
       async?: boolean;
+      operationId?: string;
       signal?: AbortSignal;
     },
   ): Promise<unknown>;
@@ -406,7 +419,10 @@ export interface HindsightLikeClient {
       id?: string;
       tags?: string[];
       maxTokens?: number;
-      trigger?: { refreshAfterConsolidation?: boolean };
+      trigger?: {
+        refreshAfterConsolidation?: boolean;
+        tagsMatch?: TagsMatch;
+      };
       signal?: AbortSignal;
     },
   ): Promise<unknown>;
@@ -418,7 +434,10 @@ export interface HindsightLikeClient {
       sourceQuery?: string;
       tags?: string[];
       maxTokens?: number;
-      trigger?: { refreshAfterConsolidation?: boolean };
+      trigger?: {
+        refreshAfterConsolidation?: boolean;
+        tagsMatch?: TagsMatch;
+      };
       signal?: AbortSignal;
     },
   ): Promise<unknown>;
@@ -432,6 +451,66 @@ export interface HindsightLikeClient {
     mentalModelId: string,
     options?: { dryRun?: boolean; signal?: AbortSignal },
   ): Promise<unknown>;
+  /** Knowledge pages (official wrappers in @vectorize-io/hindsight-client ^0.9.0). */
+  getKnowledgeBaseTree?(bankId: string, options?: { signal?: AbortSignal }): Promise<unknown>;
+  createKnowledgeFolder?(
+    bankId: string,
+    name: string,
+    options?: { parentId?: string | null; signal?: AbortSignal },
+  ): Promise<unknown>;
+  createKnowledgePage?(
+    bankId: string,
+    name: string,
+    sourceQuery: string,
+    options?: {
+      parentId?: string | null;
+      tags?: string[];
+      maxTokens?: number;
+      /** When set, must restate page defaults (server replaces, does not merge). */
+      trigger?: {
+        mode?: "full" | "delta";
+        refreshAfterConsolidation?: boolean;
+        refreshCron?: string | null;
+        factTypes?: Array<"world" | "experience" | "observation">;
+        excludeMentalModels?: boolean;
+        excludeMentalModelIds?: string[];
+        tagsMatch?: TagsMatch;
+        tagGroups?: HindsightTagGroup[];
+        includeChunks?: boolean;
+        recallMaxTokens?: number;
+        recallChunksMaxTokens?: number;
+      };
+      signal?: AbortSignal;
+    },
+  ): Promise<unknown>;
+  getKnowledgePage?(
+    bankId: string,
+    pageId: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<unknown>;
+  searchKnowledgeBase?(
+    bankId: string,
+    query: string,
+    options?: { limit?: number; signal?: AbortSignal },
+  ): Promise<unknown>;
+  updateKnowledgeNode?(
+    bankId: string,
+    nodeId: string,
+    options: {
+      name?: string;
+      parentId?: string | null;
+      sourceQuery?: string;
+      tags?: string[];
+      maxTokens?: number;
+      signal?: AbortSignal;
+    },
+  ): Promise<unknown>;
+  deleteKnowledgeNode?(
+    bankId: string,
+    nodeId: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<unknown>;
+  exportKnowledgeBase?(bankId: string, options?: { signal?: AbortSignal }): Promise<unknown>;
   updateBankConfig?(
     bankId: string,
     options: {

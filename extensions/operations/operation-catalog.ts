@@ -493,12 +493,52 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
       name: "hindsight_status",
       label: "Hindsight Status",
       description:
-        "Inspect Pi Hindsight status: setup gate, coding/life banks, project scope tags (basis), recall/retain flags, queue. Use before changing memory config. Read-only.",
+        "Inspect Pi Hindsight status: setup gate, coding/life banks, project scope tags (basis), recall/retain flags, queue, and sync readiness (queue depth, git seed receipt, knowledge-page capability). Use before changing memory config. Read-only.",
       parameters: Type.Object({}),
       async execute(_id, _params, signal, _onUpdate, ctx) {
         useCwd(ctx.cwd);
         if (signal?.aborted) throw new Error("Aborted");
-        const result = operations.status(ctx.cwd);
+        const result = await operations.status(ctx.cwd);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          details: result,
+        };
+      },
+      renderResult: renderMemoryToolTextResult,
+    }),
+    defineCatalogTool({
+      name: "hindsight_seed_git",
+      label: "Hindsight Seed Git",
+      description:
+        "Opt-in cold-repo seed: retain recent git commit messages (strategy gitlog) into the project bank. Not automatic — conversation retain remains primary. dryRun defaults true; set dryRun=false to enqueue (and flush by default).",
+      parameters: Type.Object({
+        limit: Type.Optional(
+          Type.Integer({
+            minimum: 1,
+            maximum: 2000,
+            description: "Max commits to include (default 300).",
+          }),
+        ),
+        dryRun: Type.Optional(
+          Type.Boolean({
+            description: "Default true (preview). Set false to enqueue retain.",
+          }),
+        ),
+        flush: Type.Optional(
+          Type.Boolean({
+            description: "When dryRun=false, flush the queue after enqueue (default true).",
+          }),
+        ),
+      }),
+      async execute(_id, params, signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        if (signal?.aborted) throw new Error("Aborted");
+        const result = await operations.seedGitLog({
+          cwd: ctx.cwd,
+          ...(params.limit !== undefined ? { limit: params.limit } : {}),
+          dryRun: params.dryRun ?? true,
+          ...(params.flush !== undefined ? { flush: params.flush } : {}),
+        });
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
           details: result,
@@ -652,7 +692,7 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
       name: "hindsight_mental_model",
       label: "Hindsight Mental Model",
       description:
-        "Agent control plane for mental models on the selected bank. Actions: list|get|create|update|refresh|delete. Project-tier create defaults tags to source:pi + project:<activeId>. Mutating actions (create/update/refresh/delete) default dryRun=true; set dryRun=false to apply.",
+        "Agent control plane for mental models on the selected bank. Actions: list|get|create|update|refresh|delete. Project-tier create defaults tags to source:pi + project:<activeId>. Optional tagsMatch sets refresh tag matching on create/update trigger. Mutating actions default dryRun=true; set dryRun=false to apply.",
       parameters: Type.Object({
         action: Type.Union([
           Type.Literal("list"),
@@ -670,6 +710,7 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
         sourceQuery: Type.Optional(Type.String()),
         tags: Type.Optional(Type.Array(Type.String())),
         maxTokens: Type.Optional(Type.Integer({ minimum: 1 })),
+        tagsMatch: Type.Optional(tagMatchSchema),
         dryRun: Type.Optional(
           Type.Boolean({
             description: "Mutating actions default true (preview). Set false to apply.",
@@ -693,6 +734,87 @@ export function createOperationCatalog(deps: MemoryOperationsDeps): OperationCat
           ...(params.sourceQuery ? { sourceQuery: params.sourceQuery } : {}),
           ...(params.tags ? { tags: params.tags } : {}),
           ...(params.maxTokens !== undefined ? { maxTokens: params.maxTokens } : {}),
+          ...(params.tagsMatch ? { tagsMatch: params.tagsMatch } : {}),
+          ...(mutating
+            ? { dryRun: params.dryRun ?? true }
+            : params.dryRun !== undefined
+              ? { dryRun: params.dryRun }
+              : {}),
+        });
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          details: result,
+        };
+      },
+      renderResult: renderMemoryToolTextResult,
+    }),
+    defineCatalogTool({
+      name: "hindsight_knowledge",
+      label: "Hindsight Knowledge Pages",
+      description:
+        "Agent control plane for knowledge pages (living docs over bank observations). Actions: tree|search|get|export|seed_taxonomy|create_page|create_folder|update|delete. Prefer search then get for routine Q&A (pages are not auto-injected). seed_taxonomy creates the fixed five-page coding taxonomy (idempotent; degrades when pages unavailable). Use export only for a portable full-bank markdown bundle. Project-tier create_page defaults tags to source:pi + project:<activeId>. Mutating actions default dryRun=true. Requires Hindsight client/server knowledge-base support.",
+      parameters: Type.Object({
+        action: Type.Union([
+          Type.Literal("tree"),
+          Type.Literal("search"),
+          Type.Literal("get"),
+          Type.Literal("export"),
+          Type.Literal("seed_taxonomy"),
+          Type.Literal("create_page"),
+          Type.Literal("create_folder"),
+          Type.Literal("update"),
+          Type.Literal("delete"),
+        ]),
+        bank: Type.Optional(Type.String({ description: "Bank id or alias project|global|user." })),
+        id: Type.Optional(Type.String({ description: "Page or folder id for get/update/delete." })),
+        query: Type.Optional(
+          Type.String({ description: "Search query for action=search (hybrid page search)." }),
+        ),
+        limit: Type.Optional(
+          Type.Integer({ minimum: 1, maximum: 50, description: "Search result limit (1–50)." }),
+        ),
+        name: Type.Optional(Type.String()),
+        sourceQuery: Type.Optional(
+          Type.String({ description: "Page question for create_page / update." }),
+        ),
+        parentId: Type.Optional(
+          Type.Union([Type.String(), Type.Null()], {
+            description:
+              "Folder parent. Omit for root create; pass null on update to move to root.",
+          }),
+        ),
+        tags: Type.Optional(Type.Array(Type.String())),
+        maxTokens: Type.Optional(Type.Integer({ minimum: 1 })),
+        tagsMatch: Type.Optional(tagMatchSchema),
+        dryRun: Type.Optional(
+          Type.Boolean({
+            description:
+              "Mutating actions (seed_taxonomy|create_page|create_folder|update|delete) default true (preview). Set false to apply.",
+          }),
+        ),
+      }),
+      async execute(_id, params, signal, _onUpdate, ctx) {
+        useCwd(ctx.cwd);
+        if (signal?.aborted) throw new Error("Aborted");
+        const mutating =
+          params.action === "create_page" ||
+          params.action === "create_folder" ||
+          params.action === "update" ||
+          params.action === "delete" ||
+          params.action === "seed_taxonomy";
+        const result = await operations.knowledge({
+          action: params.action,
+          cwd: ctx.cwd,
+          ...(params.bank ? { bank: params.bank } : {}),
+          ...(params.id ? { id: params.id } : {}),
+          ...(params.query ? { query: params.query } : {}),
+          ...(params.limit !== undefined ? { limit: params.limit } : {}),
+          ...(params.name ? { name: params.name } : {}),
+          ...(params.sourceQuery ? { sourceQuery: params.sourceQuery } : {}),
+          ...(params.parentId !== undefined ? { parentId: params.parentId } : {}),
+          ...(params.tags ? { tags: params.tags } : {}),
+          ...(params.maxTokens !== undefined ? { maxTokens: params.maxTokens } : {}),
+          ...(params.tagsMatch ? { tagsMatch: params.tagsMatch } : {}),
           ...(mutating
             ? { dryRun: params.dryRun ?? true }
             : params.dryRun !== undefined

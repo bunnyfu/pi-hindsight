@@ -6,6 +6,7 @@ import {
 } from "../banks/bank-templates.js";
 import { resolveProjectIdentity } from "../banks/banking.js";
 import { resolveOperationBank } from "../banks/bank-selection.js";
+import { seedKnowledgePages } from "../banks/knowledge-page-seed.js";
 import type { MemoryOperationsDeps } from "./memory-operation-types.js";
 
 export function createBankTemplateOperations(deps: MemoryOperationsDeps) {
@@ -47,7 +48,27 @@ export function createBankTemplateOperations(deps: MemoryOperationsDeps) {
       });
       const dryRun = args.dryRun ?? true;
       const result = await client.importBankTemplate(bankId, manifest, { dryRun });
-      return { bankId, template, dryRun, result };
+      // Coding project templates also seed the knowledge-page taxonomy when the server supports pages.
+      let knowledgeSeed: Awaited<ReturnType<typeof seedKnowledgePages>> | undefined;
+      if (template.id === "pi-coding-project") {
+        const baseTags = [
+          "source:pi",
+          ...(resolvedProjectId ? [`project:${resolvedProjectId}`] : []),
+        ];
+        knowledgeSeed = await seedKnowledgePages({
+          client,
+          bankId,
+          baseTags,
+          dryRun,
+        });
+      }
+      return {
+        bankId,
+        template,
+        dryRun,
+        result,
+        ...(knowledgeSeed ? { knowledgeSeed } : {}),
+      };
     },
   };
 }

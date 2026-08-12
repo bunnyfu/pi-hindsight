@@ -41,6 +41,27 @@ describe("bank templates", () => {
     });
   });
 
+  it("seats multi-strategy retain and knowledge entity_labels on the coding project template", () => {
+    const template = getBuiltInBankTemplate("pi-coding-project");
+    const bank = template?.manifest.bank;
+    expect(bank?.retain_default_strategy).toBe("conversation");
+    expect(bank?.retain_extraction_mode).toBe("verbose");
+    expect(bank?.entities_allow_free_form).toBe(true);
+    expect(bank?.retain_strategies).toMatchObject({
+      git: expect.objectContaining({ retain_extraction_mode: "verbose" }),
+      gitlog: expect.objectContaining({ retain_chunk_size: 12_000 }),
+      conversation: expect.objectContaining({ retain_chunk_size: 12_000 }),
+      document: expect.objectContaining({ retain_extraction_mode: "verbose" }),
+      survey: expect.objectContaining({ retain_extraction_mode: "custom" }),
+    });
+    const labels = bank?.entity_labels as Array<{ key?: string; tag?: boolean }> | undefined;
+    expect(labels?.[0]).toMatchObject({ key: "knowledge", tag: true });
+    // Non-coding project templates stay strategy-light.
+    const conversation = getBuiltInBankTemplate("pi-conversation-project");
+    expect(conversation?.manifest.bank?.retain_strategies).toBeUndefined();
+    expect(conversation?.manifest.bank?.entity_labels).toBeUndefined();
+  });
+
   it("matches Pi's own default user-bank missions for the coding user template", () => {
     const template = getBuiltInBankTemplate("pi-coding-user");
     const defaults = defaultGlobalBankMissions();

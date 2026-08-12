@@ -21,6 +21,7 @@ import {
   type FlushRetainQueueResult,
 } from "../queue/queue.js";
 import { createMemoryIdentity } from "../operations/memory-identity.js";
+import { LIVE_SESSION_RETAIN_STRATEGY } from "../banks/retain-strategies.js";
 import { expandObservationScopes } from "./observation-scopes.js";
 import { buildRetainJob as buildRetainJobCore } from "./retain-job-builder.js";
 import { appendRetainReceipts } from "./retain-receipts.js";
@@ -88,6 +89,8 @@ export function buildRetainJob(args: {
       ...(args.sessionFile ? { pi_session_file: args.sessionFile } : {}),
     },
     ...(observationScopes.length ? { observationScopes } : {}),
+    // Coding bank templates define named strategies; live sessions use conversation.
+    strategy: LIVE_SESSION_RETAIN_STRATEGY,
   });
 }
 
