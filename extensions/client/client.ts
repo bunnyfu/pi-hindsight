@@ -291,6 +291,62 @@ export function createHindsightClient(config: ResolvedConfig): HindsightLikeClie
         },
         options?.signal,
       ),
+    getKnowledgeBaseTree: (bankId, options) =>
+      withTimeout(
+        "hindsight getKnowledgeBaseTree",
+        timeoutMs,
+        (signal) => raw.getKnowledgeBaseTree(bankId, { ...options, signal }),
+        options?.signal,
+      ),
+    createKnowledgeFolder: (bankId, name, options) =>
+      withTimeout(
+        "hindsight createKnowledgeFolder",
+        timeoutMs,
+        (signal) => raw.createKnowledgeFolder(bankId, name, { ...options, signal }),
+        options?.signal,
+      ),
+    createKnowledgePage: (bankId, name, sourceQuery, options) =>
+      withTimeout(
+        "hindsight createKnowledgePage",
+        timeoutMs,
+        (signal) => raw.createKnowledgePage(bankId, name, sourceQuery, { ...options, signal }),
+        options?.signal,
+      ),
+    getKnowledgePage: (bankId, pageId, options) =>
+      withTimeout(
+        "hindsight getKnowledgePage",
+        timeoutMs,
+        (signal) => raw.getKnowledgePage(bankId, pageId, { ...options, signal }),
+        options?.signal,
+      ),
+    searchKnowledgeBase: (bankId, query, options) =>
+      withTimeout(
+        "hindsight searchKnowledgeBase",
+        timeoutMs,
+        (signal) => raw.searchKnowledgeBase(bankId, query, { ...options, signal }),
+        options?.signal,
+      ),
+    updateKnowledgeNode: (bankId, nodeId, options) =>
+      withTimeout(
+        "hindsight updateKnowledgeNode",
+        timeoutMs,
+        (signal) => raw.updateKnowledgeNode(bankId, nodeId, { ...options, signal }),
+        options?.signal,
+      ),
+    deleteKnowledgeNode: (bankId, nodeId, options) =>
+      withTimeout(
+        "hindsight deleteKnowledgeNode",
+        timeoutMs,
+        (signal) => raw.deleteKnowledgeNode(bankId, nodeId, { ...options, signal }),
+        options?.signal,
+      ),
+    exportKnowledgeBase: (bankId, options) =>
+      withTimeout(
+        "hindsight exportKnowledgeBase",
+        timeoutMs,
+        (signal) => raw.exportKnowledgeBase(bankId, { ...options, signal }),
+        options?.signal,
+      ),
     updateBankConfig: (bankId, options) =>
       withTimeout(
         "hindsight updateBankConfig",

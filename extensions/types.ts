@@ -441,7 +441,7 @@ export interface HindsightLikeClient {
     mentalModelId: string,
     options?: { dryRun?: boolean; signal?: AbortSignal },
   ): Promise<unknown>;
-  /** Knowledge pages (client wrappers land after @vectorize-io/hindsight-client 0.8.6). */
+  /** Knowledge pages (official wrappers in @vectorize-io/hindsight-client ^0.9.0). */
   getKnowledgeBaseTree?(bankId: string, options?: { signal?: AbortSignal }): Promise<unknown>;
   createKnowledgeFolder?(
     bankId: string,
@@ -460,9 +460,15 @@ export interface HindsightLikeClient {
       trigger?: {
         mode?: "full" | "delta";
         refreshAfterConsolidation?: boolean;
+        refreshCron?: string | null;
         factTypes?: Array<"world" | "experience" | "observation">;
         excludeMentalModels?: boolean;
+        excludeMentalModelIds?: string[];
         tagsMatch?: TagsMatch;
+        tagGroups?: HindsightTagGroup[];
+        includeChunks?: boolean;
+        recallMaxTokens?: number;
+        recallChunksMaxTokens?: number;
       };
       signal?: AbortSignal;
     },
