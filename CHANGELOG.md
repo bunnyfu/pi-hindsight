@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.12.0](https://github.com/luxus/pi-hindsight/compare/v0.11.1...v0.12.0) (2026-08-13)
+
+
+### Features
+
+* add hindsight_knowledge control plane for knowledge pages ([8731cac](https://github.com/luxus/pi-hindsight/commit/8731cac2fe64c88d8ca8866bcd0bf3df030736bc)), closes [#556](https://github.com/luxus/pi-hindsight/issues/556)
+* compact tool-call write-back for retain noise ([ad9c2e6](https://github.com/luxus/pi-hindsight/commit/ad9c2e68842bf8434fb18b3b92737284f59bf048)), closes [#561](https://github.com/luxus/pi-hindsight/issues/561)
+* **config:** prefer HINDSIGHT_API_TOKEN over HINDSIGHT_API_KEY ([af46e63](https://github.com/luxus/pi-hindsight/commit/af46e639cc3114323c92ee5de298795700db0830))
+* **config:** prefer HINDSIGHT_API_TOKEN over HINDSIGHT_API_KEY ([c5f8e8d](https://github.com/luxus/pi-hindsight/commit/c5f8e8d29d0bd9c9a18c2234719043c89127aaed)), closes [#553](https://github.com/luxus/pi-hindsight/issues/553)
+* knowledge export, tagsMatch, harness tag, async operationId ([fe1aec6](https://github.com/luxus/pi-hindsight/commit/fe1aec639ab9bdd06469513cb6473173caac0089))
+* multi-strategy retain and knowledge entity_labels on coding banks ([781545d](https://github.com/luxus/pi-hindsight/commit/781545db493f7dd466312171249d64d1f24fd3d1)), closes [#558](https://github.com/luxus/pi-hindsight/issues/558)
+* opt-in gitlog seed and sync readiness status ([9f77690](https://github.com/luxus/pi-hindsight/commit/9f77690f8287b3f30c43949cbaea3a45e2ef23a5)), closes [#560](https://github.com/luxus/pi-hindsight/issues/560)
+* seed knowledge-page taxonomy with capability degrade ([12415ff](https://github.com/luxus/pi-hindsight/commit/12415ff12377a2e6be92fff1ba166b8a4308a37b)), closes [#559](https://github.com/luxus/pi-hindsight/issues/559)
+
+
+### Bug Fixes
+
+* **banks:** type knowledge entity_labels for hindsight-client 0.9 ([66172ff](https://github.com/luxus/pi-hindsight/commit/66172ff2ec719ecf27ae43017c9ec5636bbfa0fe))
+* **client:** align knowledge pages stack with hindsight-client 0.9.0 ([e9ec27c](https://github.com/luxus/pi-hindsight/commit/e9ec27c63e8e5838f84b6dd7ee39807da8933f1f))
+* **smoke:** raise sync retain timeout for parallel CI ([40b02ea](https://github.com/luxus/pi-hindsight/commit/40b02ea7b5bfea8ddbc20bc6018f01a6c06aef19))
+* **smoke:** raise sync retain timeout for parallel CI ([df9c267](https://github.com/luxus/pi-hindsight/commit/df9c2670c314c0576dd7f65c15dce4a7be91bb63))
+* **smoke:** recall imported facts without waiting on consolidation ([1cb26eb](https://github.com/luxus/pi-hindsight/commit/1cb26ebe9deb0aecf72004a6ea033595c1e547b6))
+* **smoke:** use sync retain so import documents materialize ([350e762](https://github.com/luxus/pi-hindsight/commit/350e762219a19ef815d5fc32735e06aba2657029))
+* **smoke:** verify import via getDocument then raw-fact recall ([44a2505](https://github.com/luxus/pi-hindsight/commit/44a2505dad54512ee77ad50f3dacc15d15b16aa4))
+* **tools:** keep mental-model list responses metadata-only ([52af4ea](https://github.com/luxus/pi-hindsight/commit/52af4eaf571cf8d63d40370818773afb3ff090e5))
+
 ## [0.11.1](https://github.com/luxus/pi-hindsight/compare/v0.11.0...v0.11.1) (2026-08-03)
 
 
