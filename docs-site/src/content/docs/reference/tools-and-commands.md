@@ -57,7 +57,7 @@ Pi exposes memory tools plus an agent control plane for selected banks:
 - `hindsight_scope`
 - `hindsight_config` (allowlisted get/patch; dry-run default on patch; no raw secrets)
 - `hindsight_bank`
-- `hindsight_mental_model`
+- `hindsight_mental_model` — list is metadata-only; use get for full content
 - `hindsight_knowledge` — tree/search/get + dry-run mutating page/folder ops (knowledge-base client/server required; not auto-injected)
 - `hindsight_scope_migrate`
 

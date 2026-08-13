@@ -404,12 +404,20 @@ export interface HindsightLikeClient {
   ): Promise<unknown>;
   listMentalModels?(
     bankId: string,
-    options?: { tags?: string[]; signal?: AbortSignal },
+    options?: {
+      tags?: string[];
+      /** Exclude large content/provenance; prefer metadata for agent list. */
+      detail?: "metadata" | "content" | "full";
+      signal?: AbortSignal;
+    },
   ): Promise<unknown>;
   getMentalModel?(
     bankId: string,
     mentalModelId: string,
-    options?: { signal?: AbortSignal },
+    options?: {
+      detail?: "metadata" | "content" | "full";
+      signal?: AbortSignal;
+    },
   ): Promise<unknown>;
   createMentalModel?(
     bankId: string,

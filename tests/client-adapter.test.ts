@@ -145,10 +145,14 @@ describe("Hindsight client adapter", () => {
     const { createHindsightClient } = await import("../extensions/client/client.js");
     const client = createHindsightClient(DEFAULT_CONFIG);
 
-    await client.listMentalModels!("bank", { tags: ["project:a"] });
+    await client.listMentalModels!("bank", { tags: ["project:a"], detail: "metadata" });
     expect(mocks.listMentalModels).toHaveBeenCalledWith(
       "bank",
-      expect.objectContaining({ tags: ["project:a"], signal: expect.any(AbortSignal) }),
+      expect.objectContaining({
+        tags: ["project:a"],
+        detail: "metadata",
+        signal: expect.any(AbortSignal),
+      }),
     );
 
     await client.getMentalModel!("bank", "mm1");

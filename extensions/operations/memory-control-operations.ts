@@ -167,6 +167,69 @@ function clientMethod<K extends keyof HindsightLikeClient>(
   return (fn as (...args: never[]) => unknown).bind(client) as NonNullable<HindsightLikeClient[K]>;
 }
 
+/** Agent-facing list fields only (no content / reflect_response / source facts). */
+export type MentalModelListItemMetadata = {
+  id: string;
+  name: string;
+  tags?: string[];
+  max_tokens?: number;
+  last_refreshed_at?: string;
+};
+
+function mentalModelListRows(response: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(response)) {
+    return response.filter((entry): entry is Record<string, unknown> =>
+      Boolean(entry && typeof entry === "object"),
+    );
+  }
+  if (!response || typeof response !== "object") return [];
+  const body = response as { items?: unknown; mental_models?: unknown };
+  const rows = Array.isArray(body.items)
+    ? body.items
+    : Array.isArray(body.mental_models)
+      ? body.mental_models
+      : [];
+  return rows.filter((entry): entry is Record<string, unknown> =>
+    Boolean(entry && typeof entry === "object"),
+  );
+}
+
+/**
+ * Project a listMentalModels response to metadata-only items for agent tools.
+ * Drops content, reflect_response, and other heavy fields even if the server returns them.
+ */
+export function projectMentalModelListMetadata(response: unknown): {
+  items: MentalModelListItemMetadata[];
+} {
+  const items: MentalModelListItemMetadata[] = [];
+  for (const row of mentalModelListRows(response)) {
+    const id = typeof row.id === "string" ? row.id : undefined;
+    const name = typeof row.name === "string" ? row.name : undefined;
+    if (!id || !name) continue;
+    const tags = Array.isArray(row.tags)
+      ? row.tags.filter((tag): tag is string => typeof tag === "string")
+      : undefined;
+    const maxTokens =
+      typeof row.max_tokens === "number"
+        ? row.max_tokens
+        : typeof row.maxTokens === "number"
+          ? row.maxTokens
+          : undefined;
+    const lastRefreshedAt =
+      typeof row.last_refreshed_at === "string"
+        ? row.last_refreshed_at
+        : typeof row.lastRefreshedAt === "string"
+          ? row.lastRefreshedAt
+          : undefined;
+    const item: MentalModelListItemMetadata = { id, name };
+    if (tags !== undefined) item.tags = tags;
+    if (maxTokens !== undefined) item.max_tokens = maxTokens;
+    if (lastRefreshedAt !== undefined) item.last_refreshed_at = lastRefreshedAt;
+    items.push(item);
+  }
+  return { items };
+}
+
 export function createControlOperations(deps: MemoryOperationsDeps) {
   return {
     async status(cwd: string) {
@@ -285,7 +348,9 @@ export function createControlOperations(deps: MemoryOperationsDeps) {
       switch (args.action) {
         case "list": {
           const list = clientMethod(deps, "listMentalModels");
-          return { bankId, result: await list(bankId) };
+          // Prefer server metadata detail; always project so agent context cannot carry content.
+          const raw = await list(bankId, { detail: "metadata" });
+          return { bankId, result: projectMentalModelListMetadata(raw) };
         }
         case "get": {
           if (!args.id) throw new Error("id is required for get");
