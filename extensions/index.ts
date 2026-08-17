@@ -16,6 +16,12 @@ export default function hindsightExtension(pi: ExtensionAPI) {
   pi.on("context", async (event, ctx) => lifecycle.recall(event, ctx));
 
   pi.on("agent_end", async (event, ctx) => {
+    // Herdr-spawned sub-agents are consolidated by their parent orchestrator session;
+    // retaining their internal work logs duplicates the parent's outcome records.
+    // Herdr marks child processes with PI_SUBAGENT_* env vars — skip auto-retain there.
+    if (process.env.PI_SUBAGENT_NAME) {
+      return;
+    }
     await lifecycle.retain(event, ctx);
   });
 
