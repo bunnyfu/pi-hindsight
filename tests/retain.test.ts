@@ -279,6 +279,7 @@ describe("recordRetainDeliveries", () => {
       remaining: 0,
       deadLettered: 0,
       malformed: 0,
+      errors: [],
       delivered: [
         {
           queueJobId: "job-1",
@@ -308,6 +309,7 @@ describe("recordRetainDeliveries", () => {
       remaining: 0,
       deadLettered: 0,
       malformed: 0,
+      errors: [],
     });
     expect(await listRetainReceipts(cwd, 10)).toEqual([]);
   });

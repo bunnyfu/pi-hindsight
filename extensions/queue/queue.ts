@@ -203,6 +203,8 @@ export interface FlushRetainQueueResult {
   remaining: number;
   deadLettered: number;
   malformed: number;
+  /** Redacted error messages for jobs that failed delivery this flush (newest last). */
+  errors: string[];
   operationIds?: string[];
   outcome?: RetainOutcome;
   delivered?: RetainDeliverySummary[];
@@ -266,6 +268,7 @@ export async function flushRetainQueue(
     const deadLetteredJobs: RetainJob[] = [];
     const operationIds: string[] = [];
     const delivered: RetainDeliverySummary[] = [];
+    const errors: string[] = [];
     let itemsCount = 0;
     let hasItemsCount = false;
     let tokens = 0;
@@ -305,6 +308,7 @@ export async function flushRetainQueue(
         sent += 1;
       } catch (error) {
         const errorMessage = redactQueueError(error);
+        errors.push(`job ${job.id} -> ${job.bankId}/${job.documentId}: ${errorMessage}`);
         const retries = job.retries + 1;
         const deadLetter = retries >= maxRetries;
         const failedJob = {
@@ -340,6 +344,7 @@ export async function flushRetainQueue(
       remaining: remaining.length,
       deadLettered: appendedDeadLetterJobs,
       malformed: parsed.malformedLines.length,
+      errors,
       ...(uniqueOperationIds.length ? { operationIds: uniqueOperationIds } : {}),
       ...(hasItemsCount || uniqueOperationIds.length || hasTokens ? { outcome: aggregate } : {}),
       ...(delivered.length ? { delivered } : {}),

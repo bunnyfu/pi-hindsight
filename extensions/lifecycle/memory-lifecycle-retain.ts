@@ -15,6 +15,7 @@ import {
   readSessionMemoryMeta,
 } from "../utils/session-memory-meta.js";
 import { redactError } from "../utils/sanitize.js";
+import { logDebug, logHeadlessError } from "../utils/headless-log.js";
 import type { HindsightLikeClient, ResolvedConfig } from "../types.js";
 import type { RuntimeSnapshot } from "./memory-lifecycle-runtime.js";
 import type { HindsightActivity } from "../utils/status.js";
@@ -103,6 +104,9 @@ export function createRetainTurnPolicy(deps: RetainTurnPolicyDeps): RetainTurnPo
       const nextRetainMode = sessionMeta.nextRetainMode;
       const sessionMemory = getEffectiveSessionMemoryMode(sessionMeta);
       if (!sessionMemory.retain || nextRetainMode === "off") {
+        logDebug(
+          `retain skipped: session memory mode (retain=${sessionMemory.retain}, nextRetainMode=${nextRetainMode})`,
+        );
         try {
           await markRetainedMessages(runtime, event.messages);
         } catch (error) {
@@ -127,7 +131,10 @@ export function createRetainTurnPolicy(deps: RetainTurnPolicyDeps): RetainTurnPo
 
       const messages = await newRetainMessages(runtime, event.messages);
       const messageCount = retainableMessageCount(messages);
-      if (!messageCount) return { queued: false, sent: 0, remaining: 0 };
+      if (!messageCount) {
+        logDebug("retain skipped: no new retainable messages after cursor filter");
+        return { queued: false, sent: 0, remaining: 0 };
+      }
 
       try {
         deps.setMemoryStatus(runtime, "retaining");
@@ -180,6 +187,7 @@ export function createRetainTurnPolicy(deps: RetainTurnPolicyDeps): RetainTurnPo
         }
         return { queued, sent, remaining };
       } catch (error) {
+        logHeadlessError("retain failed", error);
         deps.setMemoryStatus(runtime, "retain-failed");
         deps.notify(runtime, `Hindsight retain queue failed: ${redactError(error)}`, "warning");
         return { queued: false, sent: 0, remaining: 0 };

@@ -8,6 +8,7 @@ import { ensureGlobalBank, ensureProjectBank } from "../banks/bank-operations.js
 import { flushRetainQueue, retainQueuePath } from "../queue/queue.js";
 import { recordRetainDeliveries } from "./retain.js";
 import { formatFlushRetainQueueResult } from "../queue/flush-presenter.js";
+import { logDebug, logHeadless, logHeadlessError } from "../utils/headless-log.js";
 import { bankSelectionMessage } from "../utils/diagnostics.js";
 import type { HindsightLikeClient, ResolvedConfig } from "../types.js";
 import { redactError } from "../utils/sanitize.js";
@@ -59,6 +60,11 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
   let initHealth: InitHealth | undefined;
   let periodicFlush: NodeJS.Timeout | undefined;
   let periodicFlushActive = false;
+  // Auto-retain in flight for this process (agent_end). Hosts that fully await
+  // extension handlers (pi CLI does) make this redundant, but awaiting it in
+  // shutdown() guarantees the retain (and its queue append) settles before the
+  // final shutdown flush even under hosts that dispatch handlers fire-and-forget.
+  let inFlightAutoRetain: Promise<unknown> | undefined;
   const stopPeriodicFlush = () => {
     if (!periodicFlush) return;
     clearInterval(periodicFlush);
@@ -229,17 +235,42 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
       if (!config.enabled || !config.retain.enabled || (!canRetainProject && !canRetainUser))
         return { queued: false, sent: 0, remaining: 0 };
       const runtime = snapshotRuntime(ctx);
-      if (!runtime) return { queued: false, sent: 0, remaining: 0 };
-      if (!isMemorySetupComplete(config, runtime.cwd))
+      if (!runtime) {
+        logHeadless(
+          "retain skipped: session runtime snapshot unavailable (extension ctx unavailable at agent_end)",
+        );
         return { queued: false, sent: 0, remaining: 0 };
-      return retainPolicy.retain(event, runtime);
+      }
+      if (!isMemorySetupComplete(config, runtime.cwd)) {
+        logDebug("retain skipped: memory setup incomplete");
+        return { queued: false, sent: 0, remaining: 0 };
+      }
+      const attempt = retainPolicy.retain(event, runtime);
+      inFlightAutoRetain = attempt;
+      try {
+        return await attempt;
+      } finally {
+        if (inFlightAutoRetain === attempt) inFlightAutoRetain = undefined;
+      }
     },
 
     async shutdown(ctx: RuntimeCtx): Promise<void> {
       stopPeriodicFlush();
       if (!config.enabled || !config.retain.enabled) return;
+      // Ensure any in-flight agent_end retain settles before the final queue flush,
+      // so its durable queue append is visible to (and delivered by) this flush.
+      if (inFlightAutoRetain) {
+        try {
+          await inFlightAutoRetain;
+        } catch {
+          // Already reported by the retain path; shutdown still flushes the queue.
+        }
+      }
       const runtime = snapshotRuntime(ctx);
-      if (!runtime) return;
+      if (!runtime) {
+        logHeadless("shutdown flush skipped: session runtime snapshot unavailable");
+        return;
+      }
       if (!isMemorySetupComplete(config, runtime.cwd)) return;
       try {
         const result = await flushRetainQueue(retainQueuePath(runtime.cwd, config), client, {
@@ -247,11 +278,17 @@ export function createMemoryLifecycle(initialCwd: string = process.cwd()): Memor
           maxElapsedMs: config.retain.shutdownFlushTimeoutMs,
           stopOnFirstFailure: true,
         });
+        if (result.remaining > 0) {
+          logHeadless(
+            `shutdown flush left ${result.remaining} retain job(s) queued on disk${result.errors.length ? `; last error: ${result.errors[result.errors.length - 1]}` : ""}`,
+          );
+        }
         await recordRetainDeliveries(runtime.cwd, config, result);
         if (result.deadLettered || result.remaining) {
           notify(runtime, formatFlushRetainQueueResult(result), "warning");
         }
       } catch (error) {
+        logHeadlessError("shutdown retain queue flush failed", error);
         notify(runtime, `Shutdown retain queue flush failed: ${redactError(error)}`, "warning");
         // Keep queue on disk for next run.
       }

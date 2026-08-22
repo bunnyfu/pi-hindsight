@@ -11,6 +11,7 @@ import { baseTags } from "../banks/banking.js";
 import { projectMessages } from "../utils/messages.js";
 import { redactError } from "../utils/sanitize.js";
 import { contextLabel, liveDocumentId, stableSessionId } from "../utils/session.js";
+import { logDebug, logHeadless } from "../utils/headless-log.js";
 import {
   enqueueRetain,
   enqueueRetainCoalesced,
@@ -113,7 +114,13 @@ export async function enqueueRetainFromAgentEnd(args: {
     messages: args.event.messages,
     ...(args.extraTags ? { extraTags: args.extraTags } : {}),
   });
-  if (!job) return { queued: false, sent: 0, remaining: 0 };
+  if (!job) {
+    logDebug("no retainable messages projected from agent_end; nothing enqueued");
+    return { queued: false, sent: 0, remaining: 0 };
+  }
+  logDebug(
+    `retain job built: ${job.bankId}/${job.documentId} (delivery=${args.config.retain.delivery}, async=${args.config.retain.async})`,
+  );
 
   // Coalesced delivery: merge this delta into any compatible pending job and defer the
   // remote flush to the session boundary (shutdown) / periodic flush. This collapses the
@@ -127,6 +134,14 @@ export async function enqueueRetainFromAgentEnd(args: {
 
   await enqueueRetain(args.cwd, args.config, job);
   const result = await flushRetain(args.cwd, args.config, args.client);
+  logDebug(
+    `retain flush: sent=${result.sent} remaining=${result.remaining} deadLettered=${result.deadLettered}`,
+  );
+  if (result.remaining > 0) {
+    logHeadless(
+      `retain delivery failed for ${job.documentId}; job requeued on disk (${result.remaining} pending)${result.errors.length ? `; last error: ${result.errors[result.errors.length - 1]}` : ""}`,
+    );
+  }
   await recordRetainDeliveries(args.cwd, args.config, result);
   let reflectError: string | undefined;
   if (args.config.retain.postRetainReflect) {

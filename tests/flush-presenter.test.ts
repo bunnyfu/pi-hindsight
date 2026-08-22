@@ -7,7 +7,7 @@ import {
 import type { FlushRetainQueueResult } from "../extensions/queue/queue.js";
 
 function result(overrides: Partial<FlushRetainQueueResult> = {}): FlushRetainQueueResult {
-  return { sent: 1, remaining: 0, deadLettered: 0, malformed: 0, ...overrides };
+  return { sent: 1, remaining: 0, deadLettered: 0, malformed: 0, errors: [], ...overrides };
 }
 
 describe("flush presenter", () => {
